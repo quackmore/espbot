@@ -7,13 +7,16 @@
  * ----------------------------------------------------------------------------
  */
 
+extern "C"
+{
 #include "c_types.h"
 #include "osapi.h"
 #include "user_interface.h"
 #include "mem.h"
 #include "spi_flash.h"
+}
 
-#include "spiffs_flash_functions.h"
+#include "spiffs_flash_functions.hpp"
 
 // flash read function (checkout SPIFFS documentation)
 s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)

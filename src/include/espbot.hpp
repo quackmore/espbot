@@ -9,19 +9,9 @@
 #ifndef __ESPBOT_HPP__
 #define __ESPBOT_HPP__
 
-#define P_FATAL(...) os_printf(__VA_ARGS__)
-#define P_ERROR(...) os_printf(__VA_ARGS__)
-#define P_WARN(...) os_printf(__VA_ARGS__)
-#define P_INFO(...) os_printf(__VA_ARGS__)
-#define P_DEBUG(...) os_printf(__VA_ARGS__)
-#define P_TRACE(...) os_printf(__VA_ARGS__)
-#define P_ALL(...) os_printf(__VA_ARGS__)
-
-
-// this function is the SDK callback system_init_done_cb
 extern "C"
 {
-  void espbot_init(void);
+#include "osapi.h"
 }
 
 #define SIG_STAMODE_GOT_IP 0
@@ -33,7 +23,7 @@ class Espbot
 private:
   char m_name[32];
   // espbot task
-  static const int QUEUE_LEN = 4;
+  static const int QUEUE_LEN = 8;
   os_event_t *m_queue;
   // heartbeat timer
   static const int HEARTBEAT_PERIOD = 60000;

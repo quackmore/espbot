@@ -21,7 +21,10 @@ extern "C"
 #include "espbot_release.h"
 }
 
+#include "espbot_global.hpp"
 #include "espbot.hpp"
+#include "esp8266_spiffs.hpp"
+#include "debug.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -40,7 +43,7 @@ static void ICACHE_FLASH_ATTR print_greetings(void)
     P_DEBUG("---------------------------------------------------\n");
 }
 
-static void ICACHE_FLASH_ATTR espbot_task(os_event_t *e)
+static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
 {
     switch (e->sig)
     {
@@ -66,25 +69,21 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
 
 void ICACHE_FLASH_ATTR Espbot::init(void)
 {
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
-
-    system_set_os_print(1); // enable log print
-
     // set default name
+    // check if a configuration file exists ...
     os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
+
 
     print_greetings();
 
     // setup the task
     m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
-    system_os_task(espbot_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
+    system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
 
     // start an heartbeat timer
     os_timer_disarm(&m_heartbeat);
     os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
     os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
-
-    // now start the wifi
 }
 
 uint32 ICACHE_FLASH_ATTR Espbot::get_chip_id(void)
@@ -116,24 +115,18 @@ void ICACHE_FLASH_ATTR Espbot::set_name(char *t_name)
 {
     os_memset(m_name, 0, 32);
     os_strncpy(m_name, t_name, 31);
+    // save configuration file in case ...
 }
 
-Espbot espbot;
-
-// dirty reference to esp8266_spiffs_test.cpp ...
-void run_tests(void);
-void run_tests_c(void);
+// make espbot_init available to user_main.c
+extern "C" void espbot_init(void);
 
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
+    espfs.init();
+    espdebug.init();
+    esplog.init();
     espbot.init();
 
-    // run some spiffs test
-    // start a 20 seconds timer for connecting a terminal to the serial port ...
-
-    os_timer_t wait_20_secs;
-    os_timer_disarm(&wait_20_secs);
-    os_timer_setfn(&wait_20_secs, (os_timer_func_t *)run_tests, NULL);
-    os_timer_arm(&wait_20_secs, 20000, 0);
-
+    // now start the wifi
 }

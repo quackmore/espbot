@@ -12,7 +12,7 @@
 // ESP8266 and SDK references
 extern "C"
 {
-#include "spiffs_flash_functions.h"
+#include "spiffs_flash_functions.hpp"
 #include "spiffs.h"
 }
 
@@ -27,7 +27,7 @@ typedef enum
 } flashfs_status;
 
 // The file system class
-class flashfs
+class Flashfs
 {
 protected:
   u8_t m_work[LOG_PAGE_SIZE * 2]; // ram memory buffer being double the size of the logical page size
@@ -52,8 +52,8 @@ protected:
   flashfs_status status;
 
 public:
-  flashfs();
-  ~flashfs(){};
+  Flashfs();
+  ~Flashfs(){};
   void init(void);    // will mount the file system (eventually formatting it)
   void format(void);  // will clean everything, a new init is required after this
   void unmount(void); // thinking about a controlled reset of the target
@@ -82,20 +82,20 @@ typedef enum
 } flashfs_file_status;
 
 // the file class
-class ffile
+class Ffile
 {
 private:
-  flashfs *m_fs;
+  Flashfs *m_fs;
   spiffs_file m_fd;
   char m_name[32];
   flashfs_file_status status;
 
 public:
-  ffile(flashfs *);                       // not sure if really useful but just in case ...
-  ffile(flashfs *t_fs, char *t_filename); // will open 'filename' from filesytem t_fs
+  Ffile(Flashfs *);                       // not sure if really useful but just in case ...
+  Ffile(Flashfs *t_fs, char *t_filename); // will open 'filename' from filesytem t_fs
                                           // (or create if it does not exist)
                                           // ready for reading or writing (append)
-  ~ffile();                               // will close the file
+  ~Ffile();                               // will close the file
                                           // according to documentation closing a file
                                           // will flush the file cache
 
@@ -122,11 +122,11 @@ public:
 
 /*  EXAMPLE EXAMPLE EXAMPLE 
     ...
-    flashfs fs;
+    Flashfs fs;
     fs.init();
     if (fs.is_available)
     {
-      ffile cfg(&fs, "config.cfg"); // constructor will open or create the file
+      Ffile cfg(&fs, "config.cfg"); // constructor will open or create the file
       if (cfg.is_available())
       {
         cfg.n_append("this configuration",19);
