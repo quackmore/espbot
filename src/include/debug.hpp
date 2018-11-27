@@ -50,8 +50,8 @@ private:
   int m_serial_level;
   int m_file_level;
 
-  int get_saved_cfg(void);
-  int save_cfg(void);
+  int get_saved_cfg(void); // return 0 on success, otherwise 1
+  int save_cfg(void);      // return 0 on success, otherwise 1
 
 public:
   Logger(){};
@@ -60,7 +60,7 @@ public:
   void init();
   int get_serial_level(void);
   int get_file_level(void);
-  void set_levels(char t_serial_level,char t_file_level);
+  void set_levels(char t_serial_level, char t_file_level);
 
   void fatal(const char *, ...);
   void error(const char *, ...);

@@ -18,6 +18,7 @@ extern "C"
 extern "C"
 {
 #include "uart.h"
+#include "mem.h"
 #include "espbot_release.h"
 }
 
@@ -25,6 +26,7 @@ extern "C"
 #include "espbot.hpp"
 #include "esp8266_spiffs.hpp"
 #include "debug.hpp"
+#include "json.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -56,6 +58,9 @@ static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
     case SIG_SOFTAPMODE_STACONNECTED:
         // [wifi station+AP] station connected
         break;
+    case SIG_SOFTAPMODE_STADISCONNECTED:
+        // [wifi station+AP] station disconnected
+        break;
     default:
         break;
     }
@@ -70,11 +75,9 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
 void ICACHE_FLASH_ATTR Espbot::init(void)
 {
     // set default name
-    // check if a configuration file exists ...
     os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
-
-
-    print_greetings();
+    get_saved_cfg();
+    esplog.info("espbot name set to %s",get_name());
 
     // setup the task
     m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
@@ -84,6 +87,8 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     os_timer_disarm(&m_heartbeat);
     os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
     os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
+
+    esplog.info("Espbot::init complete\n");
 }
 
 uint32 ICACHE_FLASH_ATTR Espbot::get_chip_id(void)
@@ -111,11 +116,22 @@ char ICACHE_FLASH_ATTR *Espbot::get_name(void)
     return m_name;
 }
 
-void ICACHE_FLASH_ATTR Espbot::set_name(char *t_name)
+void ICACHE_FLASH_ATTR Espbot::set_name(char *t_name, int t_len)
 {
-    os_memset(m_name, 0, 32);
-    os_strncpy(m_name, t_name, 31);
-    // save configuration file in case ...
+    if (os_strncmp(m_name, t_name, t_len) != 0)
+    {
+        os_memset(m_name, 0, 32);
+        if (t_len > 31)
+        {
+            esplog.warn("Espbot::set_name: truncating name to 31 characters\n");
+            os_strncpy(m_name, t_name, 31);
+        }
+        else
+        {
+            os_strncpy(m_name, t_name, t_len);
+        }
+        save_cfg();
+    }
 }
 
 // make espbot_init available to user_main.c
@@ -123,10 +139,113 @@ extern "C" void espbot_init(void);
 
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    system_set_os_print(1); // enable log print
+    print_greetings();
+
     espfs.init();
     espdebug.init();
     esplog.init();
     espbot.init();
 
-    // now start the wifi
+    espwifi.init();
+}
+
+int ICACHE_FLASH_ATTR Espbot::get_saved_cfg(void)
+{
+    if (espfs.is_available())
+    {
+        if (!Ffile::exists("espbot.cfg"))
+        {
+            os_printf("[INFO]: Espbot::get_saved_cfg - no cfg file found\n");
+            return 1;
+        }
+        Ffile cfgfile(&espfs, "espbot.cfg");
+        if (cfgfile.is_available())
+        {
+            char *buffer = (char *)os_zalloc(64);
+            if (buffer)
+            {
+                int buf_len = cfgfile.n_read(buffer, 64);
+                Json_str cfg_str(buffer, os_strlen(buffer));
+                if (cfg_str.syntax_check() == JSON_SINTAX_OK)
+                {
+                    int cfg_param_checked = 0;
+                    while (cfg_str.find_next_pair() == JSON_NEW_PAIR_FOUND)
+                    {
+                        if (os_strncmp(cfg_str.get_cur_pair_string(), "name", cfg_str.get_cur_pair_string_len()) == 0)
+                        {
+                            if (cfg_str.get_cur_pair_value_type() == JSON_STRING)
+                            {
+                                set_name(cfg_str.get_cur_pair_value(), cfg_str.get_cur_pair_value_len());
+                                cfg_param_checked++;
+                            }
+                        }
+                    }
+                    if (cfg_param_checked != 1) // found the wrong number of parameters
+                    {
+                        os_printf("[ERROR]: Espbot::get_saved_cfg - available configuration is incomplete\n");
+                        return 1;
+                    }
+                }
+                else
+                {
+                    os_printf("[ERROR]: Espbot::get_saved_cfg - cannot parse json string\n");
+                    return 1;
+                }
+            }
+            else
+            {
+                os_printf("[ERROR]: Espbot::get_saved_cfg - Not enough heap space\n");
+                return 1;
+            }
+            os_free(buffer);
+        }
+        else
+        {
+            os_printf("[ERROR]: Espbot::get_saved_cfg - cannot open espbot.cfg\n");
+            return 1;
+        }
+    }
+    else
+    {
+        os_printf("[ERROR]: Espbot::get_saved_cfg - file system is not available\n");
+        return 1;
+    }
+    return 0;
+}
+
+int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
+{
+    if (espfs.is_available())
+    {
+        Ffile cfgfile(&espfs, "espbot.cfg");
+        if (cfgfile.is_available())
+        {
+            cfgfile.clear();
+            char *buffer = (char *)os_zalloc(64);
+            if (buffer)
+            {
+                os_sprintf(buffer, "{\"name\": %s}", m_name);
+                cfgfile.n_append(buffer, os_strlen(buffer));
+            }
+            else
+            {
+                esplog.error("Espbot::save_cfg - not enough heap memory available\n");
+                return 1;
+            }
+            os_free(buffer);
+        }
+        else
+        {
+            esplog.error("Espbot::save_cfg - cannot open espbot.cfg\n");
+            return 1;
+        }
+    }
+    else
+    {
+        esplog.error("Espbot::save_cfg - file system not available\n");
+        return 1;
+    }
+    return 0;
 }

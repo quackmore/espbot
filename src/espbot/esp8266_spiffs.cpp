@@ -87,7 +87,7 @@ void ICACHE_FLASH_ATTR Flashfs::init(void)
             return;
         }
     }
-    P_TRACE("[TRACE]: File system mounted.\n");
+    P_INFO("[INFO]: File system mounted.\n");
     status = FFS_AVAILABLE;
     u32_t total = 0;
     u32_t used = 0;
@@ -491,4 +491,25 @@ void ICACHE_FLASH_ATTR Ffile::flush_cache()
         status = FFS_F_UNAVAILABLE;
         P_ERROR("[ERROR]: flushing cache on a not available file system\n");
     }
+}
+
+bool ICACHE_FLASH_ATTR Ffile::exists(char *t_name)
+{
+    spiffs_DIR directory;
+    struct spiffs_dirent tmp_file;
+    struct spiffs_dirent *file_ptr;
+
+    if (espfs.is_available())
+    {
+        SPIFFS_opendir(espfs.get_handler(), "/", &directory);
+        while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
+        {
+            if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))
+            {
+                return true;
+            }
+        }
+        SPIFFS_closedir(&directory);
+    }
+    return false;
 }

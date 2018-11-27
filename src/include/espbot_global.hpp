@@ -13,10 +13,12 @@
 #include "espbot.hpp"
 #include "esp8266_spiffs.hpp"
 #include "debug.hpp"
+#include "wifi.hpp"
 
 extern Flashfs espfs;
 extern Dbggr espdebug;
 extern Logger esplog;
 extern Espbot espbot;
+extern Wifi espwifi;
 
 #endif

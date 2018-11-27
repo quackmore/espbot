@@ -14,4 +14,5 @@ Flashfs espfs;
 Dbggr espdebug;
 Logger esplog;
 Espbot espbot;
+Wifi espwifi;
 

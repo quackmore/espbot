@@ -41,13 +41,13 @@
 // debug macros
 #include "espbot_global.hpp"
 #include "debug.hpp"
-#define P_FATAL(...) esplog.fatal(__VA_ARGS__)
-#define P_ERROR(...) esplog.error(__VA_ARGS__)
-#define P_WARN(...) esplog.warn(__VA_ARGS__)
-#define P_INFO(...) esplog.info(__VA_ARGS__)
-#define P_DEBUG(...) esplog.debug(__VA_ARGS__)
-#define P_TRACE(...) esplog.trace(__VA_ARGS__)
-#define P_ALL(...) esplog.all(__VA_ARGS__)
+#define P_FATAL(...) os_printf(__VA_ARGS__)
+#define P_ERROR(...) os_printf(__VA_ARGS__)
+#define P_WARN(...) os_printf(__VA_ARGS__)
+#define P_INFO(...) os_printf(__VA_ARGS__)
+#define P_DEBUG(...) os_printf(__VA_ARGS__)
+#define P_TRACE(...) os_printf(__VA_ARGS__)
+#define P_ALL(...) os_printf(__VA_ARGS__)
 /*
 #define SPIFFS_DEBUG (1)
 #if SPIFFS_DEBUG

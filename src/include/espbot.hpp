@@ -17,6 +17,7 @@ extern "C"
 #define SIG_STAMODE_GOT_IP 0
 #define SIG_STAMODE_DISCONNECTED 1
 #define SIG_SOFTAPMODE_STACONNECTED 2
+#define SIG_SOFTAPMODE_STADISCONNECTED 3
 
 class Espbot
 {
@@ -29,6 +30,9 @@ private:
   static const int HEARTBEAT_PERIOD = 60000;
   os_timer_t m_heartbeat;
 
+  int get_saved_cfg(void); // return 0 on success, otherwise 1
+  int save_cfg(void);      // return 0 on success, otherwise 1
+
 protected:
 public:
   Espbot(){};
@@ -39,7 +43,7 @@ public:
   const char *get_sdk_version(void);
   char *get_version(void);
   char *get_name(void);
-  void set_name(char *);
+  void set_name(char *,int); // requires string and string length
 };
 
 #endif

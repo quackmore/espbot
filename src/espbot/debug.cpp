@@ -33,7 +33,9 @@ extern "C"
 void ICACHE_FLASH_ATTR Dbggr::init(void)
 {
     m_min_heap_size = 65535;
+    os_printf("[INFO]: Dbggr::init complete\n");
 }
+
 void ICACHE_FLASH_ATTR Dbggr::check_heap_size(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
@@ -55,10 +57,14 @@ int ICACHE_FLASH_ATTR Logger::get_saved_cfg(void)
 {
     if (espfs.is_available())
     {
+        if (!Ffile::exists("logger.cfg"))
+        {
+            os_printf("[INFO]: Logger::get_saved_cfg - no cfg file found\n");
+            return 1;
+        }
         Ffile cfgfile(&espfs, "logger.cfg");
         if (cfgfile.is_available())
         {
-            os_printf("Available heap: %d\n", system_get_free_heap_size());
             char *buffer = (char *)os_zalloc(DEBUG_CFG_FILE_SIZE);
             if (buffer)
             {
@@ -100,32 +106,35 @@ int ICACHE_FLASH_ATTR Logger::get_saved_cfg(void)
                             }
                         }
                     }
-                    if (cfg_param_checked == 2) // found the correct number of parameters
-                        return 1;
+                    if (cfg_param_checked != 2) // found the wrong number of parameters
                     {
                         os_printf("[ERROR]: Logger::get_saved_cfg - available configuration is incomplete\n");
+                        return 1;
                     }
                 }
                 else
                 {
                     os_printf("[ERROR]: Logger::get_saved_cfg - cannot parse json string\n");
+                    return 1;
                 }
             }
             else
             {
-                os_printf("[ERROR]: Logger::get_saved_cfg - Not enough available heap\n");
+                os_printf("[ERROR]: Logger::get_saved_cfg - Not enough heap space\n");
+                return 1;
             }
             os_free(buffer);
-            os_printf("Available heap: %d\n", system_get_free_heap_size());
         }
         else
         {
-            os_printf("[INFO]: Logger::get_saved_cfg - no configuration available\n");
+            os_printf("[ERROR]: Logger::get_saved_cfg - cannot open logger.cfg\n");
+            return 1;
         }
     }
     else
     {
         os_printf("[ERROR]: Logger::get_saved_cfg - file system is not available\n");
+        return 1;
     }
     return 0;
 }
@@ -147,23 +156,27 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
             else
             {
                 esplog.error("Logger::save_cfg - not enough heap memory available\n");
+                return 1;
             }
             os_free(buffer);
         }
         else
         {
             esplog.error("Logger::save_cfg - cannot open logger.cfg\n");
+            return 1;
         }
     }
     else
     {
         esplog.error("Logger::save_cfg - file system not available\n");
+        return 1;
     }
+    return 0;
 }
 
 void ICACHE_FLASH_ATTR Logger::init(void)
 {
-    if (!get_saved_cfg())
+    if (get_saved_cfg())
     {
         os_printf("[INFO]: Logger::init - starting with default configuration\n");
         m_serial_level = LOG_INFO;
