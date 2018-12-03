@@ -2,10 +2,12 @@
 
 # Summary
 
-empty structure for esp8266 apps (C++)
-SPIFFS
-WIFI
-WEBSERVER with APIs
+Empty structure for esp8266 apps (NON-OS SDK and C++).
+
+Features:
++ SPIFFS
++ WIFI
++ WEBSERVER with APIs
 
 more to come ... (mDns, OTA)
 
