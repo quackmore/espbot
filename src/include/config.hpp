@@ -6,21 +6,25 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __ESPBOT_GLOBAL_HPP__
-#define __ESPBOT_GLOBAL_HPP__
+#ifndef __CONFIG_HPP__
+#define __CONFIG_HPP__
 
+class File_to_json
+{
+private:
+  char *m_filename;
+  char *m_cache;
+  char *m_value_str;
+  int m_value_len;
 
-#include "espbot.hpp"
-#include "esp8266_spiffs.hpp"
-#include "debug.hpp"
-#include "wifi.hpp"
-#include "webserver.hpp"
-
-extern Flashfs espfs;
-extern Dbggr espdebug;
-extern Logger esplog;
-extern Espbot espbot;
-extern Wifi espwifi;
-extern Websvr espwebsvr;
+public:
+  File_to_json(char *); // require filename
+  ~File_to_json();
+  bool exists(void);
+  int find_string(char *); // require string name of a json pair
+                                // return 0 on success !=0 on fail
+  char *get_value(void);
+  int get_value_len(void);
+};
 
 #endif

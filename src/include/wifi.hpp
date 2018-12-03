@@ -28,13 +28,22 @@ private:
   char m_station_ssid[32];
   char m_station_pwd[64];
 
+  scan_config *m_scan_config;
+  bool m_scan_completed;
+  struct bss_info *m_ap_list;
+
   bool m_timeout_timer_active;
   os_timer_t m_station_connect_timeout;
   os_timer_t m_wait_before_reconnect;
 
-  static void switch_to_stationap(void); // static because called by timer exhaustion (pointer required)
+  static void switch_to_stationap(void);                // static because called by timer exhaustion (pointer required)
+  static void scan_completed(void *arg, STATUS status); // static because used as a callback
 
-  int get_station_saved_cfg(void); // return 0 on success, otherwise 1
+  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
+  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+                                  // return CFG_REQUIRES_UPDATE when cfg require update
+                                  // return CFG_ERROR otherwise
+
 
 public:
   Wifi(){};
@@ -59,8 +68,14 @@ public:
   void station_set_pwd(char *t_str, int t_len);  // won't save configuraion to flash
   char *station_get_ssid(void);
   char *station_get_password(void);
-  int save_station_cfg(void); // return 0 on success, otherwise 1
-  static void connect(void);  // static because called by timer exhaustion (pointer required)
+  int save_cfg(void); // return 0 on success, otherwise 1
+
+  static void connect(void); // static because called by timer exhaustion (pointer required)
+
+  void scan_for_ap(void);           // start a new AP scan
+  bool scan_for_ap_completed(void); // return true if AP scan was completed
+  int get_ap_count(void);           // return the number of APs found
+  char *get_ap_name(int);           // return the name of AP number xx (from 0 to (ap_count-1))
 };
 
 #endif

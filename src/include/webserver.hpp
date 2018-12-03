@@ -6,21 +6,31 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __ESPBOT_GLOBAL_HPP__
-#define __ESPBOT_GLOBAL_HPP__
+
+#ifndef __WEBSERVER_HPP__
+#define __WEBSERVER_HPP__
+
+extern "C"
+{
+#include "c_types.h"
+#include "espconn.h"
+}
+
+#define SERVER_PORT 80
+
+class Websvr
+{
+private:
+ struct espconn esp_conn;
+ esp_tcp esptcp;
 
 
-#include "espbot.hpp"
-#include "esp8266_spiffs.hpp"
-#include "debug.hpp"
-#include "wifi.hpp"
-#include "webserver.hpp"
+public:
+  Websvr(){};
+  ~Websvr(){};
 
-extern Flashfs espfs;
-extern Dbggr espdebug;
-extern Logger esplog;
-extern Espbot espbot;
-extern Wifi espwifi;
-extern Websvr espwebsvr;
+  void start(uint32); // port
+  void stop(void);
+};
 
 #endif

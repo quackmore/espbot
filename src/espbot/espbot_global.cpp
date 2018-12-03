@@ -15,4 +15,5 @@ Dbggr espdebug;
 Logger esplog;
 Espbot espbot;
 Wifi espwifi;
+Websvr espwebsvr;
 

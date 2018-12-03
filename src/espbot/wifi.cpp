@@ -21,6 +21,7 @@ extern "C"
 #include "debug.hpp"
 #include "json.hpp"
 #include "espbot_utils.hpp"
+#include "config.hpp"
 
 bool ICACHE_FLASH_ATTR Wifi::is_timeout_timer_active(void)
 {
@@ -93,7 +94,7 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, '0'); // informing everybody of
                                                                    // successfully connection to AP
         // time to update flash configuration for (eventually) saving ssid and password
-        espwifi.save_station_cfg();
+        espwifi.save_cfg();
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
         esplog.info("station: " MACSTR " join, AID = %d\n",
@@ -110,7 +111,7 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
                                                                                // a station disconnected from ESP8266
         break;
     case EVENT_SOFTAPMODE_PROBEREQRECVED:
-        esplog.info("softAP received a probe request\n");
+        esplog.debug("softAP received a probe request\n");
         break;
     case EVENT_OPMODE_CHANGED:
         switch (wifi_get_opmode())
@@ -221,12 +222,16 @@ void ICACHE_FLASH_ATTR Wifi::init()
     m_ap_config.max_connection = 4;                              // uint8 max_connection;
     m_ap_config.beacon_interval = 100;                           // uint16 beacon_interval;
 
-    if (get_station_saved_cfg()) // something went wrong while loading flash config
+    if (restore_cfg() != CFG_OK) // something went wrong while loading flash config
     {
         esplog.info("Wifi::init setting null station config\n");
         os_memset(m_station_ssid, 0, 32);
         os_memset(m_station_pwd, 0, 32);
     }
+
+    m_scan_config = NULL; // will scan for all AP with no filter on channel or ssid
+    m_ap_list = NULL;
+    m_scan_completed = false;
 
     m_timeout_timer_active = false;
 
@@ -255,79 +260,66 @@ char ICACHE_FLASH_ATTR *Wifi::station_get_password(void)
     return m_station_pwd;
 }
 
-int ICACHE_FLASH_ATTR Wifi::get_station_saved_cfg(void)
+int ICACHE_FLASH_ATTR Wifi::restore_cfg(void)
 {
-    if (espfs.is_available())
+    File_to_json cfgfile("wifi.cfg");
+    if (cfgfile.exists())
     {
-        if (!Ffile::exists("wifi.cfg"))
+        if (cfgfile.find_string("station_ssid"))
         {
-            esplog.info("Wifi::get_station_saved_cfg - no cfg file found\n");
-            return 1;
+            esplog.error("Wifi::restore_cfg - available configuration is incomplete\n");
+            return CFG_ERROR;
         }
-        Ffile cfgfile(&espfs, "wifi.cfg");
-        if (cfgfile.is_available())
+        os_memset(m_station_ssid, 0, 32);
+        os_strncpy(m_station_ssid, cfgfile.get_value(), 31);
+        if (cfgfile.find_string("station_pwd"))
         {
-            os_printf("Available heap: %d\n", system_get_free_heap_size());
-            char *buffer = (char *)os_zalloc(200);
-            if (buffer)
-            {
-                int buf_len = cfgfile.n_read(buffer, 200);
-                Json_str cfg_str(buffer, os_strlen(buffer));
-                if (cfg_str.syntax_check() == JSON_SINTAX_OK)
-                {
-                    int cfg_param_checked = 0;
-                    while (cfg_str.find_next_pair() == JSON_NEW_PAIR_FOUND)
-                    {
-                        if (os_strncmp(cfg_str.get_cur_pair_string(), "station_ssid", cfg_str.get_cur_pair_string_len()) == 0)
-                        {
-                            if (cfg_str.get_cur_pair_value_type() == JSON_STRING)
-                            {
-                                station_set_ssid(cfg_str.get_cur_pair_value(), cfg_str.get_cur_pair_value_len());
-                                cfg_param_checked++;
-                            }
-                        }
-                        if (os_strncmp(cfg_str.get_cur_pair_string(), "station_pwd", cfg_str.get_cur_pair_string_len()) == 0)
-                        {
-                            if (cfg_str.get_cur_pair_value_type() == JSON_STRING)
-                            {
-                                station_set_pwd(cfg_str.get_cur_pair_value(), cfg_str.get_cur_pair_value_len());
-                                cfg_param_checked++;
-                            }
-                        }
-                    }
-                    if (cfg_param_checked != 2) // found the wrong number of parameters
-                    {
-                        esplog.error("Wifi::get_station_saved_cfg - available configuration is incomplete\n");
-                        return 1;
-                    }
-                }
-                else
-                {
-                    esplog.error("Wifi::get_station_saved_cfg - cannot parse json string\n");
-                    return 1;
-                }
-            }
-            else
-            {
-                esplog.error("Wifi::get_station_saved_cfg - not enough heap memory available\n");
-                return 1;
-            }
+            esplog.error("Wifi::restore_cfg - available configuration is incomplete\n");
+            return CFG_ERROR;
         }
-        else
-        {
-            esplog.error("Wifi::get_station_saved_cfg - cannot open wifi.cfg\n");
-            return 1;
-        }
+        os_memset(m_station_pwd, 0, 64);
+        os_strncpy(m_station_pwd, cfgfile.get_value(), 63);
+        return CFG_OK;
     }
     else
     {
-        esplog.error("Wifi::get_station_saved_cfg - file system is not available\n");
-        return 1;
+        esplog.info("Wifi::restore_cfg - cfg file not found\n");
+        return CFG_ERROR;
     }
-    return 0;
 }
 
-int ICACHE_FLASH_ATTR Wifi::save_station_cfg(void)
+int ICACHE_FLASH_ATTR Wifi::saved_cfg_not_update(void)
+{
+    File_to_json cfgfile("wifi.cfg");
+    if (cfgfile.exists())
+    {
+        if (cfgfile.find_string("station_ssid"))
+        {
+            esplog.error("Wifi::saved_cfg_not_update - available configuration is incomplete\n");
+            return CFG_ERROR;
+        }
+        if (os_strcmp(m_station_ssid, cfgfile.get_value()))
+        {
+            return CFG_REQUIRES_UPDATE;
+        }
+        if (cfgfile.find_string("station_pwd"))
+        {
+            esplog.error("Wifi::saved_cfg_not_update - available configuration is incomplete\n");
+            return CFG_ERROR;
+        }
+        if (os_strcmp(m_station_pwd, cfgfile.get_value()))
+        {
+            return CFG_REQUIRES_UPDATE;
+        }
+        return CFG_OK;
+    }
+    else
+    {
+        return CFG_REQUIRES_UPDATE;
+    }
+}
+
+int ICACHE_FLASH_ATTR Wifi::save_cfg(void)
 {
     if (espfs.is_available())
     {
@@ -338,28 +330,28 @@ int ICACHE_FLASH_ATTR Wifi::save_station_cfg(void)
             char *buffer = (char *)os_zalloc(200);
             if (buffer)
             {
-                os_sprintf(buffer, "{\"station_ssid\": %s,\"station_pwd\": %s}", espwifi.m_station_ssid, espwifi.m_station_pwd);
+                os_sprintf(buffer, "{\"station_ssid\": \"%s\",\"station_pwd\": \"%s\"}", espwifi.m_station_ssid, espwifi.m_station_pwd);
                 cfgfile.n_append(buffer, os_strlen(buffer));
+                os_free(buffer);
             }
             else
             {
                 esplog.error("Wifi::save_cfg - not enough heap memory available\n");
-                return 1;
+                return CFG_ERROR;
             }
-            os_free(buffer);
         }
         else
         {
             esplog.error("Wifi::save_cfg - cannot open wifi.cfg\n");
-            return 1;
+            return CFG_ERROR;
         }
     }
     else
     {
         esplog.error("Wifi::save_cfg - file system not available\n");
-        return 1;
+        return CFG_ERROR;
     }
-    return 0;
+    return CFG_OK;
 }
 
 void ICACHE_FLASH_ATTR Wifi::station_set_ssid(char *t_str, int t_len)
@@ -388,4 +380,54 @@ void ICACHE_FLASH_ATTR Wifi::station_set_pwd(char *t_str, int t_len)
     {
         os_strncpy(m_station_pwd, t_str, t_len);
     }
+}
+
+void ICACHE_FLASH_ATTR Wifi::scan_for_ap(void)
+{
+    m_scan_completed = false;
+    wifi_station_scan(m_scan_config, (scan_done_cb_t)Wifi::scan_completed);
+}
+
+bool ICACHE_FLASH_ATTR Wifi::scan_for_ap_completed(void)
+{
+    return m_scan_completed;
+}
+
+void ICACHE_FLASH_ATTR Wifi::scan_completed(void *arg, STATUS status)
+{
+    esplog.trace("ap scan_completed\n");
+    // delete previuos results
+    espwifi.m_ap_list = NULL;
+    // now check results
+    if (status == OK)
+        espwifi.m_ap_list = (struct bss_info *)arg;
+    else
+        esplog.error("Wifi::scan_completed - cannot complete ap scan\n");
+    espwifi.m_scan_completed = true;
+}
+
+int ICACHE_FLASH_ATTR Wifi::get_ap_count(void)
+{
+    int cnt = 0;
+    struct bss_info *scan_list = m_ap_list;
+    while (scan_list != NULL)
+    {
+        cnt++;
+        scan_list = scan_list->next.stqe_next;
+    }
+    return cnt;
+}
+
+char ICACHE_FLASH_ATTR *Wifi::get_ap_name(int t_idx)
+{
+    int cnt = 0;
+    struct bss_info *scan_list = m_ap_list;
+    while (scan_list != NULL)
+    {
+        if (cnt == t_idx)
+            return (char *)scan_list->ssid;
+        cnt++;
+        scan_list = scan_list->next.stqe_next;
+    }
+    return NULL;
 }

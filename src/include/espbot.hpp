@@ -30,20 +30,24 @@ private:
   static const int HEARTBEAT_PERIOD = 60000;
   os_timer_t m_heartbeat;
 
-  int get_saved_cfg(void); // return 0 on success, otherwise 1
-  int save_cfg(void);      // return 0 on success, otherwise 1
+  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
+  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+                                  // return CFG_REQUIRES_UPDATE when cfg require update
+                                  // return CFG_ERROR otherwise
+  int save_cfg(void);             // return CFG_OK on success, otherwise CFG_ERROR
 
 protected:
 public:
   Espbot(){};
   ~Espbot(){};
   void init(void);
+  void reset(void);
   uint32 get_chip_id(void);
   uint8 get_boot_version(void);
   const char *get_sdk_version(void);
   char *get_version(void);
   char *get_name(void);
-  void set_name(char *,int); // requires string and string length
+  void set_name(char *); // requires string
 };
 
 #endif

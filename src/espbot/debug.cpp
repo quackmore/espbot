@@ -25,6 +25,7 @@ extern "C"
 #include "esp8266_spiffs.hpp"
 #include "espbot_utils.hpp"
 #include "json.hpp"
+#include "config.hpp"
 
 /*
  * DEBUGGER
@@ -53,94 +54,67 @@ uint32 ICACHE_FLASH_ATTR Dbggr::get_mim_heap_size(void)
 
 #define DEBUG_CFG_FILE_SIZE 128
 
-int ICACHE_FLASH_ATTR Logger::get_saved_cfg(void)
+int ICACHE_FLASH_ATTR Logger::restore_cfg(void)
 {
-    if (espfs.is_available())
+    File_to_json cfgfile("logger.cfg");
+    if (cfgfile.exists())
     {
-        if (!Ffile::exists("logger.cfg"))
+        if (cfgfile.find_string("serial_level"))
         {
-            os_printf("[INFO]: Logger::get_saved_cfg - no cfg file found\n");
-            return 1;
+            esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
+            return CFG_ERROR;
         }
-        Ffile cfgfile(&espfs, "logger.cfg");
-        if (cfgfile.is_available())
+        m_serial_level = atoi(cfgfile.get_value());
+        if (cfgfile.find_string("file_level"))
         {
-            char *buffer = (char *)os_zalloc(DEBUG_CFG_FILE_SIZE);
-            if (buffer)
-            {
-                int buf_len = cfgfile.n_read(buffer, 64);
-                Json_str cfg_str(buffer, os_strlen(buffer));
-                if (cfg_str.syntax_check() == JSON_SINTAX_OK)
-                {
-                    int cfg_param_checked = 0;
-                    while (cfg_str.find_next_pair() == JSON_NEW_PAIR_FOUND)
-                    {
-                        if (os_strncmp(cfg_str.get_cur_pair_string(), "serial_level", cfg_str.get_cur_pair_string_len()) == 0)
-                        {
-                            if (cfg_str.get_cur_pair_value_type() == JSON_INTEGER)
-                            {
-                                char *value = (char *)os_zalloc(cfg_str.get_cur_pair_value_len() + 1);
-                                if (value)
-                                {
-                                    os_strncpy(value, cfg_str.get_cur_pair_value(), cfg_str.get_cur_pair_value_len());
-                                    m_serial_level = atoi(value);
-                                    if (m_serial_level >= LOG_OFF && m_serial_level <= LOG_ALL)
-                                        cfg_param_checked++;
-                                }
-                                os_free(value);
-                            }
-                        }
-                        else if (os_strncmp(cfg_str.get_cur_pair_string(), "file_level", cfg_str.get_cur_pair_string_len()) == 0)
-                        {
-                            if (cfg_str.get_cur_pair_value_type() == JSON_INTEGER)
-                            {
-                                char *value = (char *)os_zalloc(cfg_str.get_cur_pair_value_len() + 1);
-                                if (value)
-                                {
-                                    os_strncpy(value, cfg_str.get_cur_pair_value(), cfg_str.get_cur_pair_value_len());
-                                    m_file_level = atoi(value);
-                                    if (m_file_level >= LOG_OFF && m_file_level <= LOG_ERROR)
-                                        cfg_param_checked++;
-                                }
-                                os_free(value);
-                            }
-                        }
-                    }
-                    if (cfg_param_checked != 2) // found the wrong number of parameters
-                    {
-                        os_printf("[ERROR]: Logger::get_saved_cfg - available configuration is incomplete\n");
-                        return 1;
-                    }
-                }
-                else
-                {
-                    os_printf("[ERROR]: Logger::get_saved_cfg - cannot parse json string\n");
-                    return 1;
-                }
-            }
-            else
-            {
-                os_printf("[ERROR]: Logger::get_saved_cfg - Not enough heap space\n");
-                return 1;
-            }
-            os_free(buffer);
+            esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
+            return CFG_ERROR;
         }
-        else
-        {
-            os_printf("[ERROR]: Logger::get_saved_cfg - cannot open logger.cfg\n");
-            return 1;
-        }
+        m_file_level = atoi(cfgfile.get_value());
+        return CFG_OK;
     }
     else
     {
-        os_printf("[ERROR]: Logger::get_saved_cfg - file system is not available\n");
-        return 1;
+        esplog.info("Logger::restore_cfg - cfg file not found\n");
+        return CFG_ERROR;
     }
-    return 0;
+}
+
+int ICACHE_FLASH_ATTR Logger::saved_cfg_not_update(void)
+{
+    File_to_json cfgfile("logger.cfg");
+    if (cfgfile.exists())
+    {
+        if (cfgfile.find_string("serial_level"))
+        {
+            esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
+            return CFG_ERROR;
+        }
+        if (m_serial_level != atoi(cfgfile.get_value()))
+        {
+            return CFG_REQUIRES_UPDATE;
+        }
+        if (cfgfile.find_string("file_level"))
+        {
+            esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
+            return CFG_ERROR;
+        }
+        if (m_file_level != atoi(cfgfile.get_value()))
+        {
+            return CFG_REQUIRES_UPDATE;
+        }
+        return CFG_OK;
+    }
+    else
+    {
+        return CFG_REQUIRES_UPDATE;
+    }
 }
 
 int ICACHE_FLASH_ATTR Logger::save_cfg(void)
 {
+    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+        return CFG_OK;
     if (espfs.is_available())
     {
         Ffile cfgfile(&espfs, "logger.cfg");
@@ -152,35 +126,35 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
             {
                 os_sprintf(buffer, "{\"serial_level\": %d,\"file_level\": %d}", m_serial_level, m_file_level);
                 cfgfile.n_append(buffer, os_strlen(buffer));
+                os_free(buffer);
             }
             else
             {
                 esplog.error("Logger::save_cfg - not enough heap memory available\n");
-                return 1;
+                return CFG_ERROR;
             }
-            os_free(buffer);
         }
         else
         {
             esplog.error("Logger::save_cfg - cannot open logger.cfg\n");
-            return 1;
+            return CFG_ERROR;
         }
     }
     else
     {
         esplog.error("Logger::save_cfg - file system not available\n");
-        return 1;
+        return CFG_ERROR;
     }
-    return 0;
+    return CFG_OK;
 }
 
 void ICACHE_FLASH_ATTR Logger::init(void)
 {
-    if (get_saved_cfg())
+    m_serial_level = LOG_INFO;
+    m_file_level = LOG_ERROR;
+    if (restore_cfg())
     {
-        os_printf("[INFO]: Logger::init - starting with default configuration\n");
-        m_serial_level = LOG_INFO;
-        m_file_level = LOG_ERROR;
+        esplog.info("Logger::init - starting with default configuration\n");
     }
 }
 

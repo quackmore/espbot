@@ -56,7 +56,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
     {
         if (*ptr == '{')
             break;
-        if (*ptr != ' ')
+        if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
             return (ptr - m_str);
         ptr++;
     }
@@ -69,7 +69,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
         {
             if (*ptr == '"')
                 break;
-            if (*ptr != ' ')
+            if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
                 return (ptr - m_str + 1);
             ptr++;
         }
@@ -99,7 +99,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
         {
             if (*ptr == ':')
                 break;
-            if (*ptr != ' ')
+            if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
                 return (ptr - m_str + 1);
             ptr++;
         }
@@ -120,7 +120,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
                 m_cur_pair_value_type = JSON_OBJECT;
                 break;
             }
-            if (*ptr != ' ')
+            if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
                 return (ptr - m_str + 1);
             ptr++;
         }
@@ -131,7 +131,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
             ptr++;
             while ((ptr - m_str) < m_str_len) // looking for number end
             {
-                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' '))
+                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == 'n'))
                     break;
                 if ((*ptr >= '0') && (*ptr <= '9'))
                 {
@@ -194,8 +194,9 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
                 another_pair_found = true;
                 break;
             }
-            if (*ptr != ' ')
+            if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
                 return (ptr - m_str + 1);
+            ptr++;
         }
         if ((ptr - m_str) == m_str_len)
             return (ptr - m_str + 1);
@@ -205,7 +206,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
     ptr++;
     while ((ptr - m_str) < m_str_len) // looking for end of string
     {
-        if (*ptr != ' ')
+        if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
             return (ptr - m_str + 1);
         ptr++;
     }
@@ -225,7 +226,7 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
         {
             if (*m_cursor == '{')
                 break;
-            if (*m_cursor != ' ')
+            if ((*m_cursor != ' ') && (*m_cursor != '\r') && (*m_cursor != '\n'))
                 return JSON_ERR;
             m_cursor++;
         }
@@ -237,7 +238,7 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
     {
         if (*m_cursor == '"')
             break;
-        if (*m_cursor != ' ')
+        if ((*m_cursor != ' ') && (*m_cursor != '\r') && (*m_cursor != '\n'))
             return JSON_ERR;
         m_cursor++;
     }
@@ -272,7 +273,7 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
     {
         if (*m_cursor == ':')
             break;
-        if (*m_cursor != ' ')
+        if ((*m_cursor != ' ') && (*m_cursor != '\r') && (*m_cursor != '\n'))
             return JSON_ERR;
         m_cursor++;
     }
@@ -298,7 +299,7 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
             m_cur_pair_value = m_cursor;
             break;
         }
-        if (*m_cursor != ' ')
+        if ((*m_cursor != ' ') && (*m_cursor != '\r') && (*m_cursor != '\n'))
             return JSON_ERR;
         m_cursor++;
     }
@@ -309,7 +310,7 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
         m_cursor++;
         while ((m_cursor - m_str) < m_str_len) // looking for number end
         {
-            if ((*m_cursor == ',') || (*m_cursor == '}') || (*m_cursor == ' '))
+            if ((*m_cursor == ',') || (*m_cursor == '}') || (*m_cursor == ' ') || (*m_cursor == '\r') || (*m_cursor == 'n'))
             {
                 m_cur_pair_value_len = (m_cursor - m_cur_pair_value);
                 break;
@@ -362,7 +363,7 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
     {
         if ((*m_cursor == '}') || (*m_cursor == ','))
             break;
-        if (*m_cursor != ' ')
+        if ((*m_cursor != ' ') && (*m_cursor != '\r') && (*m_cursor != '\n'))
             return JSON_ERR;
         m_cursor++;
     }

@@ -30,6 +30,9 @@ extern "C"
 #define DEBUG_MAX_SAVED_ERRORS 20
 #define DEBUG_MAX_FILE_SAVED_ERRORS 20
 
+#define CFG_OK 0
+#define CFG_REQUIRES_UPDATE 1
+#define CFG_ERROR 2
 class Dbggr
 {
 private:
@@ -50,8 +53,11 @@ private:
   int m_serial_level;
   int m_file_level;
 
-  int get_saved_cfg(void); // return 0 on success, otherwise 1
-  int save_cfg(void);      // return 0 on success, otherwise 1
+  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
+  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+                                  // return CFG_REQUIRES_UPDATE when cfg require update
+                                  // return CFG_ERROR otherwise
+  int save_cfg(void);             // return CFG_OK on success, otherwise CFG_ERROR
 
 public:
   Logger(){};

@@ -511,5 +511,34 @@ bool ICACHE_FLASH_ATTR Ffile::exists(char *t_name)
         }
         SPIFFS_closedir(&directory);
     }
+    else
+    {
+        P_ERROR("[ERROR]: checking if file exists on not available file system\n");
+    }
     return false;
+}
+
+int ICACHE_FLASH_ATTR Ffile::size(char *t_name)
+{
+    spiffs_DIR directory;
+    struct spiffs_dirent tmp_file;
+    struct spiffs_dirent *file_ptr;
+
+    if (espfs.is_available())
+    {
+        SPIFFS_opendir(espfs.get_handler(), "/", &directory);
+        while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
+        {
+            if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))
+            {
+                return file_ptr->size;
+            }
+        }
+        SPIFFS_closedir(&directory);
+    }
+    else
+    {
+        P_ERROR("[ERROR]: checking file size on not available file system\n");
+    }
+    return -1;
 }
