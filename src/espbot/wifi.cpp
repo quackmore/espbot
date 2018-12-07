@@ -230,6 +230,7 @@ void ICACHE_FLASH_ATTR Wifi::init()
     }
 
     m_scan_config = NULL; // will scan for all AP with no filter on channel or ssid
+    m_ap_count = 0;
     m_ap_list = NULL;
     m_scan_completed = false;
 
@@ -397,10 +398,33 @@ void ICACHE_FLASH_ATTR Wifi::scan_completed(void *arg, STATUS status)
 {
     esplog.trace("ap scan_completed\n");
     // delete previuos results
-    espwifi.m_ap_list = NULL;
+    espwifi.free_ap_list();
     // now check results
     if (status == OK)
-        espwifi.m_ap_list = (struct bss_info *)arg;
+    {
+        // start counting APs
+        struct bss_info *scan_list = (struct bss_info *)arg;
+        while (scan_list)
+        {
+            espwifi.m_ap_count++;
+            scan_list = scan_list->next.stqe_next;
+        }
+        // now store APs SSID
+        espwifi.m_ap_list = (char *)os_zalloc(33 * espwifi.m_ap_count);
+        if (espwifi.m_ap_list)
+        {
+            int idx = 0;
+            scan_list = (struct bss_info *)arg;
+            while (scan_list)
+            {
+                os_memcpy((espwifi.m_ap_list + (33 * idx)), (char *)scan_list->ssid, 32);
+                scan_list = scan_list->next.stqe_next;
+                idx++;
+            }
+        }
+        else
+            esplog.error("Wifi::scan_completed - not enough heap memory (%d)\n", 33 * espwifi.m_ap_count);
+    }
     else
         esplog.error("Wifi::scan_completed - cannot complete ap scan\n");
     espwifi.m_scan_completed = true;
@@ -408,26 +432,23 @@ void ICACHE_FLASH_ATTR Wifi::scan_completed(void *arg, STATUS status)
 
 int ICACHE_FLASH_ATTR Wifi::get_ap_count(void)
 {
-    int cnt = 0;
-    struct bss_info *scan_list = m_ap_list;
-    while (scan_list != NULL)
-    {
-        cnt++;
-        scan_list = scan_list->next.stqe_next;
-    }
-    return cnt;
+    return m_ap_count;
 }
 
 char ICACHE_FLASH_ATTR *Wifi::get_ap_name(int t_idx)
 {
-    int cnt = 0;
-    struct bss_info *scan_list = m_ap_list;
-    while (scan_list != NULL)
+    if (t_idx < m_ap_count)
+        return (m_ap_list + (33 * t_idx));
+    else
+        return "";
+}
+
+void ICACHE_FLASH_ATTR Wifi::free_ap_list(void)
+{
+    m_ap_count = 0;
+    if (m_ap_list)
     {
-        if (cnt == t_idx)
-            return (char *)scan_list->ssid;
-        cnt++;
-        scan_list = scan_list->next.stqe_next;
+        os_free(m_ap_list);
+        m_ap_list=NULL;
     }
-    return NULL;
 }

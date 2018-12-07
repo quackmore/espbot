@@ -37,11 +37,12 @@ void ICACHE_FLASH_ATTR Dbggr::init(void)
     os_printf("[INFO]: Dbggr::init complete\n");
 }
 
-void ICACHE_FLASH_ATTR Dbggr::check_heap_size(void)
+uint32 ICACHE_FLASH_ATTR Dbggr::check_heap_size(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
     if (m_min_heap_size > currentHeap)
         m_min_heap_size = currentHeap;
+    return currentHeap;
 }
 uint32 ICACHE_FLASH_ATTR Dbggr::get_mim_heap_size(void)
 {
@@ -59,18 +60,18 @@ int ICACHE_FLASH_ATTR Logger::restore_cfg(void)
     File_to_json cfgfile("logger.cfg");
     if (cfgfile.exists())
     {
-        if (cfgfile.find_string("serial_level"))
+        if (cfgfile.find_string("logger_serial_level"))
         {
             esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         m_serial_level = atoi(cfgfile.get_value());
-        if (cfgfile.find_string("file_level"))
+        if (cfgfile.find_string("logger_memory_level"))
         {
             esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
             return CFG_ERROR;
         }
-        m_file_level = atoi(cfgfile.get_value());
+        m_memory_level = atoi(cfgfile.get_value());
         return CFG_OK;
     }
     else
@@ -85,7 +86,7 @@ int ICACHE_FLASH_ATTR Logger::saved_cfg_not_update(void)
     File_to_json cfgfile("logger.cfg");
     if (cfgfile.exists())
     {
-        if (cfgfile.find_string("serial_level"))
+        if (cfgfile.find_string("logger_serial_level"))
         {
             esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
             return CFG_ERROR;
@@ -94,12 +95,12 @@ int ICACHE_FLASH_ATTR Logger::saved_cfg_not_update(void)
         {
             return CFG_REQUIRES_UPDATE;
         }
-        if (cfgfile.find_string("file_level"))
+        if (cfgfile.find_string("logger_memory_level"))
         {
             esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
             return CFG_ERROR;
         }
-        if (m_file_level != atoi(cfgfile.get_value()))
+        if (m_memory_level != atoi(cfgfile.get_value()))
         {
             return CFG_REQUIRES_UPDATE;
         }
@@ -121,16 +122,16 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)os_zalloc(DEBUG_CFG_FILE_SIZE);
+            char *buffer = (char *)os_zalloc(64);
             if (buffer)
             {
-                os_sprintf(buffer, "{\"serial_level\": %d,\"file_level\": %d}", m_serial_level, m_file_level);
+                os_sprintf(buffer, "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}", m_serial_level, m_memory_level);
                 cfgfile.n_append(buffer, os_strlen(buffer));
                 os_free(buffer);
             }
             else
             {
-                esplog.error("Logger::save_cfg - not enough heap memory available\n");
+                esplog.error("Logger::save_cfg - not enough heap memory available (%d)\n", 64);
                 return CFG_ERROR;
             }
         }
@@ -151,7 +152,7 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
 void ICACHE_FLASH_ATTR Logger::init(void)
 {
     m_serial_level = LOG_INFO;
-    m_file_level = LOG_ERROR;
+    m_memory_level = LOG_ERROR;
     if (restore_cfg())
     {
         esplog.info("Logger::init - starting with default configuration\n");
@@ -163,63 +164,93 @@ int ICACHE_FLASH_ATTR Logger::get_serial_level(void)
     return m_serial_level;
 }
 
-int ICACHE_FLASH_ATTR Logger::get_file_level(void)
+int ICACHE_FLASH_ATTR Logger::get_memory_level(void)
 {
-    return m_file_level;
+    return m_memory_level;
 }
 
-void ICACHE_FLASH_ATTR Logger::set_levels(char t_serial_level, char m_file_level)
+void ICACHE_FLASH_ATTR Logger::set_levels(char t_serial_level, char t_memory_level)
 {
-    if ((m_serial_level != t_serial_level) || (m_file_level != m_file_level))
+    if ((m_serial_level != t_serial_level) || (m_memory_level != t_memory_level))
     {
         m_serial_level = t_serial_level;
-        m_file_level = m_file_level;
+        m_memory_level = t_memory_level;
         save_cfg();
     }
 }
 
 void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_FATAL)
-        return;
-    else
+    if ((m_serial_level >= LOG_FATAL) || (m_memory_level >= LOG_FATAL))
     {
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
-        os_printf_plus("[FATAL] %s", buffer);
+        if (m_serial_level >= LOG_FATAL)
+            os_printf_plus("[FATAL] %s", buffer);
+        if (m_memory_level >= LOG_FATAL)
+        {
+            char *json_ptr = (char *)os_zalloc(36 + os_strlen(buffer));
+            if (json_ptr)
+            {
+                os_sprintf(json_ptr,
+                           "{\"time\": %d,\"msg\":\"[FATAL] %s\"}",
+                           system_get_time(), buffer);
+                esp_last_errors.push_back(json_ptr, true);
+            }
+        }
     }
 }
 
 void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_ERROR)
-        return;
-    else
+    if ((m_serial_level >= LOG_ERROR) || (m_memory_level >= LOG_ERROR))
     {
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
-        os_printf_plus("[ERROR] %s", buffer);
+        if (m_serial_level >= LOG_ERROR)
+            os_printf_plus("[ERROR] %s", buffer);
+        if (m_memory_level >= LOG_ERROR)
+        {
+            char *json_ptr = (char *)os_zalloc(36 + os_strlen(buffer));
+            if (json_ptr)
+            {
+                os_sprintf(json_ptr,
+                           "{\"time\": %d,\"msg\":\"[ERROR] %s\"}",
+                           system_get_time(), buffer);
+                esp_last_errors.push_back(json_ptr, true);
+            }
+        }
     }
 }
 
 void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_WARN)
-        return;
-    else
+    if ((m_serial_level >= LOG_WARN) || (m_memory_level >= LOG_WARN))
     {
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
-        os_printf_plus("[WARN] %s", buffer);
+        if (m_serial_level >= LOG_WARN)
+            os_printf_plus("[WARN] %s", buffer);
+        if (m_memory_level >= LOG_WARN)
+        {
+            char *json_ptr = (char *)os_zalloc(36 + os_strlen(buffer));
+            if (json_ptr)
+            {
+                os_sprintf(json_ptr,
+                           "{\"time\": %d,\"msg\":\"[WARN] %s\"}",
+                           system_get_time(), buffer);
+                esp_last_errors.push_back(json_ptr, true);
+            }
+        }
     }
 }
 
@@ -232,7 +263,7 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
         os_printf_plus("[INFO] %s", buffer);
     }
@@ -247,7 +278,7 @@ void ICACHE_FLASH_ATTR Logger::debug(const char *t_format, ...)
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
         os_printf_plus("[DEBUG] %s", buffer);
     }
@@ -262,7 +293,7 @@ void ICACHE_FLASH_ATTR Logger::trace(const char *t_format, ...)
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
         os_printf_plus("[TRACE] %s", buffer);
     }
@@ -277,7 +308,7 @@ void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, 256, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
         os_printf_plus("[ALL] %s", buffer);
     }

@@ -24,18 +24,49 @@ extern "C"
 #include "espbot_utils.hpp"
 
 // HTTP status codes
-#define HTTP_OK "200 OK"
-#define HTTP_BAD_REQUEST "400 Bad Request"
-#define HTTP_UNAUTHORIZED "401 Unauthorized"
-#define HTTP_FORBIDDEN "403 Forbidden"
-#define HTTP_NOT_FOUND "404 Not Found"
-#define HTTP_SERVER_ERROR "500 Internal Server Error"
+#define HTTP_OK 200
+#define HTTP_CREATED 201
+#define HTTP_ACCEPTED 202
+#define HTTP_BAD_REQUEST 400
+#define HTTP_UNAUTHORIZED 401
+#define HTTP_FORBIDDEN 403
+#define HTTP_NOT_FOUND 404
+#define HTTP_SERVER_ERROR 500
 
-#define HTTP_ERROR_MSG "400 [Bad Request]\nI'm sorry, my responses are limited. You must ask the right question."
-#define HTTP_NO_MSG "\0"
+static char ICACHE_FLASH_ATTR *error_msg(int code)
+{
+    switch (code)
+    {
+    case HTTP_OK:
+        return "OK";
+    case HTTP_BAD_REQUEST:
+        return "Bad Request";
+    case HTTP_UNAUTHORIZED:
+        return "Unauthorized";
+    case HTTP_FORBIDDEN:
+        return "Forbidden";
+    case HTTP_NOT_FOUND:
+        return "Not Found";
+    case HTTP_SERVER_ERROR:
+        return "Internal Server Error";
+    default:
+        return "";
+    }
+}
 
-// data structures for sending data and
-// make sure espconn_send is called after espconn_sent_callback of the previous packet.
+#define HTTP_CONTENT_TEXT "text/html"
+#define HTTP_CONTENT_JSON "application/json"
+
+//
+// HTTP responding:
+// ----------------
+// to make sure espconn_send is called after espconn_sent_callback of the previous packet
+// a flag is set before calling espconn_send (will be reset by sendcb)
+//
+// befor sending a response the flag will be checked
+// when the flag is found set (espconn_send not done yet)
+// a timer will used for postponing response
+//
 
 #define DATA_SENT_TIMER_PERIOD 500
 static char *send_buffer;
@@ -45,17 +76,18 @@ static bool esp_busy_sending_data = false;
 struct svr_response
 {
     struct espconn *p_espconn;
-    char *code;
+    int code;
+    char *content_type;
     char *msg;
-    bool free_the_buffer;
+    bool free_msg;
 };
 
-static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, char *code, char *msg, bool free_the_buffer);
+static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg);
 
 static void ICACHE_FLASH_ATTR webserver_pending_response(void *arg)
 {
     struct svr_response *response_data = (struct svr_response *)arg;
-    response(response_data->p_espconn, response_data->code, response_data->msg, response_data->free_the_buffer);
+    response(response_data->p_espconn, response_data->code, response_data->content_type, response_data->msg, response_data->free_msg);
     os_free(response_data);
 }
 
@@ -67,13 +99,14 @@ static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
         os_free(send_buffer);
 }
 
-static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, char *code, char *msg, bool free_the_buffer)
+static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg)
 {
     esplog.trace("response: *p_espconn: %X\n"
-                 "                code: %s\n"
+                 "                code: %d\n"
+                 "        content-type: %s\n"
                  "                 msg: %s\n"
-                 "     free_the_buffer: %d\n",
-                 p_espconn, code, msg, free_the_buffer);
+                 "            free_msg: %d\n",
+                 p_espconn, code, content_type, msg, free_msg);
     if (esp_busy_sending_data) // previous espconn_send not completed yet
     {
         esplog.info("Websvr::response - previous espconn_send not completed yet\n");
@@ -82,8 +115,9 @@ static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, char *code, ch
         {
             response_data->p_espconn = p_espconn;
             response_data->code = code;
+            response_data->content_type = content_type;
             response_data->msg = msg;
-            response_data->free_the_buffer = free_the_buffer;
+            response_data->free_msg = free_msg;
             os_timer_setfn(&websvr_wait_for_data_sent, (os_timer_func_t *)webserver_pending_response, (void *)response_data);
             os_timer_arm(&websvr_wait_for_data_sent, DATA_SENT_TIMER_PERIOD, 0);
         }
@@ -95,21 +129,39 @@ static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, char *code, ch
     else // previous espconn_send completed
     {
         esp_busy_sending_data = true;
-        send_buffer = (char *)os_zalloc(170 + // header length
-                                        25 +  // HTTP code + length
-                                        os_strlen(msg));
-
+        if (code >= HTTP_BAD_REQUEST) // format error msg as json
+        {
+            char *err_msg = (char *)os_zalloc(79 + os_strlen(msg));
+            if (err_msg)
+            {
+                os_sprintf(err_msg,
+                           "{\"error\":{\"code\": %d,\"message\": \"%s\",\"reason\": \"%s\"}}",
+                           code, error_msg(code), msg);
+                // replace original msg with the formatted one
+                if (free_msg)
+                    os_free(msg);
+                msg = err_msg;
+                free_msg = true;
+            }
+            else
+            {
+                esplog.error("websvr::response: not enough heap memory (%d)\n", (171 + 25 + os_strlen(msg)));
+                // there will be no response so clear the flag
+                esp_busy_sending_data = false;
+                return;
+            }
+        }
+        send_buffer = (char *)os_zalloc(184 + os_strlen(msg)); // header + code + max error msg + max content type + content len
         if (send_buffer)
         {
-            os_sprintf(send_buffer, "HTTP/1.0 %s\r\n"
+            os_sprintf(send_buffer, "HTTP/1.0 %d %s\r\n"
                                     "Server: espbot/1.0.0\r\n"
-                                    "Content-Type: text/html; charset=utf-8\r\n"
+                                    "Content-Type: %s\r\n"
                                     "Content-Length: %d\r\n"
                                     "Date: Wed, 28 Nov 2018 12:00:00 GMT\r\n"
-                                    //                           "Connection: keep-alive\n"
                                     "Pragma: no-cache\r\n\r\n%s",
-                       code, os_strlen(msg), msg);
-            if (free_the_buffer)
+                       code, error_msg(code), content_type, os_strlen(msg), msg);
+            if (free_msg)
                 os_free(msg); // free the msg buffer now that it has been used
             sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, os_strlen(send_buffer));
             if (res)
@@ -122,9 +174,110 @@ static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, char *code, ch
             // os_free(send_buffer); // webserver_sentcb will free it
         }
         else
+        {
             esplog.error("websvr::response: not enough heap memory (%d)\n", (171 + 25 + os_strlen(msg)));
+            // there will be no response so clear the flag
+            esp_busy_sending_data = false;
+        }
     }
 }
+
+// end of HTTP responding
+
+//
+// WEB API features that require timing
+// + File system format
+// + Wifi scan for APs
+//
+
+static os_timer_t format_delay_timer;
+
+static void ICACHE_FLASH_ATTR format_function(void)
+{
+    espfs.format();
+}
+
+static os_timer_t wifi_scan_timeout_timer;
+
+static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_espconn)
+{
+    static int counter = 0;
+    if (counter < 10) // wait for a scan completion at maximum for 5 seconds
+    {
+        if (espwifi.scan_for_ap_completed())
+        {
+            char *scan_list = (char *)os_zalloc(40 + ((32 + 6) * espwifi.get_ap_count()));
+            if (scan_list)
+            {
+                char *tmp_ptr;
+                os_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDss\":[", espwifi.get_ap_count());
+                for (int idx = 0; idx < espwifi.get_ap_count(); idx++)
+                {
+                    tmp_ptr = scan_list + os_strlen(scan_list);
+                    if (idx > 0)
+                        *(tmp_ptr++) = ',';
+                    os_sprintf(tmp_ptr, "\"%s\"", espwifi.get_ap_name(idx));
+                }
+                tmp_ptr = scan_list + os_strlen(scan_list);
+                os_sprintf(tmp_ptr, "]}");
+                response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, scan_list, true);
+                counter = 0;
+                espwifi.free_ap_list();
+            }
+            else
+            {
+                esplog.error("Websvr::wifi_scan_timeout_function - not enough heap memory %d\n", 32 + ((32 + 3) * espwifi.get_ap_count()));
+                // may be the list was too big but there is enough heap memory for a response
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+                counter = 0;
+                espwifi.free_ap_list();
+            }
+        }
+        else
+        {
+            // not ready yet, wait for another 500 ms
+            os_timer_setfn(&wifi_scan_timeout_timer, (os_timer_func_t *)wifi_scan_timeout_function, ptr_espconn);
+            os_timer_arm(&wifi_scan_timeout_timer, 500, 0);
+            counter++;
+        }
+    }
+    else
+    {
+        counter = 0;
+        response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Timeout on Wifi::scan_for_ap", false);
+    }
+}
+
+// End of WEB API features that require timing
+
+//
+// HTTP Receiving:
+// Managing:
+// + File requests
+// + WEB API
+//
+//  List of enabled routes:
+//  [GET]   /
+//  [GET]   /:filename
+//  [GET]   /api/espbot/info
+//  [GET]   /api/espbot/cfg
+//  [POST]  /api/espbot/cfg
+//  [POST]  /api/espbot/reset
+//  [GET]   /api/fs/info
+//  [POST]  /api/fs/format
+//  [GET]   /api/files/ls
+//  [GET]   /api/files/cat/:filename
+//  [POST]  /api/files/delete/:filename
+//  [POST]  /api/files/create/:filename
+//  [GET]   /api/debug/info
+//  [GET]   /api/debug/cfg
+//  [POST]  /api/debug/cfg
+//  [GET]   /api/wifi/cfg
+//  [POST]  /api/wifi/cfg
+//  [GET]   /api/wifi/scan
+//  [POST]  /api/wifi/connect
+//  [POST]  /api/wifi/disconnect
+//
 
 typedef enum
 {
@@ -168,7 +321,7 @@ ICACHE_FLASH_ATTR Html_parsed_req::~Html_parsed_req()
         os_free(req_content);
 }
 
-static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_req)
+static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *parsed_req)
 {
     char *tmp_ptr = req;
     char *end_ptr = NULL;
@@ -177,7 +330,7 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
 
     if (tmp_ptr == NULL)
     {
-        esplog.error("websvr::parse_request - cannot parse empty message\n");
+        esplog.error("websvr::parse_http_request - cannot parse empty message\n");
         return;
     }
 
@@ -217,7 +370,7 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
         parsed_req->req_content = (char *)os_zalloc(parsed_req->content_len + 1);
         if (parsed_req->req_content == NULL)
         {
-            esplog.error("websvr::parse_request - not enough heap memory\n");
+            esplog.error("websvr::parse_http_request - not enough heap memory\n");
             return;
         }
         os_memcpy(parsed_req->req_content, tmp_ptr, parsed_req->content_len);
@@ -230,14 +383,14 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
     end_ptr = (char *)os_strstr(tmp_ptr, " HTTP");
     if (end_ptr == NULL)
     {
-        esplog.error("websvr::parse_request - cannot find HTTP token\n");
+        esplog.error("websvr::parse_http_request - cannot find HTTP token\n");
         return;
     }
     len = end_ptr - tmp_ptr;
     parsed_req->url = (char *)os_zalloc(len + 1);
     if (parsed_req->url == NULL)
     {
-        esplog.error("websvr::parse_request - not enough heap memory\n");
+        esplog.error("websvr::parse_http_request - not enough heap memory\n");
         return;
     }
     os_memcpy(parsed_req->url, tmp_ptr, len);
@@ -250,7 +403,7 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
         tmp_ptr = (char *)os_strstr(tmp_ptr, "content-length: ");
         if (tmp_ptr == NULL)
         {
-            esplog.trace("websvr::parse_request - cannot find Content-Length\n");
+            esplog.trace("websvr::parse_http_request - didn't find any Content-Length\n");
             return;
         }
     }
@@ -258,14 +411,14 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
     end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
     if (end_ptr == NULL)
     {
-        esplog.error("websvr::parse_request - cannot find Content-Length value\n");
+        esplog.error("websvr::parse_http_request - cannot find Content-Length value\n");
         return;
     }
     len = end_ptr - tmp_ptr;
     tmp_str = (char *)os_zalloc(len + 1);
     if (tmp_str == NULL)
     {
-        esplog.error("websvr::parse_request - not enough heap memory\n");
+        esplog.error("websvr::parse_http_request - not enough heap memory\n");
         return;
     }
     parsed_req->content_len = atoi(tmp_str);
@@ -275,7 +428,7 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
     tmp_ptr = (char *)os_strstr(tmp_ptr, "\r\n\r\n");
     if (tmp_ptr == NULL)
     {
-        esplog.error("websvr::parse_request - cannot find Content start\n");
+        esplog.error("websvr::parse_http_request - cannot find Content start\n");
         return;
     }
     tmp_ptr += 4;
@@ -283,19 +436,19 @@ static void ICACHE_FLASH_ATTR parse_request(char *req, Html_parsed_req *parsed_r
     parsed_req->req_content = (char *)os_zalloc(parsed_req->content_len + 1);
     if (parsed_req->req_content == NULL)
     {
-        esplog.error("websvr::parse_request - not enough heap memory\n");
+        esplog.error("websvr::parse_http_request - not enough heap memory\n");
         return;
     }
     os_memcpy(parsed_req->req_content, tmp_ptr, parsed_req->content_len);
 }
 
-static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char* filename)
+static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
 {
     if (espfs.is_available())
     {
         if (!Ffile::exists(filename))
         {
-            response(p_espconn, HTTP_NOT_FOUND, "File not found\n", false);
+            response(p_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
             return;
         }
         int file_size = Ffile::size(filename);
@@ -306,26 +459,26 @@ static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char* filen
             if (file_content)
             {
                 sel_file.n_read(file_content, file_size);
-                response(p_espconn, HTTP_OK, file_content, true);
+                response(p_espconn, HTTP_OK, HTTP_CONTENT_TEXT, file_content, true);
                 // os_free(file_content); // dont't free the msg buffer cause it could not have been used yet
             }
             else
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", file_size + 1);
                 // may be the file was too big but there is enough heap memory for a response
-                response(p_espconn, HTTP_SERVER_ERROR, "Not enough heap memory\n", false);
+                response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
             }
             return;
         }
         else
         {
-            response(p_espconn, HTTP_SERVER_ERROR, "Cannot open file\n", false);
+            response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
             return;
         }
     }
     else
     {
-        response(p_espconn, HTTP_SERVER_ERROR, "File system is not available\n", false);
+        response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
         return;
     }
 }
@@ -334,12 +487,11 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
 {
     struct espconn *ptr_espconn = (struct espconn *)arg;
     Html_parsed_req parsed_req;
-    // save the received message
-    // os_memcpy(pRecDataCur, precdata, length);
+
     esplog.trace("Websvr::webserver_recv received request len:%u\n", length);
     esplog.trace("Websvr::webserver_recv received request:\n%s\n", precdata);
 
-    parse_request(precdata, &parsed_req);
+    parse_http_request(precdata, &parsed_req);
 
     esplog.trace("Websvr::webserver_recv parsed request:\n"
                  "->                  no_header_message: %d\n"
@@ -353,40 +505,19 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
                  parsed_req.content_len,
                  parsed_req.req_content);
 
-    //  routes:
-    //  [GET]   /
-    //  [GET]   /api/espbot/info
-    //  [GET]   /api/espbot/cfg
-    //  [POST]  /api/espbot/cfg
-    //  [POST]  /api/espbot/reset
-    //  [GET]   /api/fs/info
-    //  [POST]  /api/fs/format
-    //  [GET]   /api/files/ls
-    //  [GET]   /api/files/cat/:name
-    //  [POST]  /api/files/delete/:name
-    //  [POST]  /api/files/create/:name
-    //  [GET]   /api/debug/info
-    //  [GET]   /api/debug/cfg
-    //  [POST]  /api/debug/cfg
-    //  [GET]   /api/wifi/cfg
-    //  [POST]  /api/wifi/cfg
-    //  [GET]   /api/wifi/scan
-    //  [POST]  /api/wifi/connect
-    //  [POST]  /api/wifi/disconnect
-
     if (parsed_req.no_header_message || (parsed_req.url == NULL))
     {
         esplog.info("Websvr::webserver_recv - No header message or empty url\n");
         return;
     }
-    if ((0 == os_strcmp(parsed_req.url, "/")) && (parsed_req.req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req.url, "/")) && (parsed_req.req_method == HTTP_GET)) // home
     {
         // home: look for index.html
         char *file_name = "index.html";
         return_file(ptr_espconn, file_name);
         return;
     }
-    if ((os_strncmp(parsed_req.url, "/api/", 5)) && (parsed_req.req_method == HTTP_GET))
+    if ((os_strncmp(parsed_req.url, "/api/", 5)) && (parsed_req.req_method == HTTP_GET)) // file
     {
         // not an api: look for specified file
         char *file_name = parsed_req.url + os_strlen("/");
@@ -402,13 +533,13 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
                             "\"espbot_version\":\"%s\","
                             "\"chip_id\":\"%d\","
                             "\"sdk_version\":\"%s\","
-                            "\"boot_version\":\"%d\"}\n",
+                            "\"boot_version\":\"%d\"}",
                        espbot.get_name(),
                        ESPBOT_RELEASE,
                        system_get_chip_id(),
                        system_get_sdk_version(),
                        system_get_boot_version());
-            response(ptr_espconn, HTTP_OK, msg, true);
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
             // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
         }
         else
@@ -422,8 +553,8 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         char *msg = (char *)os_zalloc(64);
         if (msg)
         {
-            os_sprintf(msg, "{\"espbot_name\":\"%s\"}\n", espbot.get_name());
-            response(ptr_espconn, HTTP_OK, msg, true);
+            os_sprintf(msg, "{\"espbot_name\":\"%s\"}", espbot.get_name());
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
             // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
         }
         else
@@ -437,53 +568,38 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         Json_str espbot_cfg(parsed_req.req_content, parsed_req.content_len);
         if (espbot_cfg.syntax_check() == JSON_SINTAX_OK)
         {
-            int param_count = 0;
-            while (espbot_cfg.find_next_pair() == JSON_NEW_PAIR_FOUND)
+            if (espbot_cfg.find_pair("espbot_name") != JSON_NEW_PAIR_FOUND)
             {
-                if (os_strncmp(espbot_cfg.get_cur_pair_string(), "espbot_name", espbot_cfg.get_cur_pair_string_len()) == 0)
-                {
-                    if (espbot_cfg.get_cur_pair_value_type() == JSON_STRING)
-                    {
-                        char *tmp_name = (char *)os_zalloc(espbot_cfg.get_cur_pair_value_len() + 1);
-                        if (tmp_name)
-                        {
-                            if (tmp_name)
-                            {
-                                os_strncpy(tmp_name, espbot_cfg.get_cur_pair_value(), espbot_cfg.get_cur_pair_value_len());
-                                espbot.set_name(tmp_name);
-                                os_free(tmp_name);
-                                param_count++;
-                            }
-                            else
-                            {
-                                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", espbot_cfg.get_cur_pair_value_len() + 1);
-                        }
-                    }
-                }
-            }
-            if (param_count != 1)
-            {
-                response(ptr_espconn, HTTP_BAD_REQUEST, "Cannot find any configuration parameters\n", false);
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'espbot_name'", false);
                 return;
+            }
+            if (espbot_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'espbot_name' does not have a STRING value type", false);
+                return;
+            }
+            char *tmp_name = (char *)os_zalloc(espbot_cfg.get_cur_pair_value_len() + 1);
+            if (tmp_name)
+            {
+                os_strncpy(tmp_name, espbot_cfg.get_cur_pair_value(), espbot_cfg.get_cur_pair_value_len());
+                espbot.set_name(tmp_name);
+                os_free(tmp_name);
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", espbot_cfg.get_cur_pair_value_len() + 1);
             }
         }
         else
         {
-            response(ptr_espconn, HTTP_BAD_REQUEST, "Json bad syntax\n", false);
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
             return;
         }
-
         char *msg = (char *)os_zalloc(64);
         if (msg)
         {
-            os_sprintf(msg, "{\"espbot_name\":\"%s\"}\n", espbot.get_name());
-            response(ptr_espconn, HTTP_OK, msg, true);
+            os_sprintf(msg, "{\"espbot_name\":\"%s\"}", espbot.get_name());
+            response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg, true);
             // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
         }
         else
@@ -494,7 +610,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
     }
     if ((0 == os_strcmp(parsed_req.url, "/api/espbot/reset")) && (parsed_req.req_method == HTTP_POST))
     {
-        response(ptr_espconn, HTTP_OK, "", false);
+        response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
         espbot.reset();
         return;
     }
@@ -505,10 +621,10 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             char *msg = (char *)os_zalloc(128);
             if (msg)
             {
-                os_sprintf(msg, "{\"file_system_size\":\"%d\","
-                                "\"file_system_used_size\":\"%d\"}\n",
+                os_sprintf(msg, "{\"file_system_size\": %d,"
+                                "\"file_system_used_size\": %d}",
                            espfs.get_total_size(), espfs.get_used_size());
-                response(ptr_espconn, HTTP_OK, msg, true);
+                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
                 // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
                 return;
             }
@@ -520,7 +636,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         }
         else
         {
-            response(ptr_espconn, HTTP_SERVER_ERROR, "File system is not available\n", false);
+            response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
             return;
         }
     }
@@ -528,13 +644,14 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
     {
         if (espfs.is_available())
         {
-            response(ptr_espconn, HTTP_OK, "", false);
-            espfs.format();
+            response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+            os_timer_setfn(&format_delay_timer, (os_timer_func_t *)format_function, NULL);
+            os_timer_arm(&format_delay_timer, 500, 0);
             return;
         }
         else
         {
-            response(ptr_espconn, HTTP_SERVER_ERROR, "File system is not available\n", false);
+            response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
             return;
         }
     }
@@ -566,8 +683,8 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
                     file_ptr = espfs.list(1);
                 }
                 tmp_ptr = file_list + os_strlen(file_list);
-                os_sprintf(tmp_ptr, "]}\n");
-                response(ptr_espconn, HTTP_OK, file_list, true);
+                os_sprintf(tmp_ptr, "]}");
+                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, file_list, true);
                 // os_free(file_list); // dont't free the msg buffer cause it could not have been used yet
                 return;
             }
@@ -579,7 +696,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         }
         else
         {
-            response(ptr_espconn, HTTP_SERVER_ERROR, "File system is not available\n", false);
+            response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
             return;
         }
     }
@@ -588,7 +705,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         char *file_name = parsed_req.url + os_strlen("/api/files/cat/");
         if (os_strlen(file_name) == 0)
         {
-            response(ptr_espconn, HTTP_BAD_REQUEST, "No file name provided\n", false);
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
             return;
         }
         return_file(ptr_espconn, file_name);
@@ -599,32 +716,32 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         char *file_name = parsed_req.url + os_strlen("/api/files/delete/");
         if (os_strlen(file_name) == 0)
         {
-            response(ptr_espconn, HTTP_BAD_REQUEST, "No file name provided\n", false);
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
             return;
         }
         if (espfs.is_available())
         {
             if (!Ffile::exists(file_name))
             {
-                response(ptr_espconn, HTTP_NOT_FOUND, "File not found\n", false);
+                response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
                 return;
             }
             Ffile sel_file(&espfs, file_name);
             if (sel_file.is_available())
             {
-                response(ptr_espconn, HTTP_OK, "", false);
+                response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
                 sel_file.remove();
                 return;
             }
             else
             {
-                response(ptr_espconn, HTTP_SERVER_ERROR, "Cannot open file\n", false);
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
                 return;
             }
         }
         else
         {
-            response(ptr_espconn, HTTP_SERVER_ERROR, "File system is not available\n", false);
+            response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
             return;
         }
     }
@@ -633,37 +750,263 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         char *file_name = parsed_req.url + os_strlen("/api/files/create/");
         if (os_strlen(file_name) == 0)
         {
-            response(ptr_espconn, HTTP_BAD_REQUEST, "No file name provided\n", false);
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
             return;
         }
         if (espfs.is_available())
         {
             if (Ffile::exists(file_name))
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, "File already exists\n", false);
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "File already exists", false);
                 return;
             }
             Ffile sel_file(&espfs, file_name);
             if (sel_file.is_available())
             {
                 sel_file.n_append(parsed_req.req_content, parsed_req.content_len);
-                response(ptr_espconn, HTTP_OK, "", false);
+                response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, "", false);
                 return;
             }
             else
             {
-                response(ptr_espconn, HTTP_SERVER_ERROR, "Cannot open file\n", false);
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
                 return;
             }
         }
         else
         {
-            response(ptr_espconn, HTTP_SERVER_ERROR, "File system is not available\n", false);
+            response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
             return;
         }
     }
-
-    response(ptr_espconn, HTTP_BAD_REQUEST, "", false);
+    if ((0 == os_strcmp(parsed_req.url, "/api/debug/info")) && (parsed_req.req_method == HTTP_GET))
+    {
+        // check how much memory needed for last_errors
+        int last_errors_len = 0;
+        char *err_ptr = esp_last_errors.get_head();
+        while (err_ptr)
+        {
+            last_errors_len += os_strlen(err_ptr);
+            err_ptr = esp_last_errors.next();
+        }
+        char *msg = (char *)os_zalloc(64 +                           // formatting string
+                                      10 +                           // heap mem figures
+                                      (3 * esp_last_errors.size()) + // errors formatting
+                                      last_errors_len);              // errors
+        if (msg)
+        {
+            os_sprintf(msg,
+                       "{\"current_heap_size\": %d,\"minimum_heap_size\": %d,\"errors\":[",
+                       espdebug.check_heap_size(),
+                       espdebug.get_mim_heap_size());
+            // now add saved errors
+            char *str_ptr;
+            int cnt = 0;
+            err_ptr = esp_last_errors.get_head();
+            while (err_ptr)
+            {
+                str_ptr = msg + os_strlen(msg);
+                if (cnt == 0)
+                    os_sprintf(str_ptr, "%s", err_ptr);
+                else
+                    os_sprintf(str_ptr, ",%s", err_ptr);
+                err_ptr = esp_last_errors.next();
+                cnt++;
+            }
+            str_ptr = msg + os_strlen(msg);
+            os_sprintf(str_ptr, "]}");
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+            // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n",
+                         64 + 10 + (3 * esp_last_errors.size()) + last_errors_len);
+        }
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/debug/cfg")) && (parsed_req.req_method == HTTP_GET))
+    {
+        char *msg = (char *)os_zalloc(64);
+        if (msg)
+        {
+            os_sprintf(msg,
+                       "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}",
+                       esplog.get_serial_level(),
+                       esplog.get_memory_level());
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+            // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        return;
+    }
+    if ((os_strcmp(parsed_req.url, "/api/debug/cfg") == 0) && (parsed_req.req_method == HTTP_POST))
+    {
+        Json_str debug_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (debug_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (debug_cfg.find_pair("logger_serial_level") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'logger_serial_level'", false);
+                return;
+            }
+            if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'logger_serial_level' does not have an integer value type", false);
+                return;
+            }
+            char *tmp_serial_level = (char *)os_zalloc(debug_cfg.get_cur_pair_value_len() + 1);
+            if (tmp_serial_level)
+            {
+                os_strncpy(tmp_serial_level, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            if (debug_cfg.find_pair("logger_memory_level") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'logger_memory_level'", false);
+                os_free(tmp_serial_level);
+                return;
+            }
+            if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'logger_memory_level' does not have an integer value type", false);
+                os_free(tmp_serial_level);
+                return;
+            }
+            char *tmp_memory_level = (char *)os_zalloc(debug_cfg.get_cur_pair_value_len() + 1);
+            if (tmp_memory_level)
+            {
+                os_strncpy(tmp_memory_level, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            esplog.set_levels(atoi(tmp_serial_level), atoi(tmp_memory_level));
+            os_free(tmp_serial_level);
+            os_free(tmp_memory_level);
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+        char *msg = (char *)os_zalloc(64);
+        if (msg)
+        {
+            os_sprintf(msg,
+                       "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}",
+                       esplog.get_serial_level(),
+                       esplog.get_memory_level());
+            response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg, true);
+            // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/cfg")) && (parsed_req.req_method == HTTP_GET))
+    {
+        char *msg = (char *)os_zalloc(64);
+        if (msg)
+        {
+            os_sprintf(msg,
+                       "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
+                       espwifi.station_get_ssid(),
+                       espwifi.station_get_password());
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+            // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        return;
+    }
+    if ((os_strcmp(parsed_req.url, "/api/wifi/cfg") == 0) && (parsed_req.req_method == HTTP_POST))
+    {
+        Json_str wifi_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (wifi_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (wifi_cfg.find_pair("station_ssid") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'station_ssid'", false);
+                return;
+            }
+            if (wifi_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'station_ssid' does not have a STRING value type", false);
+                return;
+            }
+            char *tmp_ssid = wifi_cfg.get_cur_pair_value();
+            int tmp_ssid_len = wifi_cfg.get_cur_pair_value_len();
+            if (wifi_cfg.find_pair("station_pwd") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'station_pwd'", false);
+                return;
+            }
+            if (wifi_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'station_pwd' does not have an integer value type", false);
+                return;
+            }
+            espwifi.station_set_ssid(tmp_ssid, tmp_ssid_len);
+            espwifi.station_set_pwd(wifi_cfg.get_cur_pair_value(), wifi_cfg.get_cur_pair_value_len());
+            espwifi.save_cfg();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+        char *msg = (char *)os_zalloc(140);
+        if (msg)
+        {
+            os_sprintf(msg,
+                       "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
+                       espwifi.station_get_ssid(),
+                       espwifi.station_get_password());
+            response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg, true);
+            // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 140);
+        }
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/scan")) && (parsed_req.req_method == HTTP_POST))
+    {
+        // response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, NULL);
+        os_timer_setfn(&wifi_scan_timeout_timer, (os_timer_func_t *)wifi_scan_timeout_function, ptr_espconn);
+        os_timer_arm(&wifi_scan_timeout_timer, 500, 0);
+        espwifi.scan_for_ap();
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/connect")) && (parsed_req.req_method == HTTP_POST))
+    {
+        response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+        Wifi::connect();
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/disconnect")) && (parsed_req.req_method == HTTP_POST))
+    {
+        response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+        Wifi::switch_to_stationap();
+        return;
+    }
+    //  [GET]   /api/wifi/scan
+    response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "I'm sorry, my responses are limited. You must ask the right question.", false);
 }
 
 static ICACHE_FLASH_ATTR void webserver_recon(void *arg, sint8 err)
@@ -699,6 +1042,9 @@ static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
 void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
 {
     os_timer_disarm(&websvr_wait_for_data_sent);
+    os_timer_disarm(&format_delay_timer);
+    os_timer_disarm(&wifi_scan_timeout_timer);
+
     esp_conn.type = ESPCONN_TCP;
     esp_conn.state = ESPCONN_NONE;
     esp_conn.proto.tcp = &esptcp;

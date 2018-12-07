@@ -16,6 +16,7 @@
 #include "wifi.hpp"
 #include "webserver.hpp"
 
+extern Str_list esp_last_errors;
 extern Flashfs espfs;
 extern Dbggr espdebug;
 extern Logger esplog;

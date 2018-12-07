@@ -46,13 +46,14 @@ public:
   ~Json_str(){};
   int syntax_check(void);                        // return JSON_SINTAX_OK on fine syntax
                                                  // return (error position) in case of error
-  Json_pair_type find_next_pair(void);           // find next json pair (return true if found)
+  Json_pair_type find_next_pair(void);           // find next json pair
   char *get_cur_pair_string(void);               // return current pair string (NULL if none)
   int get_cur_pair_string_len(void);             // return current pair string length (0 if none)
   Json_value_type get_cur_pair_value_type(void); // return current json pair value type
   char *get_cur_pair_value(void);                // return current pair value as string (NULL if none)
   int get_cur_pair_value_len(void);              // return current pair value length (0 if none)
-  char *get_cursor(void);                        // for debug purposes
+  // char *get_cursor(void);                        // for debug purposes
+  Json_pair_type find_pair(char *t_string);      // find json pair with string == t_string
 };
 
 #endif

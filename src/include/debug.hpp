@@ -14,6 +14,8 @@ extern "C"
 #include "c_types.h"
 }
 
+#include "espbot_utils.hpp"
+
 #define LOG_OFF 0
 #define LOG_FATAL 1
 #define LOG_ERROR 2
@@ -22,7 +24,7 @@ extern "C"
 #define LOG_DEBUG 5
 #define LOG_TRACE 6
 #define LOG_ALL 7
-#define LOG_BUF_SIZE 256
+#define LOG_BUF_SIZE 1024
 
 // found somewhere on www.esp8266.com
 // 3fffeb30 and 3fffffff is the designated area for the user stack
@@ -33,6 +35,7 @@ extern "C"
 #define CFG_OK 0
 #define CFG_REQUIRES_UPDATE 1
 #define CFG_ERROR 2
+
 class Dbggr
 {
 private:
@@ -43,7 +46,7 @@ public:
   ~Dbggr(){};
 
   void init(void);
-  void check_heap_size(void);
+  uint32 check_heap_size(void);   // return current heap size and eventually update minimum value
   uint32 get_mim_heap_size(void);
 };
 
@@ -51,7 +54,7 @@ class Logger
 {
 private:
   int m_serial_level;
-  int m_file_level;
+  int m_memory_level;
 
   int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
   int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
@@ -65,8 +68,8 @@ public:
 
   void init();
   int get_serial_level(void);
-  int get_file_level(void);
-  void set_levels(char t_serial_level, char t_file_level);
+  int get_memory_level(void);
+  void set_levels(char t_serial_level, char t_memory_level);
 
   void fatal(const char *, ...);
   void error(const char *, ...);

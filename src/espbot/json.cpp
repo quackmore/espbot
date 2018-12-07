@@ -401,7 +401,23 @@ int ICACHE_FLASH_ATTR Json_str::get_cur_pair_value_len(void)
     return m_cur_pair_value_len;
 }
 
-char ICACHE_FLASH_ATTR *Json_str::get_cursor(void)
+// char ICACHE_FLASH_ATTR *Json_str::get_cursor(void)
+// {
+//     return m_cursor;
+// }
+
+Json_pair_type ICACHE_FLASH_ATTR Json_str::find_pair(char *t_string)
 {
-    return m_cursor;
+    m_cursor = m_str;
+    if (syntax_check() == JSON_SINTAX_OK)
+    {
+        while (find_next_pair() == JSON_NEW_PAIR_FOUND)
+        {
+            if (os_strncmp(get_cur_pair_string(), t_string, get_cur_pair_string_len()) == 0)
+                return JSON_NEW_PAIR_FOUND;
+        }
+        return JSON_NO_NEW_PAIR_FOUND;
+    }
+    else
+        return JSON_ERR;
 }

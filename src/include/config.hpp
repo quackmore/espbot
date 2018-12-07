@@ -16,15 +16,15 @@ private:
   char *m_cache;
   char *m_value_str;
   int m_value_len;
+  int get_value_len(void);
 
 public:
   File_to_json(char *); // require filename
   ~File_to_json();
   bool exists(void);
   int find_string(char *); // require string name of a json pair
-                                // return 0 on success !=0 on fail
+                           // return 0 on success !=0 on fail
   char *get_value(void);
-  int get_value_len(void);
 };
 
 #endif

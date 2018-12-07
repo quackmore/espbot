@@ -77,27 +77,6 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
     P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
 }
 
-void ICACHE_FLASH_ATTR Espbot::init(void)
-{
-    // set default name
-    os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
-    if (restore_cfg())
-        esplog.info("no cfg available, espbot name set to %s\n", get_name());
-    else
-        esplog.info("espbot name set to %s\n", get_name());
-
-    // setup the task
-    m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
-    system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
-
-    // start an heartbeat timer
-    os_timer_disarm(&m_heartbeat);
-    os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
-    os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
-
-    esplog.info("Espbot::init complete\n");
-}
-
 uint32 ICACHE_FLASH_ATTR Espbot::get_chip_id(void)
 {
     return system_get_chip_id();
@@ -143,6 +122,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     system_set_os_print(1); // enable log print
     print_greetings();
 
+    esp_last_errors.init(20);
     espfs.init();
     espdebug.init();
     esplog.init();
@@ -230,8 +210,68 @@ int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
     return 0;
 }
 
+// GRACEFUL RESET
+// 1) wait 300 ms
+// 2) stop the webserver
+// 3) wait 200 ms
+// 4) stop the wifi
+// 5) wait 200 ms
+// 6) system_restart
+
+static int graceful_rst_counter = 0;
+static os_timer_t graceful_rst_timer;
+
+static void ICACHE_FLASH_ATTR graceful_reset(void)
+{
+    graceful_rst_counter++;
+    espbot.reset();
+}
+
 void ICACHE_FLASH_ATTR Espbot::reset(void)
 {
-    wifi_set_opmode_current(NULL_MODE);
-    system_restart();
+    switch (graceful_rst_counter)
+    {
+    case 0:
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_arm(&graceful_rst_timer, 300, 0);
+        break;
+    case 1:
+        espwebsvr.stop();
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_arm(&graceful_rst_timer, 200, 0);
+        break;
+    case 2:
+        wifi_set_opmode_current(NULL_MODE);
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_arm(&graceful_rst_timer, 200, 0);
+        break;
+    case 3:
+        system_restart();
+        break;
+    default:
+        break;
+    }
+}
+
+void ICACHE_FLASH_ATTR Espbot::init(void)
+{
+    // set default name
+    os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
+    if (restore_cfg())
+        esplog.info("no cfg available, espbot name set to %s\n", get_name());
+    else
+        esplog.info("espbot name set to %s\n", get_name());
+
+    os_timer_disarm(&graceful_rst_timer);
+
+    // start an heartbeat timer
+    os_timer_disarm(&m_heartbeat);
+    os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
+    os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
+
+    // setup the task
+    m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
+    system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
+
+    esplog.info("Espbot::init complete\n");
 }
