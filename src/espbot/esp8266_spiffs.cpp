@@ -493,15 +493,15 @@ void ICACHE_FLASH_ATTR Ffile::flush_cache()
     }
 }
 
-bool ICACHE_FLASH_ATTR Ffile::exists(char *t_name)
+bool ICACHE_FLASH_ATTR Ffile::exists(Flashfs *t_fs, char *t_name)
 {
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
 
-    if (espfs.is_available())
+    if (t_fs->is_available())
     {
-        SPIFFS_opendir(espfs.get_handler(), "/", &directory);
+        SPIFFS_opendir(t_fs->get_handler(), "/", &directory);
         while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
         {
             if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))
@@ -518,15 +518,15 @@ bool ICACHE_FLASH_ATTR Ffile::exists(char *t_name)
     return false;
 }
 
-int ICACHE_FLASH_ATTR Ffile::size(char *t_name)
+int ICACHE_FLASH_ATTR Ffile::size(Flashfs *t_fs, char *t_name)
 {
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
 
-    if (espfs.is_available())
+    if (t_fs->is_available())
     {
-        SPIFFS_opendir(espfs.get_handler(), "/", &directory);
+        SPIFFS_opendir(t_fs->get_handler(), "/", &directory);
         while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
         {
             if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))

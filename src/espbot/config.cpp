@@ -39,7 +39,7 @@ ICACHE_FLASH_ATTR File_to_json::~File_to_json()
 
 bool ICACHE_FLASH_ATTR File_to_json::exists(void)
 {
-    return (Ffile::exists(m_filename));
+    return (Ffile::exists(&espfs, m_filename));
 }
 
 int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
@@ -52,7 +52,7 @@ int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
     {
         if (m_cache == NULL) // file content not cached yet
         {
-            if (!Ffile::exists(m_filename))
+            if (!Ffile::exists(&espfs, m_filename))
             {
                 esplog.error("File_to_json::find_string - file not found\n");
                 return FILE_TO_JSON_ERROR;
@@ -60,10 +60,10 @@ int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
             Ffile cfgfile(&espfs, m_filename);
             if (cfgfile.is_available())
             {
-                m_cache = (char *)os_zalloc(Ffile::size(m_filename) + 1);
+                m_cache = (char *)os_zalloc(Ffile::size(&espfs, m_filename) + 1);
                 if (m_cache)
                 {
-                    cfgfile.n_read(m_cache, Ffile::size(m_filename));
+                    cfgfile.n_read(m_cache, Ffile::size(&espfs, m_filename));
                 }
                 else
                 {

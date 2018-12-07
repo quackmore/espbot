@@ -446,12 +446,12 @@ static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filen
 {
     if (espfs.is_available())
     {
-        if (!Ffile::exists(filename))
+        if (!Ffile::exists(&espfs, filename))
         {
             response(p_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
             return;
         }
-        int file_size = Ffile::size(filename);
+        int file_size = Ffile::size(&espfs, filename);
         Ffile sel_file(&espfs, filename);
         if (sel_file.is_available())
         {
@@ -721,7 +721,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         }
         if (espfs.is_available())
         {
-            if (!Ffile::exists(file_name))
+            if (!Ffile::exists(&espfs, file_name))
             {
                 response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
                 return;
@@ -755,7 +755,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         }
         if (espfs.is_available())
         {
-            if (Ffile::exists(file_name))
+            if (Ffile::exists(&espfs, file_name))
             {
                 response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "File already exists", false);
                 return;

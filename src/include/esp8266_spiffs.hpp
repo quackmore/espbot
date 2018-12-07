@@ -118,8 +118,8 @@ public:
   void clear(); // clear the whole file content
   void remove();
   void flush_cache();         // not sure if really useful but just in case ...
-  static bool exists(char *); // making it static does not require creating an object before
-  static int size(char *);    // making it static does not require creating an object before
+  static bool exists(Flashfs *, char *); // making it static does not require creating an object before
+  static int size(Flashfs *, char *);    // making it static does not require creating an object before 
 };
 
 /*  EXAMPLE EXAMPLE EXAMPLE 
