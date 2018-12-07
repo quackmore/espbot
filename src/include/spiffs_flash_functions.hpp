@@ -39,8 +39,18 @@
 #define SPIFFS_FLASH_BOUNDARY_ERROR -10202
 
 // debug macros
-#define debug (1)
-#if debug
+#include "espbot_global.hpp"
+#include "debug.hpp"
+#define P_FATAL(...) os_printf(__VA_ARGS__)
+#define P_ERROR(...) os_printf(__VA_ARGS__)
+#define P_WARN(...) os_printf(__VA_ARGS__)
+#define P_INFO(...) os_printf(__VA_ARGS__)
+#define P_DEBUG(...) os_printf(__VA_ARGS__)
+#define P_TRACE(...) os_printf(__VA_ARGS__)
+#define P_ALL(...) os_printf(__VA_ARGS__)
+/*
+#define SPIFFS_DEBUG (1)
+#if SPIFFS_DEBUG
 #define P_FATAL(...) os_printf(__VA_ARGS__)
 #define P_ERROR(...) os_printf(__VA_ARGS__)
 #define P_WARN(...) os_printf(__VA_ARGS__)
@@ -71,7 +81,7 @@
   {                \
   }
 #endif
-
+*/
 #include "spiffs.h" // for spiffs types
 
 // flash memory functions (checkout SPIFFS doumentation)

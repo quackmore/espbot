@@ -9,47 +9,45 @@
 #ifndef __ESPBOT_HPP__
 #define __ESPBOT_HPP__
 
-#define P_FATAL(...) os_printf(__VA_ARGS__)
-#define P_ERROR(...) os_printf(__VA_ARGS__)
-#define P_WARN(...) os_printf(__VA_ARGS__)
-#define P_INFO(...) os_printf(__VA_ARGS__)
-#define P_DEBUG(...) os_printf(__VA_ARGS__)
-#define P_TRACE(...) os_printf(__VA_ARGS__)
-#define P_ALL(...) os_printf(__VA_ARGS__)
-
-
-// this function is the SDK callback system_init_done_cb
 extern "C"
 {
-  void espbot_init(void);
+#include "osapi.h"
 }
 
 #define SIG_STAMODE_GOT_IP 0
 #define SIG_STAMODE_DISCONNECTED 1
 #define SIG_SOFTAPMODE_STACONNECTED 2
+#define SIG_SOFTAPMODE_STADISCONNECTED 3
 
 class Espbot
 {
 private:
   char m_name[32];
   // espbot task
-  static const int QUEUE_LEN = 4;
+  static const int QUEUE_LEN = 8;
   os_event_t *m_queue;
   // heartbeat timer
   static const int HEARTBEAT_PERIOD = 60000;
   os_timer_t m_heartbeat;
+
+  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
+  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+                                  // return CFG_REQUIRES_UPDATE when cfg require update
+                                  // return CFG_ERROR otherwise
+  int save_cfg(void);             // return CFG_OK on success, otherwise CFG_ERROR
 
 protected:
 public:
   Espbot(){};
   ~Espbot(){};
   void init(void);
+  void reset(void);
   uint32 get_chip_id(void);
   uint8 get_boot_version(void);
   const char *get_sdk_version(void);
   char *get_version(void);
   char *get_name(void);
-  void set_name(char *);
+  void set_name(char *); // requires string
 };
 
 #endif

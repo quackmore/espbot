@@ -18,10 +18,16 @@ extern "C"
 extern "C"
 {
 #include "uart.h"
+#include "mem.h"
 #include "espbot_release.h"
 }
 
+#include "espbot_global.hpp"
 #include "espbot.hpp"
+#include "esp8266_spiffs.hpp"
+#include "debug.hpp"
+#include "json.hpp"
+#include "config.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -40,18 +46,25 @@ static void ICACHE_FLASH_ATTR print_greetings(void)
     P_DEBUG("---------------------------------------------------\n");
 }
 
-static void ICACHE_FLASH_ATTR espbot_task(os_event_t *e)
+static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
 {
     switch (e->sig)
     {
     case SIG_STAMODE_GOT_IP:
         // [wifi station] got IP
+        espwebsvr.stop(); // in case there was a web server listening on esp AP interface
+        espwebsvr.start(80);
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
         break;
     case SIG_SOFTAPMODE_STACONNECTED:
         // [wifi station+AP] station connected
+        espwebsvr.stop(); // in case there was a web server listening on esp station interface
+        espwebsvr.start(80);
+        break;
+    case SIG_SOFTAPMODE_STADISCONNECTED:
+        // [wifi station+AP] station disconnected
         break;
     default:
         break;
@@ -62,29 +75,6 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
 {
     P_DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
     P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
-}
-
-void ICACHE_FLASH_ATTR Espbot::init(void)
-{
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
-
-    system_set_os_print(1); // enable log print
-
-    // set default name
-    os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
-
-    print_greetings();
-
-    // setup the task
-    m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
-    system_os_task(espbot_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
-
-    // start an heartbeat timer
-    os_timer_disarm(&m_heartbeat);
-    os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
-    os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
-
-    // now start the wifi
 }
 
 uint32 ICACHE_FLASH_ATTR Espbot::get_chip_id(void)
@@ -115,25 +105,173 @@ char ICACHE_FLASH_ATTR *Espbot::get_name(void)
 void ICACHE_FLASH_ATTR Espbot::set_name(char *t_name)
 {
     os_memset(m_name, 0, 32);
+    if (os_strlen(t_name) > 31)
+    {
+        esplog.warn("Espbot::set_name: truncating name to 31 characters\n");
+    }
     os_strncpy(m_name, t_name, 31);
+    save_cfg();
 }
 
-Espbot espbot;
-
-// dirty reference to esp8266_spiffs_test.cpp ...
-void run_tests(void);
-void run_tests_c(void);
+// make espbot_init available to user_main.c
+extern "C" void espbot_init(void);
 
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
+    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    system_set_os_print(1); // enable log print
+    print_greetings();
+
+    esp_last_errors.init(20);
+    espfs.init();
+    espdebug.init();
+    esplog.init();
     espbot.init();
 
-    // run some spiffs test
-    // start a 20 seconds timer for connecting a terminal to the serial port ...
+    espwifi.init();
+}
 
-    os_timer_t wait_20_secs;
-    os_timer_disarm(&wait_20_secs);
-    os_timer_setfn(&wait_20_secs, (os_timer_func_t *)run_tests, NULL);
-    os_timer_arm(&wait_20_secs, 20000, 0);
+int ICACHE_FLASH_ATTR Espbot::restore_cfg(void)
+{
+    File_to_json cfgfile("espbot.cfg");
+    if (cfgfile.exists())
+    {
+        if (cfgfile.find_string("espbot_name"))
+        {
+            esplog.error("Espbot::restore_cfg - available configuration is incomplete\n");
+            return CFG_ERROR;
+        }
+        set_name(cfgfile.get_value());
+        return CFG_OK;
+    }
+    else
+    {
+        esplog.error("Espbot::restore_cfg - cfg file not found\n");
+        return CFG_ERROR;
+    }
+}
 
+int ICACHE_FLASH_ATTR Espbot::saved_cfg_not_update(void)
+{
+    File_to_json cfgfile("espbot.cfg");
+    if (cfgfile.exists())
+    {
+        if (cfgfile.find_string("espbot_name"))
+        {
+            esplog.error("Espbot::saved_cfg_not_update - available configuration is incomplete\n");
+            return CFG_ERROR;
+        }
+        if (os_strcmp(m_name, cfgfile.get_value()))
+        {
+            return CFG_REQUIRES_UPDATE;
+        }
+        return CFG_OK;
+    }
+    else
+    {
+        return CFG_REQUIRES_UPDATE;
+    }
+}
+
+int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
+{
+    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+        return CFG_OK;
+    if (espfs.is_available())
+    {
+        Ffile cfgfile(&espfs, "espbot.cfg");
+        if (cfgfile.is_available())
+        {
+            cfgfile.clear();
+            char *buffer = (char *)os_zalloc(64);
+            if (buffer)
+            {
+                os_sprintf(buffer, "{\"espbot_name\": \"%s\"}", m_name);
+                cfgfile.n_append(buffer, os_strlen(buffer));
+                os_free(buffer);
+            }
+            else
+            {
+                esplog.error("Espbot::save_cfg - not enough heap memory available\n");
+                return CFG_ERROR;
+            }
+        }
+        else
+        {
+            esplog.error("Espbot::save_cfg - cannot open espbot.cfg\n");
+            return CFG_ERROR;
+        }
+    }
+    else
+    {
+        esplog.error("Espbot::save_cfg - file system not available\n");
+        return CFG_ERROR;
+    }
+    return 0;
+}
+
+// GRACEFUL RESET
+// 1) wait 300 ms
+// 2) stop the webserver
+// 3) wait 200 ms
+// 4) stop the wifi
+// 5) wait 200 ms
+// 6) system_restart
+
+static int graceful_rst_counter = 0;
+static os_timer_t graceful_rst_timer;
+
+static void ICACHE_FLASH_ATTR graceful_reset(void)
+{
+    graceful_rst_counter++;
+    espbot.reset();
+}
+
+void ICACHE_FLASH_ATTR Espbot::reset(void)
+{
+    switch (graceful_rst_counter)
+    {
+    case 0:
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_arm(&graceful_rst_timer, 300, 0);
+        break;
+    case 1:
+        espwebsvr.stop();
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_arm(&graceful_rst_timer, 200, 0);
+        break;
+    case 2:
+        wifi_set_opmode_current(NULL_MODE);
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_arm(&graceful_rst_timer, 200, 0);
+        break;
+    case 3:
+        system_restart();
+        break;
+    default:
+        break;
+    }
+}
+
+void ICACHE_FLASH_ATTR Espbot::init(void)
+{
+    // set default name
+    os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
+    if (restore_cfg())
+        esplog.info("no cfg available, espbot name set to %s\n", get_name());
+    else
+        esplog.info("espbot name set to %s\n", get_name());
+
+    os_timer_disarm(&graceful_rst_timer);
+
+    // start an heartbeat timer
+    os_timer_disarm(&m_heartbeat);
+    os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
+    os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
+
+    // setup the task
+    m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
+    system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
+
+    esplog.info("Espbot::init complete\n");
 }
