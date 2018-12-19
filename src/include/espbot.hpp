@@ -45,6 +45,7 @@ public:
   uint32 get_chip_id(void);
   uint8 get_boot_version(void);
   const char *get_sdk_version(void);
+  char *get_alias(void);
   char *get_version(void);
   char *get_name(void);
   void set_name(char *); // requires string

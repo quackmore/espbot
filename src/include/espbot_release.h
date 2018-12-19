@@ -21,4 +21,6 @@
 #define ESPBOT_RELEASE "Unavailable"
 #endif
 
+#define ESPBOT_ALIAS "Mother_Lode"
+
 #endif

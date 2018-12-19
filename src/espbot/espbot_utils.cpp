@@ -13,35 +13,18 @@ extern "C"
 #include "osapi.h"
 #include "mem.h"
 #include "user_interface.h"
+#include "ip_addr.h"
 }
 
 #include "espbot_utils.hpp"
 #include "espbot_global.hpp"
 
-int ICACHE_FLASH_ATTR atoi(char *str)
-{
-    int idx = 0;
-    int power = 1;
-    char tmpvalue;
-    char result = 0;
-    while (str[idx] != '\0')
-    {
-        tmpvalue = 0;
-        if (str[idx] >= '0' && str[idx] <= '9')
-            tmpvalue = str[idx] - '0';
-        result = result * power + tmpvalue;
-        idx++;
-        power = power * 10;
-    }
-    return result;
-}
-
 int ICACHE_FLASH_ATTR atoh(char *str)
 {
     int idx = 0;
-    int power = 1;
-    char tmpvalue;
-    char result = 0;
+    int power = 16;
+    int tmpvalue;
+    int result = 0;
     while (str[idx] != '\0')
     {
         tmpvalue = 0;
@@ -51,9 +34,11 @@ int ICACHE_FLASH_ATTR atoh(char *str)
             tmpvalue = str[idx] - 'A' + 10;
         else if (str[idx] >= '0' && str[idx] <= '9')
             tmpvalue = str[idx] - '0';
-        result = result * power + tmpvalue;
+        if (idx == 0)
+            result = tmpvalue;
+        else
+            result = result * power + tmpvalue;
         idx++;
-        power = power * 16;
     }
     return result;
 }
@@ -79,6 +64,44 @@ void ICACHE_FLASH_ATTR decodeUrlStr(char *str)
         }
     }
     *tmpptr = '\0';
+}
+
+void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
+{
+    char *tmp_ptr = str;
+    char *tmp_str, *end_ptr;
+    int len;
+    int cnt = 0;
+    int tmp_ip[4];
+    while (*tmp_ptr == ' ')
+        *tmp_ptr++;
+    do
+    {
+        if (cnt < 3)
+            end_ptr = (char *)os_strstr(tmp_ptr, ".");
+        else
+            end_ptr = str + os_strlen(str);
+        if (end_ptr == NULL)
+        {
+            esplog.trace("str_to_ipaddr - cannot find separator dot\n");
+            IP4_ADDR(ip, 1, 1, 1, 1);
+            return;
+        }
+        len = end_ptr - tmp_ptr;
+        tmp_str = (char *)os_zalloc(len + 1);
+        if (tmp_str == NULL)
+        {
+            esplog.error("str_to_ipaddr - not enough heap memory\n");
+            IP4_ADDR(ip, 1, 1, 1, 1);
+            return;
+        }
+        os_strncpy(tmp_str, tmp_ptr, len);
+        tmp_ip[cnt] = atoi(tmp_str);
+        os_free(tmp_str);
+        tmp_ptr = end_ptr + 1;
+        cnt++;
+    } while (cnt <= 3);
+    IP4_ADDR(ip, tmp_ip[0], tmp_ip[1], tmp_ip[2], tmp_ip[3]);
 }
 
 ICACHE_FLASH_ATTR Str_list::Str_list(int t_max_size)

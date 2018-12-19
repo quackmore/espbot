@@ -6,18 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __ESPBOT_TEST_HPP__
+#define __ESPBOT_TEST_HPP__
 
-#include "espbot_global.hpp"
+extern "C"
+{
+#include "ip_addr.h"
+}
 
-// global variables for esp8266 
-Str_list esp_last_errors(20); // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Dbggr espdebug;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Websvr espwebsvr;
-Webclnt espwebclnt;
+void init_test(struct ip_addr, uint32, char *);
+void run_test(void);
 
+#endif

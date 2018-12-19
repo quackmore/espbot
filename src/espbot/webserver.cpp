@@ -14,6 +14,7 @@ extern "C"
 #include "user_interface.h"
 #include "mem.h"
 #include "espbot_release.h"
+#include "ip_addr.h"
 }
 
 #include "webserver.hpp"
@@ -22,6 +23,7 @@ extern "C"
 #include "debug.hpp"
 #include "json.hpp"
 #include "espbot_utils.hpp"
+#include "espbot_test.hpp"
 
 // HTTP status codes
 #define HTTP_OK 200
@@ -526,15 +528,17 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
     }
     if ((0 == os_strcmp(parsed_req.url, "/api/espbot/info")) && (parsed_req.req_method == HTTP_GET))
     {
-        char *msg = (char *)os_zalloc(256);
+        char *msg = (char *)os_zalloc(350);
         if (msg)
         {
             os_sprintf(msg, "{\"espbot_name\":\"%s\","
+                            "\"espbot_alias\":\"%s\","
                             "\"espbot_version\":\"%s\","
                             "\"chip_id\":\"%d\","
                             "\"sdk_version\":\"%s\","
                             "\"boot_version\":\"%d\"}",
                        espbot.get_name(),
+                       espbot.get_alias(),
                        ESPBOT_RELEASE,
                        system_get_chip_id(),
                        system_get_sdk_version(),
@@ -544,7 +548,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         }
         else
         {
-            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 256);
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 350);
         }
         return;
     }
@@ -1005,7 +1009,104 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         Wifi::switch_to_stationap();
         return;
     }
-    //  [GET]   /api/wifi/scan
+    if ((0 == os_strcmp(parsed_req.url, "/api/test")) && (parsed_req.req_method == HTTP_POST))
+    {
+        struct ip_addr host_ip;
+        uint32 host_port;
+        char *request;
+        Json_str test_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (test_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (test_cfg.find_pair("host") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'host'", false);
+                return;
+            }
+            if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'host' does not have a STRING value type", false);
+                return;
+            }
+            char *tmp_str = (char *)os_zalloc(test_cfg.get_cur_pair_value_len() + 1);
+            if (tmp_str == NULL)
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                return;
+            }
+            os_strncpy(tmp_str, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
+            atoipaddr(&host_ip, tmp_str);
+            os_free(tmp_str);
+            if (test_cfg.find_pair("port") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'port'", false);
+                return;
+            }
+            if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'port' does not have an integer value type", false);
+                return;
+            }
+            tmp_str = (char *)os_zalloc(test_cfg.get_cur_pair_value_len() + 1);
+            if (tmp_str == NULL)
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                return;
+            }
+            os_strncpy(tmp_str, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
+            host_port = atoi(tmp_str);
+            os_free(tmp_str);
+            if (test_cfg.find_pair("request") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'request'", false);
+                return;
+            }
+            if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'request' does not have a string value type", false);
+                return;
+            }
+            request = (char *)os_zalloc(test_cfg.get_cur_pair_value_len() + 1);
+            if (request == NULL)
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                return;
+            }
+            os_strncpy(request, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+        char *msg = (char *)os_zalloc(64 + 20 + os_strlen(request));
+        if (msg)
+        {
+            uint32 *tmp_ptr = &host_ip.addr;
+            os_sprintf(msg,
+                       "{\"host\":\"%d.%d.%d.%d\",\"port\":%d,\"request\":\"%s\"}",
+                       ((char *)tmp_ptr)[0],
+                       ((char *)tmp_ptr)[1],
+                       ((char *)tmp_ptr)[2],
+                       ((char *)tmp_ptr)[3],
+                       host_port,
+                       request);
+            response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, msg, true);
+            // os_free(msg); // dont't free the msg buffer cause it could not have been used yet
+            init_test(host_ip, host_port, request);
+            os_free(request);
+            run_test();
+        }
+        else
+        {
+            os_free(request);
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64 + 20 + os_strlen(request));
+        }
+        return;
+    }
+
     response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "I'm sorry, my responses are limited. You must ask the right question.", false);
 }
 

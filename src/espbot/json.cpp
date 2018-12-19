@@ -109,7 +109,10 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
         while ((ptr - m_str) < m_str_len) // looking for starting '"' or number or object
         {
             if (*ptr == '"') // found a string
+            {
+                m_cur_pair_value_type = JSON_STRING;
                 break;
+            }
             if ((*ptr >= '0') && (*ptr <= '9')) // found a number
             {
                 m_cur_pair_value_type = JSON_INTEGER;

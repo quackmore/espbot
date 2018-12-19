@@ -14,7 +14,9 @@
 #include "esp8266_spiffs.hpp"
 #include "debug.hpp"
 #include "wifi.hpp"
+#include "mdns.hpp"
 #include "webserver.hpp"
+#include "webclient.hpp"
 
 extern Str_list esp_last_errors;
 extern Flashfs espfs;
@@ -22,6 +24,8 @@ extern Dbggr espdebug;
 extern Logger esplog;
 extern Espbot espbot;
 extern Wifi espwifi;
+extern Mdns esp_mDns;
 extern Websvr espwebsvr;
+extern Webclnt espwebclnt;
 
 #endif
