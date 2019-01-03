@@ -14,9 +14,8 @@ extern "C"
 #include "osapi.h"
 #include "ip_addr.h"
 
-int atoi(char *);
-int atoh(char *);
-
+  int atoi(char *);
+  int atoh(char *);
 }
 
 // default library
@@ -59,6 +58,34 @@ public:
   char *get_tail();
   char *next();
   char *prev();
+};
+
+class String
+{
+private:
+  bool m_to_be_free;
+
+public:
+  String(int);       // takes string len
+                     // use this contructor when you want to free memory on variable destruction
+  String(int, bool); // takes string len and
+                     //     false - won't free memory on variable destruction
+                     //     true  - will free memory on variable destruction
+  ~String();
+  char *ref; // string reference
+  int len(void);
+
+  //        EXAMPLE:
+  //
+  //        String tmp_str(128);
+  //        if (tmp_str.ref)
+  //        {
+  //            os_strncpy(tmp_port.ref, "source", source_length);
+  //        }
+  //        else
+  //        {
+  //            ... not enough heap memory ...
+  //        }
 };
 
 #endif

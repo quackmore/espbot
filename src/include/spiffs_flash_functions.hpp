@@ -40,7 +40,7 @@
 
 // debug macros
 #include "espbot_global.hpp"
-#include "debug.hpp"
+#include "logger.hpp"
 #define P_FATAL(...) os_printf(__VA_ARGS__)
 #define P_ERROR(...) os_printf(__VA_ARGS__)
 #define P_WARN(...) os_printf(__VA_ARGS__)

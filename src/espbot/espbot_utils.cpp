@@ -18,13 +18,16 @@ extern "C"
 
 #include "espbot_utils.hpp"
 #include "espbot_global.hpp"
+#include "debug.hpp"
 
 int ICACHE_FLASH_ATTR atoh(char *str)
 {
+    esplog.all("atoh\n");
     int idx = 0;
     int power = 16;
     int tmpvalue;
     int result = 0;
+    espmem.stack_mon();
     while (str[idx] != '\0')
     {
         tmpvalue = 0;
@@ -45,10 +48,12 @@ int ICACHE_FLASH_ATTR atoh(char *str)
 
 void ICACHE_FLASH_ATTR decodeUrlStr(char *str)
 {
+    esplog.all("decodeUrlStr\n");
     char *tmpptr = str;
     char hexchar[3];
     int idx = 0;
     hexchar[2] = 0;
+    espmem.stack_mon();
     while (str[idx] != '\0')
     {
         if (str[idx] == '%')
@@ -68,11 +73,13 @@ void ICACHE_FLASH_ATTR decodeUrlStr(char *str)
 
 void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
 {
+    esplog.all("atoipaddr\n");
     char *tmp_ptr = str;
     char *tmp_str, *end_ptr;
     int len;
     int cnt = 0;
     int tmp_ip[4];
+    espmem.stack_mon();
     while (*tmp_ptr == ' ')
         *tmp_ptr++;
     do
@@ -88,7 +95,7 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
             return;
         }
         len = end_ptr - tmp_ptr;
-        tmp_str = (char *)os_zalloc(len + 1);
+        tmp_str = (char *)esp_zalloc(len + 1);
         if (tmp_str == NULL)
         {
             esplog.error("str_to_ipaddr - not enough heap memory\n");
@@ -97,7 +104,7 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
         }
         os_strncpy(tmp_str, tmp_ptr, len);
         tmp_ip[cnt] = atoi(tmp_str);
-        os_free(tmp_str);
+        esp_free(tmp_str);
         tmp_ptr = end_ptr + 1;
         cnt++;
     } while (cnt <= 3);
@@ -106,6 +113,7 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
 
 ICACHE_FLASH_ATTR Str_list::Str_list(int t_max_size)
 {
+    esplog.all("Str_list::Str_list\n");
     m_size = 0;
     m_max_size = t_max_size;
     m_head = NULL;
@@ -115,12 +123,14 @@ ICACHE_FLASH_ATTR Str_list::Str_list(int t_max_size)
 
 ICACHE_FLASH_ATTR Str_list::~Str_list()
 {
+    esplog.all("Str_list::~Str_list\n");
     for (int idx = 0; idx < m_size; idx++)
         pop_front();
 }
 
 void ICACHE_FLASH_ATTR Str_list::init(int t_max_size)
 {
+    esplog.all("Str_list::init\n");
     m_size = 0;
     m_max_size = t_max_size;
     m_head = NULL;
@@ -130,14 +140,17 @@ void ICACHE_FLASH_ATTR Str_list::init(int t_max_size)
 
 int ICACHE_FLASH_ATTR Str_list::size(void)
 {
+    esplog.all("Str_list::size\n");
     return m_size;
 }
 
 void ICACHE_FLASH_ATTR Str_list::push_back(char *t_str, bool t_to_be_free)
 {
+    esplog.all("Str_list::push_back\n");
     if (m_size == m_max_size)
         pop_front();
-    struct List_el *el_ptr = (struct List_el *)os_zalloc(sizeof(struct List_el));
+    struct List_el *el_ptr = (struct List_el *)esp_zalloc(sizeof(struct List_el));
+    espmem.stack_mon();
     if (el_ptr)
     {
         m_size++;
@@ -161,7 +174,9 @@ void ICACHE_FLASH_ATTR Str_list::push_back(char *t_str, bool t_to_be_free)
 
 void ICACHE_FLASH_ATTR Str_list::pop_front(void)
 {
+    esplog.all("Str_list::pop_front\n");
     struct List_el *el_ptr = m_head;
+    espmem.stack_mon();
     if (m_head)
     {
         m_head = m_head->next;
@@ -171,13 +186,14 @@ void ICACHE_FLASH_ATTR Str_list::pop_front(void)
     if ((m_tail == m_head) && (m_tail)) // there is only one element in the list
         m_tail = NULL;
     if ((el_ptr->content) && (el_ptr->to_be_free))
-        os_free(el_ptr->content);
-    os_free(el_ptr);
+        esp_free(el_ptr->content);
+    esp_free(el_ptr);
     m_size--;
 }
 
 char ICACHE_FLASH_ATTR *Str_list::get_head(void)
 {
+    esplog.all("Str_list::get_head\n");
     m_cursor = m_head;
     if (m_head)
         return m_head->content;
@@ -187,6 +203,7 @@ char ICACHE_FLASH_ATTR *Str_list::get_head(void)
 
 char ICACHE_FLASH_ATTR *Str_list::get_tail(void)
 {
+    esplog.all("Str_list::get_tail\n");
     m_cursor = m_tail;
     if (m_tail)
         return m_tail->content;
@@ -196,6 +213,7 @@ char ICACHE_FLASH_ATTR *Str_list::get_tail(void)
 
 char ICACHE_FLASH_ATTR *Str_list::next(void)
 {
+    esplog.all("Str_list::next\n");
     if (m_cursor)
     {
         m_cursor = m_cursor->next;
@@ -210,6 +228,7 @@ char ICACHE_FLASH_ATTR *Str_list::next(void)
 
 char ICACHE_FLASH_ATTR *Str_list::prev(void)
 {
+    esplog.all("Str_list::prev\n");
     if (m_cursor)
     {
         m_cursor = m_cursor->prev;
@@ -220,4 +239,32 @@ char ICACHE_FLASH_ATTR *Str_list::prev(void)
     }
     else
         return NULL;
+}
+
+ICACHE_FLASH_ATTR String::String(int t_len)
+{
+    esplog.all("String::String()\n");
+    ref = (char *)esp_zalloc(t_len + 1);
+    m_to_be_free = true;
+}
+
+ICACHE_FLASH_ATTR String::String(int t_len, bool t_to_be_free)
+{
+    esplog.all("String::String(,)\n");
+    ref = (char *)esp_zalloc(t_len + 1);
+    m_to_be_free = t_to_be_free;
+}
+
+ICACHE_FLASH_ATTR String::~String()
+{
+    esplog.all("String::~String\n");
+    if (m_to_be_free)
+        if (ref)
+            esp_free(ref);
+}
+
+int ICACHE_FLASH_ATTR String::len(void)
+{
+    esplog.all("String::len\n");
+    return os_strlen(ref);
 }

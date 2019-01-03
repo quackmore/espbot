@@ -18,35 +18,42 @@ extern "C"
 #include "wifi.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "debug.hpp"
+#include "logger.hpp"
 #include "json.hpp"
 #include "espbot_utils.hpp"
+#include "debug.hpp"
 #include "config.hpp"
 
 bool ICACHE_FLASH_ATTR Wifi::is_timeout_timer_active(void)
 {
+    esplog.all("Wifi::is_timeout_timer_active\n");
     return m_timeout_timer_active;
 }
 
 void ICACHE_FLASH_ATTR Wifi::start_connect_timeout_timer(void)
 {
+    esplog.all("Wifi::start_connect_timeout_timer\n");
     os_timer_arm(&m_station_connect_timeout, WIFI_CONNECT_TIMEOUT, 0);
     m_timeout_timer_active = true;
 }
 
 void ICACHE_FLASH_ATTR Wifi::stop_connect_timeout_timer(void)
 {
+    esplog.all("Wifi::stop_connect_timeout_timer\n");
     os_timer_disarm(&m_station_connect_timeout);
 }
 
 void ICACHE_FLASH_ATTR Wifi::start_wait_before_reconnect_timer(void)
 {
+    esplog.all("Wifi::start_wait_before_reconnect_timer\n");
     os_timer_arm(&m_wait_before_reconnect, WIFI_WAIT_BEFORE_RECONNECT, 0);
 }
 
 void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
 {
+    esplog.all("Wifi::wifi_event_handler\n");
     uint32 dummy;
+    espmem.stack_mon();
 
     switch (evt->event)
     {
@@ -143,8 +150,10 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
 
 void ICACHE_FLASH_ATTR Wifi::switch_to_stationap(void)
 {
+    esplog.all("Wifi::switch_to_stationap\n");
     struct ip_info ap_ip;
     struct dhcps_lease dhcp_lease;
+    espmem.stack_mon();
 
     espwifi.m_timeout_timer_active = false;
 
@@ -190,7 +199,9 @@ void ICACHE_FLASH_ATTR Wifi::switch_to_stationap(void)
 
 void ICACHE_FLASH_ATTR Wifi::connect(void)
 {
+    esplog.all("Wifi::connect\n");
     struct station_config stationConf;
+    espmem.stack_mon();
 
     if (os_strlen(espwifi.m_station_ssid) == 0 || os_strlen(espwifi.m_station_pwd) == 0)
     {
@@ -213,6 +224,7 @@ void ICACHE_FLASH_ATTR Wifi::connect(void)
 
 void ICACHE_FLASH_ATTR Wifi::init()
 {
+    esplog.all("Wifi::init\n");
     os_strncpy((char *)m_ap_config.ssid, espbot.get_name(), 32); // uint8 ssid[32];
     os_strcpy((char *)m_ap_config.password, "espbot123456");     // uint8 password[64];
     m_ap_config.ssid_len = 0;                                    // uint8 ssid_len;
@@ -253,17 +265,21 @@ void ICACHE_FLASH_ATTR Wifi::init()
 
 char ICACHE_FLASH_ATTR *Wifi::station_get_ssid(void)
 {
+    esplog.all("Wifi::station_get_ssid\n");
     return m_station_ssid;
 }
 
 char ICACHE_FLASH_ATTR *Wifi::station_get_password(void)
 {
+    esplog.all("Wifi::station_get_password\n");
     return m_station_pwd;
 }
 
 int ICACHE_FLASH_ATTR Wifi::restore_cfg(void)
 {
+    esplog.all("Wifi::restore_cfg\n");
     File_to_json cfgfile("wifi.cfg");
+    espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string("station_ssid"))
@@ -291,7 +307,9 @@ int ICACHE_FLASH_ATTR Wifi::restore_cfg(void)
 
 int ICACHE_FLASH_ATTR Wifi::saved_cfg_not_update(void)
 {
+    esplog.all("Wifi::saved_cfg_not_update\n");
     File_to_json cfgfile("wifi.cfg");
+    espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string("station_ssid"))
@@ -322,18 +340,22 @@ int ICACHE_FLASH_ATTR Wifi::saved_cfg_not_update(void)
 
 int ICACHE_FLASH_ATTR Wifi::save_cfg(void)
 {
+    esplog.all("Wifi::save_cfg\n");
+    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+        return CFG_OK;
     if (espfs.is_available())
     {
         Ffile cfgfile(&espfs, "wifi.cfg");
+        espmem.stack_mon();
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)os_zalloc(200);
+            char *buffer = (char *)esp_zalloc(200);
             if (buffer)
             {
                 os_sprintf(buffer, "{\"station_ssid\": \"%s\",\"station_pwd\": \"%s\"}", espwifi.m_station_ssid, espwifi.m_station_pwd);
                 cfgfile.n_append(buffer, os_strlen(buffer));
-                os_free(buffer);
+                esp_free(buffer);
             }
             else
             {
@@ -357,6 +379,7 @@ int ICACHE_FLASH_ATTR Wifi::save_cfg(void)
 
 void ICACHE_FLASH_ATTR Wifi::station_set_ssid(char *t_str, int t_len)
 {
+    esplog.all("Wifi::station_set_ssid\n");
     os_memset(m_station_ssid, 0, 32);
     if (t_len > 31)
     {
@@ -371,6 +394,7 @@ void ICACHE_FLASH_ATTR Wifi::station_set_ssid(char *t_str, int t_len)
 
 void ICACHE_FLASH_ATTR Wifi::station_set_pwd(char *t_str, int t_len)
 {
+    esplog.all("Wifi::station_set_ssid\n");
     os_memset(m_station_pwd, 0, 64);
     if (t_len > 63)
     {
@@ -385,18 +409,20 @@ void ICACHE_FLASH_ATTR Wifi::station_set_pwd(char *t_str, int t_len)
 
 void ICACHE_FLASH_ATTR Wifi::scan_for_ap(void)
 {
+    esplog.all("Wifi::scan_for_ap\n");
     m_scan_completed = false;
     wifi_station_scan(m_scan_config, (scan_done_cb_t)Wifi::scan_completed);
 }
 
 bool ICACHE_FLASH_ATTR Wifi::scan_for_ap_completed(void)
 {
+    esplog.all("Wifi::scan_for_ap_completed\n");
     return m_scan_completed;
 }
 
 void ICACHE_FLASH_ATTR Wifi::scan_completed(void *arg, STATUS status)
 {
-    esplog.trace("ap scan_completed\n");
+    esplog.all("Wifi::scan_completed\n");
     // delete previuos results
     espwifi.free_ap_list();
     // now check results
@@ -410,7 +436,7 @@ void ICACHE_FLASH_ATTR Wifi::scan_completed(void *arg, STATUS status)
             scan_list = scan_list->next.stqe_next;
         }
         // now store APs SSID
-        espwifi.m_ap_list = (char *)os_zalloc(33 * espwifi.m_ap_count);
+        espwifi.m_ap_list = (char *)esp_zalloc(33 * espwifi.m_ap_count);
         if (espwifi.m_ap_list)
         {
             int idx = 0;
@@ -432,11 +458,13 @@ void ICACHE_FLASH_ATTR Wifi::scan_completed(void *arg, STATUS status)
 
 int ICACHE_FLASH_ATTR Wifi::get_ap_count(void)
 {
+    esplog.all("Wifi::get_ap_count\n");
     return m_ap_count;
 }
 
 char ICACHE_FLASH_ATTR *Wifi::get_ap_name(int t_idx)
 {
+    esplog.all("Wifi::get_ap_name\n");
     if (t_idx < m_ap_count)
         return (m_ap_list + (33 * t_idx));
     else
@@ -445,10 +473,11 @@ char ICACHE_FLASH_ATTR *Wifi::get_ap_name(int t_idx)
 
 void ICACHE_FLASH_ATTR Wifi::free_ap_list(void)
 {
+    esplog.all("Wifi::free_ap_list\n");
     m_ap_count = 0;
     if (m_ap_list)
     {
-        os_free(m_ap_list);
-        m_ap_list=NULL;
+        esp_free(m_ap_list);
+        m_ap_list = NULL;
     }
 }

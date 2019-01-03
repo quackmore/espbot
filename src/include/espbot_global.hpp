@@ -10,22 +10,27 @@
 #define __ESPBOT_GLOBAL_HPP__
 
 
+#include "debug.hpp"
 #include "espbot.hpp"
 #include "esp8266_spiffs.hpp"
-#include "debug.hpp"
+#include "logger.hpp"
 #include "wifi.hpp"
 #include "mdns.hpp"
+#include "sntp.hpp"
 #include "webserver.hpp"
 #include "webclient.hpp"
+#include "ota_upgrade.hpp"
 
 extern Str_list esp_last_errors;
 extern Flashfs espfs;
-extern Dbggr espdebug;
+extern Esp_mem espmem;
 extern Logger esplog;
 extern Espbot espbot;
 extern Wifi espwifi;
 extern Mdns esp_mDns;
+extern Sntp esp_sntp;
 extern Websvr espwebsvr;
 extern Webclnt espwebclnt;
+extern Ota_upgrade esp_ota;
 
 #endif

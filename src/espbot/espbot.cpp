@@ -22,13 +22,13 @@ extern "C"
 #include "espbot_release.h"
 }
 
+#include "debug.hpp"
 #include "espbot_global.hpp"
 #include "espbot.hpp"
 #include "esp8266_spiffs.hpp"
-#include "debug.hpp"
+#include "logger.hpp"
 #include "json.hpp"
 #include "config.hpp"
-
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -50,17 +50,20 @@ static void ICACHE_FLASH_ATTR print_greetings(void)
 
 static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
 {
+    esplog.all("espbot_coordinator_task\n");
     switch (e->sig)
     {
     case SIG_STAMODE_GOT_IP:
         // [wifi station] got IP
         esp_mDns.start();
+        esp_sntp.start();
         espwebsvr.stop(); // in case there was a web server listening on esp AP interface
         espwebsvr.start(80);
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
         esp_mDns.stop();
+        esp_sntp.stop();
         break;
     case SIG_SOFTAPMODE_STACONNECTED:
         // [wifi station+AP] station connected
@@ -77,42 +80,52 @@ static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
 
 static void ICACHE_FLASH_ATTR heartbeat_cb(void)
 {
+    esplog.all("heartbeat_cb\n");
     P_DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
+    uint32 current_timestamp = esp_sntp.get_timestamp();
+    P_DEBUG("ESPBOT HEARTBEAT: (UT+1) [%d] %s", esp_sntp.get_timestr(current_timestamp), current_timestamp);
     P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
 }
 
 uint32 ICACHE_FLASH_ATTR Espbot::get_chip_id(void)
 {
+    esplog.all("Espbot::get_chip_id\n");
     return system_get_chip_id();
 }
 
 uint8 ICACHE_FLASH_ATTR Espbot::get_boot_version(void)
 {
+    esplog.all("Espbot::get_boot_version\n");
     return system_get_boot_version();
 }
 
 const char ICACHE_FLASH_ATTR *Espbot::get_sdk_version(void)
 {
+    esplog.all("Espbot::get_sdk_version\n");
     return system_get_sdk_version();
 }
 
 char ICACHE_FLASH_ATTR *Espbot::get_alias(void)
 {
+    esplog.all("Espbot::get_alias\n");
     return (char *)ESPBOT_ALIAS;
 }
 
 char ICACHE_FLASH_ATTR *Espbot::get_version(void)
 {
+    esplog.all("Espbot::get_version\n");
     return (char *)ESPBOT_RELEASE;
 }
 
 char ICACHE_FLASH_ATTR *Espbot::get_name(void)
 {
+    esplog.all("Espbot::get_name\n");
     return m_name;
 }
 
 void ICACHE_FLASH_ATTR Espbot::set_name(char *t_name)
 {
+    esplog.all("Espbot::set_name\n");
     os_memset(m_name, 0, 32);
     if (os_strlen(t_name) > 31)
     {
@@ -127,15 +140,16 @@ extern "C" void espbot_init(void);
 
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
+    espmem.init();
     uart_init(BIT_RATE_115200, BIT_RATE_115200);
     system_set_os_print(1); // enable log print
     print_greetings();
 
     esp_last_errors.init(20);
     espfs.init();
-    espdebug.init();
     esplog.init();
     espbot.init();
+    esp_ota.init();
     espwebclnt.init();
 
     espwifi.init();
@@ -143,7 +157,9 @@ void ICACHE_FLASH_ATTR espbot_init(void)
 
 int ICACHE_FLASH_ATTR Espbot::restore_cfg(void)
 {
+    esplog.all("Espbot::restore_cfg\n");
     File_to_json cfgfile("espbot.cfg");
+    espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string("espbot_name"))
@@ -163,7 +179,9 @@ int ICACHE_FLASH_ATTR Espbot::restore_cfg(void)
 
 int ICACHE_FLASH_ATTR Espbot::saved_cfg_not_update(void)
 {
+    esplog.all("Espbot::saved_cfg_not_update\n");
     File_to_json cfgfile("espbot.cfg");
+    espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string("espbot_name"))
@@ -185,6 +203,7 @@ int ICACHE_FLASH_ATTR Espbot::saved_cfg_not_update(void)
 
 int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
 {
+    esplog.all("Espbot::save_cfg\n");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
@@ -193,12 +212,13 @@ int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)os_zalloc(64);
+            char *buffer = (char *)esp_zalloc(64);
+            espmem.stack_mon();
             if (buffer)
             {
                 os_sprintf(buffer, "{\"espbot_name\": \"%s\"}", m_name);
                 cfgfile.n_append(buffer, os_strlen(buffer));
-                os_free(buffer);
+                esp_free(buffer);
             }
             else
             {
@@ -233,12 +253,14 @@ static os_timer_t graceful_rst_timer;
 
 static void ICACHE_FLASH_ATTR graceful_reset(void)
 {
+    esplog.all("graceful_reset\n");
     graceful_rst_counter++;
     espbot.reset();
 }
 
 void ICACHE_FLASH_ATTR Espbot::reset(void)
 {
+    esplog.all("Espbot::reset\n");
     switch (graceful_rst_counter)
     {
     case 0:
@@ -247,6 +269,8 @@ void ICACHE_FLASH_ATTR Espbot::reset(void)
         break;
     case 1:
         espwebsvr.stop();
+        esp_mDns.stop();
+        esp_sntp.stop();
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
         os_timer_arm(&graceful_rst_timer, 200, 0);
         break;
@@ -265,6 +289,7 @@ void ICACHE_FLASH_ATTR Espbot::reset(void)
 
 void ICACHE_FLASH_ATTR Espbot::init(void)
 {
+    esplog.all("Espbot::init\n");
     // set default name
     os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
     if (restore_cfg())
@@ -280,7 +305,7 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
 
     // setup the task
-    m_queue = (os_event_t *)os_malloc(sizeof(os_event_t) * QUEUE_LEN);
+    m_queue = (os_event_t *)esp_zalloc(sizeof(os_event_t) * QUEUE_LEN);
     system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
 
     esplog.info("Espbot::init complete\n");

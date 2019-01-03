@@ -16,6 +16,7 @@ extern "C"
 #include "spi_flash.h"
 }
 
+#include "debug.hpp"
 #include "spiffs_flash_functions.hpp"
 
 // flash read function (checkout SPIFFS documentation)
@@ -27,6 +28,7 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
     u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
     // and how many bytes are required by alignment
     int align_bytes = t_addr % FS_ALIGN_BYTES;
+    espmem.stack_mon();
 
     // boundary checks
     if ((start_addr < FS_START) || (start_addr >= FS_END) ||
@@ -39,7 +41,7 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 
     // let's use aligned ram variables
     // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
+    uint32 buffer_space = (uint32)esp_zalloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
     uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
 
     while (t_size > 0)
@@ -52,13 +54,13 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
         if (res == SPI_FLASH_RESULT_ERR)
         {
             P_ERROR("[ERROR]: error reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
+            esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             P_ERROR("[ERROR]: timeout reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
+            esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
 
@@ -84,7 +86,7 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
             t_size = 0;
         }
     }
-    os_free((void *)buffer_space);
+    esp_free((void *)buffer_space);
     return SPIFFS_OK;
 }
 
@@ -109,8 +111,9 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src
 
     // let's use aligned ram variable
     // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)os_malloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
+    uint32 buffer_space = (uint32)esp_zalloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
     uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
+    espmem.stack_mon();
 
     while (t_size > 0)
     {
@@ -122,13 +125,13 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src
         if (res == SPI_FLASH_RESULT_ERR)
         {
             P_ERROR("[ERROR]: error reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
+            esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             P_ERROR("[ERROR]: timeout reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-            os_free((void *)buffer_space);
+            esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
 
@@ -148,13 +151,13 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src
             if (res == SPI_FLASH_RESULT_ERR)
             {
                 P_ERROR("[ERROR]: Error writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
+                esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_ERR;
             }
             if (res == SPI_FLASH_RESULT_TIMEOUT)
             {
                 P_ERROR("[ERROR]: Timeout writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
+                esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_TIMEOUT;
             }
 
@@ -178,19 +181,19 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src
             if (res == SPI_FLASH_RESULT_ERR)
             {
                 P_ERROR("[ERROR]: Error writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
+                esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_ERR;
             }
             if (res == SPI_FLASH_RESULT_TIMEOUT)
             {
                 P_ERROR("[ERROR]: Timeout writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
-                os_free((void *)buffer_space);
+                esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_TIMEOUT;
             }
             t_size = 0;
         }
     }
-    os_free((void *)buffer_space);
+    esp_free((void *)buffer_space);
     return SPIFFS_OK;
 }
 
@@ -212,6 +215,7 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_erase(u32_t t_addr, u32_t t_size)
     // find sector number and offset from sector start
     uint16_t sect_number = t_addr / FLASH_SECT_SIZE;
     uint32_t sect_offset = t_addr % FLASH_SECT_SIZE;
+    espmem.stack_mon();
 
     while (t_size > 0)
     {

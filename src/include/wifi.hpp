@@ -67,7 +67,7 @@ public:
   void station_set_pwd(char *t_str, int t_len);  // won't save configuraion to flash
   char *station_get_ssid(void);
   char *station_get_password(void);
-  int save_cfg(void); // return 0 on success, otherwise 1
+  int save_cfg(void); // return 0 on success, otherwise 1 save configuration to flash
 
   static void switch_to_stationap(void); // static because called by timer exhaustion (pointer required)
   static void connect(void);             // static because called by timer exhaustion (pointer required)

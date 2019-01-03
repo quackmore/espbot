@@ -18,10 +18,11 @@ extern "C"
 #include "mdns.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "debug.hpp"
+#include "logger.hpp"
 
 void ICACHE_FLASH_ATTR Mdns::start(void)
 {
+    esplog.all("Mdns::start\n");
     struct ip_info ipconfig;
     wifi_get_ip_info(STATION_IF, &ipconfig);
     m_info.host_name = espbot.get_name();
@@ -36,6 +37,7 @@ void ICACHE_FLASH_ATTR Mdns::start(void)
 
 void ICACHE_FLASH_ATTR Mdns::stop(void)
 {
+    esplog.all("Mdns::stop\n");
     espconn_mdns_close();
     esplog.info("mDns ended\n");
 }

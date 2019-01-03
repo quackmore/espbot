@@ -6,326 +6,195 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-// SDK includes
+
 extern "C"
 {
-#include <stdarg.h>
-#include "osapi.h"
 #include "mem.h"
 #include "user_interface.h"
-}
-extern "C"
-{
-    int ets_vsprintf(char *str, const char *format, va_list argptr);
-    int ets_vsnprintf(char *buffer, unsigned int sizeOfBuffer, const char *format, va_list argptr);
 }
 
 #include "debug.hpp"
 #include "espbot_global.hpp"
-#include "esp8266_spiffs.hpp"
-#include "espbot_utils.hpp"
-#include "json.hpp"
-#include "config.hpp"
 
 /*
  * DEBUGGER
  */
 
-void ICACHE_FLASH_ATTR Dbggr::init(void)
+void ICACHE_FLASH_ATTR Esp_mem::init(void)
 {
-    m_min_heap_size = 65535;
-    os_printf("[INFO]: Dbggr::init complete\n");
+    uint32 first_stack_var;
+    void *heap_var = os_zalloc(1);
+
+    // stack vars
+    m_stack_min_addr = (uint32)&first_stack_var;
+    m_stack_max_addr = (uint32)&first_stack_var;
+
+    // init heap infos and data structures
+    m_heap_start_addr = (uint32)heap_var;
+    if (heap_var)
+        os_free(heap_var);
+    m_max_heap_size = system_get_free_heap_size();
+    m_min_heap_size = m_max_heap_size;
+    m_heap_objs = 0;
+    m_max_heap_objs = 0;
+
+    int ii;
+    for (ii = 0; ii < HEAP_ARRAY_SIZE; ii++)
+    {
+        m_heap_array[ii].size = 0;
+        m_heap_array[ii].addr = 0;
+        m_heap_array[ii].next_item = ii + 1;
+    }
+    m_heap_array[HEAP_ARRAY_SIZE - 1].next_item = -1;
+    m_first_heap_item = -1;
+    m_first_free_heap_item = 0;
+    stack_mon();
 }
 
-uint32 ICACHE_FLASH_ATTR Dbggr::check_heap_size(void)
+void ICACHE_FLASH_ATTR Esp_mem::heap_mon(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
+    esplog.all("Esp_mem::heap_mon: %d\n", currentHeap);
     if (m_min_heap_size > currentHeap)
         m_min_heap_size = currentHeap;
-    return currentHeap;
 }
-uint32 ICACHE_FLASH_ATTR Dbggr::get_mim_heap_size(void)
+
+void ICACHE_FLASH_ATTR Esp_mem::stack_mon(void)
 {
+    uint32 stack_var_addr = (uint32)&stack_var_addr;
+    esplog.all("Dbggr::stack_mon\n");
+    if (stack_var_addr > m_stack_max_addr)
+        m_stack_max_addr = stack_var_addr;
+    if (stack_var_addr < m_stack_min_addr)
+        m_stack_min_addr = stack_var_addr;
+}
+
+void *Esp_mem::espbot_zalloc(size_t size)
+{
+    esplog.all("espbot_zalloc\n");
+    void *addr = os_zalloc(size);
+    if (addr)
+    {
+        espmem.m_heap_objs++;
+        if (espmem.m_heap_objs > espmem.m_max_heap_objs)
+            espmem.m_max_heap_objs = espmem.m_heap_objs;
+        if (espmem.m_first_free_heap_item != -1)
+        {
+            int tmp_ptr = espmem.m_first_free_heap_item;
+            espmem.m_first_free_heap_item = espmem.m_heap_array[espmem.m_first_free_heap_item].next_item;
+            espmem.m_heap_array[tmp_ptr].size = size;
+            espmem.m_heap_array[tmp_ptr].addr = addr;
+            espmem.m_heap_array[tmp_ptr].next_item = espmem.m_first_heap_item;
+            espmem.m_first_heap_item = tmp_ptr;
+            espmem.stack_mon();
+        }
+    }
+    espmem.heap_mon();
+    return addr;
+}
+
+void Esp_mem::espbot_free(void *addr)
+{
+    esplog.all("espbot_free\n");
+    espmem.m_heap_objs--;
+    os_free(addr);
+    int prev_ptr = espmem.m_first_heap_item;
+    int tmp_ptr = espmem.m_first_heap_item;
+    espmem.stack_mon();
+    while (tmp_ptr != -1)
+    {
+        if (espmem.m_heap_array[tmp_ptr].addr == addr)
+        {
+            // eliminate cuurent item from heap allocated items list
+            if (tmp_ptr == espmem.m_first_heap_item)
+                espmem.m_first_heap_item = espmem.m_heap_array[tmp_ptr].next_item;
+            else
+                espmem.m_heap_array[prev_ptr].next_item = espmem.m_heap_array[tmp_ptr].next_item;
+
+            // clear the heap item
+            espmem.m_heap_array[tmp_ptr].size = 0;
+            espmem.m_heap_array[tmp_ptr].addr = 0;
+
+            // insert it into free heap items list
+            espmem.m_heap_array[tmp_ptr].next_item = espmem.m_first_free_heap_item;
+            espmem.m_first_free_heap_item = tmp_ptr;
+
+            break;
+        }
+        prev_ptr = tmp_ptr;
+        tmp_ptr = espmem.m_heap_array[tmp_ptr].next_item;
+    }
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_min_stack_addr(void)
+{
+    esplog.all("Esp_mem::get_min_stack_addr\n");
+    return m_stack_min_addr;
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_stack_addr(void)
+{
+    esplog.all("Esp_mem::get_max_stack_addr\n");
+    return m_stack_max_addr;
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_start_heap_addr(void)
+{
+    esplog.all("Esp_mem::get_start_heap_addr\n");
+    return m_heap_start_addr;
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_heap_size(void)
+{
+    esplog.all("Esp_mem::get_max_heap_size\n");
+    return m_max_heap_size;
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_mim_heap_size(void)
+{
+    esplog.all("Esp_mem::get_mim_heap_size\n");
     return m_min_heap_size;
 }
 
-/*
- * LOGGER
- */
-
-#define DEBUG_CFG_FILE_SIZE 128
-
-int ICACHE_FLASH_ATTR Logger::restore_cfg(void)
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_used_heap_size(void)
 {
-    File_to_json cfgfile("logger.cfg");
-    if (cfgfile.exists())
+    esplog.all("Esp_mem::get_used_heap_size\n");
+    int used_heap = 0;
+    struct heap_item *item_ptr = next_heap_item(0);
+    stack_mon();
+    while (item_ptr)
     {
-        if (cfgfile.find_string("logger_serial_level"))
-        {
-            esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
-            return CFG_ERROR;
-        }
-        m_serial_level = atoi(cfgfile.get_value());
-        if (cfgfile.find_string("logger_memory_level"))
-        {
-            esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
-            return CFG_ERROR;
-        }
-        m_memory_level = atoi(cfgfile.get_value());
-        return CFG_OK;
+        used_heap += item_ptr->size;
+        item_ptr = next_heap_item(1);
+    }
+    return used_heap;
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_heap_objs(void)
+{
+    esplog.all("Esp_mem::get_max_heap_objs\n");
+    return m_max_heap_objs;
+}
+
+struct heap_item *Esp_mem::next_heap_item(int value)
+{
+    esplog.all("next_heap_item\n");
+    static struct heap_item *item_ptr = NULL;
+    stack_mon();
+    if (value == 0)
+    {
+        if (m_first_heap_item != -1)
+            item_ptr = &m_heap_array[m_first_heap_item];
     }
     else
     {
-        esplog.info("Logger::restore_cfg - cfg file not found\n");
-        return CFG_ERROR;
-    }
-}
-
-int ICACHE_FLASH_ATTR Logger::saved_cfg_not_update(void)
-{
-    File_to_json cfgfile("logger.cfg");
-    if (cfgfile.exists())
-    {
-        if (cfgfile.find_string("logger_serial_level"))
+        if (item_ptr)
         {
-            esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
-            return CFG_ERROR;
-        }
-        if (m_serial_level != atoi(cfgfile.get_value()))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        if (cfgfile.find_string("logger_memory_level"))
-        {
-            esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
-            return CFG_ERROR;
-        }
-        if (m_memory_level != atoi(cfgfile.get_value()))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        return CFG_OK;
-    }
-    else
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-}
-
-int ICACHE_FLASH_ATTR Logger::save_cfg(void)
-{
-    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    if (espfs.is_available())
-    {
-        Ffile cfgfile(&espfs, "logger.cfg");
-        if (cfgfile.is_available())
-        {
-            cfgfile.clear();
-            char *buffer = (char *)os_zalloc(64);
-            if (buffer)
-            {
-                os_sprintf(buffer, "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}", m_serial_level, m_memory_level);
-                cfgfile.n_append(buffer, os_strlen(buffer));
-                os_free(buffer);
-            }
+            if (item_ptr->next_item != -1)
+                item_ptr = &m_heap_array[item_ptr->next_item];
             else
-            {
-                esplog.error("Logger::save_cfg - not enough heap memory available (%d)\n", 64);
-                return CFG_ERROR;
-            }
-        }
-        else
-        {
-            esplog.error("Logger::save_cfg - cannot open logger.cfg\n");
-            return CFG_ERROR;
+                item_ptr = NULL;
         }
     }
-    else
-    {
-        esplog.error("Logger::save_cfg - file system not available\n");
-        return CFG_ERROR;
-    }
-    return CFG_OK;
-}
-
-void ICACHE_FLASH_ATTR Logger::init(void)
-{
-    m_serial_level = LOG_INFO;
-    m_memory_level = LOG_ERROR;
-    if (restore_cfg())
-    {
-        esplog.info("Logger::init - starting with default configuration\n");
-    }
-}
-
-int ICACHE_FLASH_ATTR Logger::get_serial_level(void)
-{
-    return m_serial_level;
-}
-
-int ICACHE_FLASH_ATTR Logger::get_memory_level(void)
-{
-    return m_memory_level;
-}
-
-void ICACHE_FLASH_ATTR Logger::set_levels(char t_serial_level, char t_memory_level)
-{
-    if ((m_serial_level != t_serial_level) || (m_memory_level != t_memory_level))
-    {
-        m_serial_level = t_serial_level;
-        m_memory_level = t_memory_level;
-        save_cfg();
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
-{
-    if ((m_serial_level >= LOG_FATAL) || (m_memory_level >= LOG_FATAL))
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        if (m_serial_level >= LOG_FATAL)
-            os_printf_plus("[FATAL] %s", buffer);
-        if (m_memory_level >= LOG_FATAL)
-        {
-            char *json_ptr = (char *)os_zalloc(36 + os_strlen(buffer));
-            if (json_ptr)
-            {
-                os_sprintf(json_ptr,
-                           "{\"time\": %d,\"msg\":\"[FATAL] %s\"}",
-                           system_get_time(), buffer);
-                esp_last_errors.push_back(json_ptr, true);
-            }
-        }
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
-{
-    if ((m_serial_level >= LOG_ERROR) || (m_memory_level >= LOG_ERROR))
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        if (m_serial_level >= LOG_ERROR)
-            os_printf_plus("[ERROR] %s", buffer);
-        if (m_memory_level >= LOG_ERROR)
-        {
-            char *json_ptr = (char *)os_zalloc(36 + os_strlen(buffer));
-            if (json_ptr)
-            {
-                os_sprintf(json_ptr,
-                           "{\"time\": %d,\"msg\":\"[ERROR] %s\"}",
-                           system_get_time(), buffer);
-                esp_last_errors.push_back(json_ptr, true);
-            }
-        }
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
-{
-    if ((m_serial_level >= LOG_WARN) || (m_memory_level >= LOG_WARN))
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        if (m_serial_level >= LOG_WARN)
-            os_printf_plus("[WARN] %s", buffer);
-        if (m_memory_level >= LOG_WARN)
-        {
-            char *json_ptr = (char *)os_zalloc(36 + os_strlen(buffer));
-            if (json_ptr)
-            {
-                os_sprintf(json_ptr,
-                           "{\"time\": %d,\"msg\":\"[WARN] %s\"}",
-                           system_get_time(), buffer);
-                esp_last_errors.push_back(json_ptr, true);
-            }
-        }
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
-{
-    if (m_serial_level < LOG_INFO)
-        return;
-    else
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        os_printf_plus("[INFO] %s", buffer);
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::debug(const char *t_format, ...)
-{
-    if (m_serial_level < LOG_DEBUG)
-        return;
-    else
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        os_printf_plus("[DEBUG] %s", buffer);
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::trace(const char *t_format, ...)
-{
-    if (m_serial_level < LOG_TRACE)
-        return;
-    else
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        os_printf_plus("[TRACE] %s", buffer);
-    }
-}
-
-void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
-{
-    if (m_serial_level < LOG_ALL)
-        return;
-    else
-    {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        os_printf_plus("[ALL] %s", buffer);
-    }
-}
-
-/*
- * PROFILER
- */
-
-ICACHE_FLASH_ATTR Profiler::Profiler(char *t_str)
-{
-    m_msg = t_str;
-    m_start_time_us = system_get_time();
-}
-
-ICACHE_FLASH_ATTR Profiler::~Profiler()
-{
-    m_stop_time_us = system_get_time();
-    os_printf("ESPBOT PROFILER: %s: %d\n", m_msg, (m_stop_time_us - m_start_time_us));
+    return item_ptr;
 }

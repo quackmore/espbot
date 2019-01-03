@@ -6,100 +6,80 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __DEBUG_HPP__
-#define __DEBUG_HPP__
+#ifndef __DEBUG_H__
+#define __DEBUG_H__
 
 extern "C"
 {
-#include "c_types.h"
+#include "mem.h"
 }
 
-#include "espbot_utils.hpp"
+#define ESPBOT_MEM 1
 
-#define LOG_OFF 0
-#define LOG_FATAL 1
-#define LOG_ERROR 2
-#define LOG_WARN 3
-#define LOG_INFO 4
-#define LOG_DEBUG 5
-#define LOG_TRACE 6
-#define LOG_ALL 7
-#define LOG_BUF_SIZE 1024
+#ifdef ESPBOT_MEM
 
-// found somewhere on www.esp8266.com
-// 3fffeb30 and 3fffffff is the designated area for the user stack
+#define esp_zalloc(a) espmem.espbot_zalloc(a)
+#define esp_free(a) espmem.espbot_free(a)
+#define esp_stack_mon(a) espmem.stack_mon()
 
-#define DEBUG_MAX_SAVED_ERRORS 20
-#define DEBUG_MAX_FILE_SAVED_ERRORS 20
+#else
 
-#define CFG_OK 0
-#define CFG_REQUIRES_UPDATE 1
-#define CFG_ERROR 2
+#define esp_zalloc(a) os_zalloc(a)
+#define esp_free(a) os_free(a)
+#define esp_stack_mon(a)
 
-class Dbggr
+#endif
+
+struct heap_item
 {
-private:
-  uint32 m_min_heap_size;
-
-public:
-  Dbggr(){};
-  ~Dbggr(){};
-
-  void init(void);
-  uint32 check_heap_size(void);   // return current heap size and eventually update minimum value
-  uint32 get_mim_heap_size(void);
+    int size;
+    void *addr;
+    int next_item;
 };
 
-class Logger
+#define HEAP_ARRAY_SIZE 20
+
+class Esp_mem
 {
-private:
-  int m_serial_level;
-  int m_memory_level;
+  private:
+    // stack infos
+    uint32 m_stack_min_addr;
+    uint32 m_stack_max_addr;
+    // heap infos
+    uint32 m_heap_start_addr;
+    uint32 m_max_heap_size;
+    uint32 m_min_heap_size;
+    uint32 m_heap_objs;
+    uint32 m_max_heap_objs;
 
-  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
-  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
-                                  // return CFG_REQUIRES_UPDATE when cfg require update
-                                  // return CFG_ERROR otherwise
-  int save_cfg(void);             // return CFG_OK on success, otherwise CFG_ERROR
+    struct heap_item m_heap_array[HEAP_ARRAY_SIZE];
+    int m_first_heap_item;
+    int m_first_free_heap_item;
 
-public:
-  Logger(){};
-  ~Logger(){};
+    void heap_mon(void);
 
-  void init();
-  int get_serial_level(void);
-  int get_memory_level(void);
-  void set_levels(char t_serial_level, char t_memory_level);
+  public:
+    Esp_mem(){};
+    ~Esp_mem(){};
 
-  void fatal(const char *, ...);
-  void error(const char *, ...);
-  void warn(const char *, ...);
-  void info(const char *, ...);
-  void debug(const char *, ...);
-  void trace(const char *, ...);
-  void all(const char *, ...);
-};
+    void init(void);
 
-class Profiler
-{
-private:
-  char *m_msg;
-  uint32_t m_start_time_us;
-  uint32_t m_stop_time_us;
+    void stack_mon(void);
 
-public:
-  Profiler(char *); // pass the message to be printed
-                    // constructor will start the timer
-  ~Profiler();      // destructor will stop the timer and print elapsed msg to serial
-  // EXAMPLE
-  // {
-  //    Profiler esp_profiler;
-  //    ...
-  //    this is the code you want to profile
-  //    place it into a block
-  //    and declare a Profiler object at the beginning
-  //    ...
-  // }
+    static void *espbot_zalloc(size_t);
+    static void espbot_free(void *);
+
+    uint32 get_min_stack_addr(void);
+    uint32 get_max_stack_addr(void);
+
+    uint32 get_start_heap_addr(void);
+    uint32 get_max_heap_size(void);
+    uint32 get_mim_heap_size(void);
+    uint32 get_used_heap_size(void);
+    uint32 get_max_heap_objs(void);
+    struct heap_item *next_heap_item(int); // 0 -> return the first heap allocated item
+                                           // 1 -> return the next heap allocated item
+                                           // return NULL if no item is found
 };
 
 #endif

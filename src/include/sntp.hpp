@@ -7,19 +7,26 @@
  * ----------------------------------------------------------------------------
  */
 
-#include "espbot_global.hpp"
+#ifndef __SNTP_HPP__
+#define __SNTP_HPP__
 
-// global variables for esp8266 
-Str_list esp_last_errors(20); // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Esp_mem espmem;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Sntp esp_sntp;
-Websvr espwebsvr;
-Webclnt espwebclnt;
-Ota_upgrade esp_ota;
+extern "C"
+{
+#include "c_types.h"
+}
 
+class Sntp
+{
+private:
+
+public:
+  Sntp(){};
+  ~Sntp(){};
+
+  void start(void);
+  void stop(void);
+  uint32 get_timestamp();
+  char *get_timestr(uint32);
+};
+
+#endif

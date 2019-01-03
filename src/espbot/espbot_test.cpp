@@ -18,6 +18,7 @@ extern "C"
 
 #include "espbot_test.hpp"
 #include "espbot_global.hpp"
+#include "debug.hpp"
 
 // function for testing purpose
 
@@ -27,6 +28,7 @@ static os_timer_t test_timer;
 
 static void ICACHE_FLASH_ATTR test_function(void)
 {
+    esplog.all("test_function\n");
     run_test();
 }
 
@@ -36,9 +38,10 @@ static char *ota_request;
 
 void ICACHE_FLASH_ATTR init_test(struct ip_addr ip, uint32 port, char *request)
 {
+    esplog.all("init_test\n");
     os_memcpy(&ota_server_ip, &ip, sizeof(struct ip_addr));
     ota_server_port = port;
-    ota_request = (char *)os_zalloc(48 + 12 + os_strlen(request));
+    ota_request = (char *)esp_zalloc(48 + 12 + os_strlen(request));
     if (ota_request == NULL)
     {
         os_printf("os_zalloc error\n");
@@ -61,6 +64,7 @@ void ICACHE_FLASH_ATTR init_test(struct ip_addr ip, uint32 port, char *request)
 
 void ICACHE_FLASH_ATTR run_test(void)
 {
+    esplog.all("run_test\n");
     system_soft_wdt_feed();
     switch (espwebclnt.get_status())
     {

@@ -12,11 +12,13 @@
 
 ICACHE_FLASH_ATTR Flashfs::Flashfs()
 {
+    esplog.all("Flashfs::Flashfs\n");
     status = FFS_NOT_INIT;
 }
 
 void ICACHE_FLASH_ATTR Flashfs::init(void)
 {
+    esplog.all("Flashfs::init\n");
     // SPIFFS_USE_MAGIC is enabled so following documentation:
     // 1) Call SPIFFS_mount
     // 2) If SPIFFS_mount fails with SPIFFS_ERR_NOT_A_FS, keep going.
@@ -93,10 +95,12 @@ void ICACHE_FLASH_ATTR Flashfs::init(void)
     u32_t used = 0;
     res = SPIFFS_info(&m_fs, &total, &used);
     P_INFO("[INFO]: File system size [bytes]: %d, used [bytes]:%d.\n", total, used);
+    espmem.stack_mon();
 }
 
 void ICACHE_FLASH_ATTR Flashfs::format(void)
 {
+    esplog.all("Flashfs::format\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: formatting a not initialized file system\n");
@@ -117,10 +121,12 @@ void ICACHE_FLASH_ATTR Flashfs::format(void)
         P_FATAL("[FATAL]: Cannot format file system, error code %d\n", res);
         status = FFS_UNAVAILABLE;
     }
+    espmem.stack_mon();
 }
 
 void ICACHE_FLASH_ATTR Flashfs::unmount(void)
 {
+    esplog.all("Flashfs::unmount\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: unmounting a not initialized file system\n");
@@ -133,11 +139,13 @@ void ICACHE_FLASH_ATTR Flashfs::unmount(void)
 
 flashfs_status ICACHE_FLASH_ATTR Flashfs::get_status()
 {
+    esplog.all("Flashfs::get_status\n");
     return status;
 }
 
 bool ICACHE_FLASH_ATTR Flashfs::is_available()
 {
+    esplog.all("Flashfs::is_available\n");
     if ((status == FFS_AVAILABLE) || (status == FFS_ERRORS))
         return true;
     else
@@ -146,6 +154,7 @@ bool ICACHE_FLASH_ATTR Flashfs::is_available()
 
 s32_t ICACHE_FLASH_ATTR Flashfs::last_error()
 {
+    esplog.all("Flashfs::last_error\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: looking for last error of a not initialized file system\n");
@@ -156,6 +165,7 @@ s32_t ICACHE_FLASH_ATTR Flashfs::last_error()
 
 u32_t ICACHE_FLASH_ATTR Flashfs::get_total_size()
 {
+    esplog.all("Flashfs::get_total_size\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: looking for total size of a not initialized file system\n");
@@ -165,10 +175,12 @@ u32_t ICACHE_FLASH_ATTR Flashfs::get_total_size()
     u32_t total = 0;
     u32_t used = 0;
     res = SPIFFS_info(&m_fs, &total, &used);
+    espmem.stack_mon();
     return total;
 }
 u32_t ICACHE_FLASH_ATTR Flashfs::get_used_size()
 {
+    esplog.all("Flashfs::get_used_size\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: looking for used size of a not initialized file system\n");
@@ -178,11 +190,13 @@ u32_t ICACHE_FLASH_ATTR Flashfs::get_used_size()
     u32_t total = 0;
     u32_t used = 0;
     res = SPIFFS_info(&m_fs, &total, &used);
+    espmem.stack_mon();
     return used;
 }
 
 s32_t ICACHE_FLASH_ATTR Flashfs::check()
 {
+    esplog.all("Flashfs::check\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: checking a not initialized file system\n");
@@ -199,11 +213,13 @@ s32_t ICACHE_FLASH_ATTR Flashfs::check()
         P_ERROR("[ERROR]: File system check found errors, error code %d\n", res);
         status = FFS_ERRORS;
     }
+    espmem.stack_mon();
     return res;
 }
 
 struct spiffs_dirent ICACHE_FLASH_ATTR *Flashfs::list(int t_file)
 {
+    esplog.all("Flashfs::list\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: listing a not initialized file system\n");
@@ -218,11 +234,13 @@ struct spiffs_dirent ICACHE_FLASH_ATTR *Flashfs::list(int t_file)
     pfile = SPIFFS_readdir(&dd, &ffile);
     if (pfile == NULL)
         SPIFFS_closedir(&dd);
+    espmem.stack_mon();
     return pfile;
 }
 
 spiffs ICACHE_FLASH_ATTR *Flashfs::get_handler()
 {
+    esplog.all("Flashfs::get_handler\n");
     if (status == FFS_NOT_INIT)
     {
         P_ERROR("[ERROR]: looking for handler of a not initialized file system\n");
@@ -235,6 +253,7 @@ spiffs ICACHE_FLASH_ATTR *Flashfs::get_handler()
 // the file status is set to FFS_F_UNAVAILABLE
 ICACHE_FLASH_ATTR Ffile::Ffile(Flashfs *t_fs)
 {
+    esplog.all("Ffile::Ffile()\n");
     status = FFS_F_UNAVAILABLE;
     m_name[0] = '\0';
     if (t_fs->is_available())
@@ -253,6 +272,7 @@ ICACHE_FLASH_ATTR Ffile::Ffile(Flashfs *t_fs)
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
 ICACHE_FLASH_ATTR Ffile::Ffile(Flashfs *t_fs, char *t_filename)
 {
+    esplog.all("Ffile::Ffile(,)\n");
     status = FFS_F_UNAVAILABLE;
     os_strncpy(m_name, t_filename, 30);
     if (os_strlen(t_filename) > 30)
@@ -282,6 +302,7 @@ ICACHE_FLASH_ATTR Ffile::Ffile(Flashfs *t_fs, char *t_filename)
 // and eventually flush chache to flash memory
 ICACHE_FLASH_ATTR Ffile::~Ffile()
 {
+    esplog.all("Ffile::~Ffile\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
@@ -296,6 +317,7 @@ ICACHE_FLASH_ATTR Ffile::~Ffile()
 // return the file name
 char ICACHE_FLASH_ATTR *Ffile::get_name()
 {
+    esplog.all("Ffile::get_name\n");
     if (os_strlen(m_name) == 0)
     {
         P_ERROR("[ERROR]: The file has no name\n");
@@ -311,6 +333,7 @@ char ICACHE_FLASH_ATTR *Ffile::get_name()
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
 void ICACHE_FLASH_ATTR Ffile::open(char *t_filename)
 {
+    esplog.all("Ffile::open\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
@@ -318,6 +341,7 @@ void ICACHE_FLASH_ATTR Ffile::open(char *t_filename)
             s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
             if (res != SPIFFS_OK)
                 P_ERROR("[ERROR]: Error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            espmem.stack_mon();
         }
         os_strncpy(m_name, t_filename, 30);
         if (os_strlen(t_filename) > 30)
@@ -344,12 +368,14 @@ void ICACHE_FLASH_ATTR Ffile::open(char *t_filename)
 // return the file status
 flashfs_file_status ICACHE_FLASH_ATTR Ffile::get_status()
 {
+    esplog.all("Ffile::get_status\n");
     return status;
 }
 
 // return the file status
 bool ICACHE_FLASH_ATTR Ffile::is_available()
 {
+    esplog.all("Ffile::is_available\n");
     if ((status == FFS_F_OPEN) || (FFS_F_MODIFIED_UNSAVED))
         return true;
     else
@@ -359,6 +385,7 @@ bool ICACHE_FLASH_ATTR Ffile::is_available()
 // read t_len bytes from the file to the t_buffer
 int ICACHE_FLASH_ATTR Ffile::n_read(char *t_buffer, int t_len)
 {
+    esplog.all("Ffile::n_read\n");
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
     {
@@ -381,12 +408,14 @@ int ICACHE_FLASH_ATTR Ffile::n_read(char *t_buffer, int t_len)
         P_ERROR("[ERROR]: reading file on a not available file system\n");
         res = -1;
     }
+    espmem.stack_mon();
     return (int)res;
 }
 
 // write (append) t_len bytes from the t_buffer to the file
 int ICACHE_FLASH_ATTR Ffile::n_append(char *t_buffer, int t_len)
 {
+    esplog.all("Ffile::n_append\n");
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
     {
@@ -411,12 +440,14 @@ int ICACHE_FLASH_ATTR Ffile::n_append(char *t_buffer, int t_len)
         P_ERROR("[ERROR]: writing file on a not available file system\n");
         res = -1;
     }
+    espmem.stack_mon();
     return (int)res;
 }
 
 // clear the file content
 void ICACHE_FLASH_ATTR Ffile::clear()
 {
+    esplog.all("Ffile::clear\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
@@ -432,6 +463,7 @@ void ICACHE_FLASH_ATTR Ffile::clear()
             }
             else
                 status = FFS_F_MODIFIED_UNSAVED;
+            espmem.stack_mon();
         }
         else
         {
@@ -448,6 +480,7 @@ void ICACHE_FLASH_ATTR Ffile::clear()
 // remove the file
 void ICACHE_FLASH_ATTR Ffile::remove()
 {
+    esplog.all("Ffile::remove\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
@@ -457,6 +490,7 @@ void ICACHE_FLASH_ATTR Ffile::remove()
                 P_ERROR("[ERROR]: Error %d while removing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
             else
                 status = FFS_F_REMOVED;
+            espmem.stack_mon();
         }
         else
         {
@@ -473,6 +507,7 @@ void ICACHE_FLASH_ATTR Ffile::remove()
 // flush chached changes to the flash memory
 void ICACHE_FLASH_ATTR Ffile::flush_cache()
 {
+    esplog.all("Ffile::flush_cache\n");
     if (m_fs && (m_fs->is_available()))
     {
         if (status == FFS_F_MODIFIED_UNSAVED)
@@ -480,6 +515,7 @@ void ICACHE_FLASH_ATTR Ffile::flush_cache()
             s32_t res = SPIFFS_fflush(m_fs->get_handler(), m_fd);
             if (res < SPIFFS_OK)
                 P_ERROR("[ERROR]: Error %d while flushing cache for file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            espmem.stack_mon();
         }
         else
         {
@@ -495,6 +531,7 @@ void ICACHE_FLASH_ATTR Ffile::flush_cache()
 
 bool ICACHE_FLASH_ATTR Ffile::exists(Flashfs *t_fs, char *t_name)
 {
+    esplog.all("Ffile::exists\n");
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
@@ -515,14 +552,17 @@ bool ICACHE_FLASH_ATTR Ffile::exists(Flashfs *t_fs, char *t_name)
     {
         P_ERROR("[ERROR]: checking if file exists on not available file system\n");
     }
+    espmem.stack_mon();
     return false;
 }
 
 int ICACHE_FLASH_ATTR Ffile::size(Flashfs *t_fs, char *t_name)
 {
+    esplog.all("Ffile::size\n");
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
+    espmem.stack_mon();
 
     if (t_fs->is_available())
     {
