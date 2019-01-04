@@ -142,42 +142,146 @@ char ICACHE_FLASH_ATTR *Ota_upgrade::get_reboot_on_completion(void)
 
 // upgrade
 
-//  OTA_IDLE = 0,
-//  OTA_VERSION_CHECKING,
-//  OTA_VERSION_CHECK_FAILED,
-//  OTA_VERSION_CHECKED,
-//  OTA_STARTED,
-//  OTA_ENDED,
-//  OTA_SUCCESS,
-//  OTA_FAILED
-
 void ICACHE_FLASH_ATTR Ota_upgrade::ota_completed_cb(void *arg)
 {
     esplog.all("Ota_upgrade::ota_completed_cb\n");
-    esp_ota.m_status = OTA_ENDED;
+    uint8 u_flag = system_upgrade_flag_check();
+
+    if (u_flag == UPGRADE_FLAG_FINISH)
+    {
+        esp_ota.m_status = OTA_SUCCESS;
+    }
+    else
+    {
+        esp_ota.m_status = OTA_FAILED;
+        esplog.trace("Ota_upgrade::ota_completed_cb - cannot complete upgrade\n");
+    }
 }
 
 void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
 {
     esplog.all("Ota_upgrade::ota_timer_function\n");
+
+    char *binary_file;
+    static struct upgrade_server_info *upgrade_svr = NULL;
+    static char *url = NULL;
+    // static struct espconn *pespconn = NULL;
+    espmem.stack_mon();
+
     switch (esp_ota.m_status)
     {
     case OTA_IDLE:
+    {
+        if (esp_ota.m_check_version)
+        {
+            esp_ota.m_status = OTA_VERSION_CHECKING;
+            // start web client
+        }
+        else
+            esp_ota.m_status = OTA_VERSION_CHECKED;
+        os_timer_arm(&esp_ota.m_ota_timer, 200, 0);
         break;
+    }
     case OTA_VERSION_CHECKING:
+    {
+        os_timer_arm(&esp_ota.m_ota_timer, 200, 0);
         break;
-    case OTA_VERSION_CHECK_FAILED:
-        break;
+    }
     case OTA_VERSION_CHECKED:
+    {
+        uint8_t userBin = system_upgrade_userbin_check();
+        switch (userBin)
+        {
+        case UPGRADE_FW_BIN1:
+            binary_file = "user2.bin";
+            break;
+        case UPGRADE_FW_BIN2:
+            binary_file = "user1.bin";
+            break;
+        default:
+            esplog.error("OTA: cannot find userbin number\n");
+            esp_ota.m_status = OTA_FAILED;
+            os_timer_arm(&esp_ota.m_ota_timer, 200, 0);
+            return;
+        }
+        upgrade_svr = (struct upgrade_server_info *)esp_zalloc(sizeof(struct upgrade_server_info));
+        url = (char *)esp_zalloc(56 + 15 + 6 + os_strlen(esp_ota.m_path));
+        *((uint32 *)(upgrade_svr->ip)) = esp_ota.m_host.addr;
+        upgrade_svr->port = esp_ota.m_port;
+        upgrade_svr->check_times = 60000;
+        upgrade_svr->check_cb = &Ota_upgrade::ota_completed_cb;
+        // upgrade_svr->pespconn = pespconn;
+        os_sprintf(url,
+                   "GET %s%s HTTP/1.1\r\nHost: %s:%d\r\n"
+                   "Connection: close\r\n"
+                   "\r\n",
+                   esp_ota.m_path, binary_file, esp_ota.m_host_str, esp_ota.m_port);
+        esplog.trace("Ota_upgrade::ota_timer_function - %s\n", url);
+        upgrade_svr->url = (uint8 *)url;
+        if (system_upgrade_start(upgrade_svr) == false)
+        {
+            esplog.error("OTA cannot start upgrade\n");
+            esp_ota.m_status = OTA_FAILED;
+        }
+        else
+        {
+            esp_ota.m_status = OTA_STARTED;
+        }
+        os_timer_arm(&esp_ota.m_ota_timer, 500, 0);
         break;
+    }
     case OTA_STARTED:
+    {
+        os_timer_arm(&esp_ota.m_ota_timer, 500, 0);
         break;
-    case OTA_ENDED:
-        break;
+    }
     case OTA_SUCCESS:
+    {
+        if (upgrade_svr)
+        {
+            esp_free(upgrade_svr);
+            upgrade_svr = NULL;
+        }
+        if (url)
+        {
+            esp_free(url);
+            url = NULL;
+        }
+        // if (pespconn)
+        // {
+        //     esp_free(pespconn);
+        //     pespconn = NULL;
+        // }
+        esplog.trace("OTA successfully completed\n");
+        if (esp_ota.m_reboot_on_completion)
+        {
+            esplog.trace("OTA - rebooting after completion\n");
+            espbot.reset(ESP_OTA_REBOOT);
+        }
+        esp_ota.m_status = OTA_IDLE;
         break;
+    }
     case OTA_FAILED:
+    {
+        if (upgrade_svr)
+        {
+            esp_free(upgrade_svr);
+            upgrade_svr = NULL;
+        }
+        if (url)
+        {
+            esp_free(url);
+            url = NULL;
+        }
+        // if (pespconn)
+        // {
+        //     esp_free(pespconn);
+        //     pespconn = NULL;
+        // }
+        esplog.error("OTA failed\n");
+        esp_ota.m_status = OTA_IDLE;
         break;
+    }
     default:
         break;
     }
@@ -189,7 +293,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::start_upgrade(void)
     if ((m_status == OTA_IDLE) || (m_status == OTA_SUCCESS) || (m_status == OTA_FAILED))
     {
         os_timer_setfn(&m_ota_timer, (os_timer_func_t *)&Ota_upgrade::ota_timer_function, NULL);
-        os_timer_arm(&m_ota_timer, 300, 0);
+        os_timer_arm(&m_ota_timer, 200, 0);
     }
     else
     {
@@ -201,12 +305,6 @@ Ota_status_type ICACHE_FLASH_ATTR Ota_upgrade::get_status(void)
 {
     esplog.all("Ota_upgrade::get_status\n");
     return m_status;
-}
-
-void ICACHE_FLASH_ATTR Ota_upgrade::clear(void)
-{
-    esplog.all("Ota_upgrade::clear\n");
-    m_status = OTA_IDLE;
 }
 
 int ICACHE_FLASH_ATTR Ota_upgrade::restore_cfg(void)
@@ -363,152 +461,3 @@ int ICACHE_FLASH_ATTR Ota_upgrade::save_cfg(void)
     }
     return CFG_OK;
 }
-
-/*
-
-
-enum espbot_upgrade_err_enum
-{
-    none = 0,
-    undefinedUserBin,
-    svrVrsOutOfDate,
-    cannotStartUpgrade,
-    upgradeError
-};
-
-static enum espbot_upgrade_err_enum espbot_upgrade_err = none;
-
-char *espbot_upgrade_err_msg[] = {
-    "No error!",
-    "OTA start: undefined user bin!",
-    "OTA start: server version out of date!",
-    "OTA start: cannot start upgrade!",
-    "OTA check completion: cannot complete FW upgrade!"};
-
-char ICACHE_FLASH_ATTR *espbot_getUpgradeLatestError(void)
-{
-    return espbot_upgrade_err_msg[espbot_upgrade_err];
-}
-
-static void ICACHE_FLASH_ATTR ota_checkCompletion_cb(void *arg)
-{
-    uint8 u_flag = system_upgrade_flag_check();
-
-    if (u_flag == UPGRADE_FLAG_FINISH)
-    {
-        espbot_upgrade_status = ESPBOT_UPGRADE_COMPLETED;
-        espbot_upgrade_err = none;
-        if (upgrade_info.rebootAtCompletion)
-        {
-            espbot_debug_log(LOW, "ESPBOT OTA: Check completion: success, rebooting!\n");
-            uint32 dummy;
-            system_os_post(USER_TASK_PRIO_0, SIG_UPGRADE_REBOOT, (os_param_t)dummy);
-        }
-        else
-        {
-            espbot_debug_log(LOW, "ESPBOT OTA: Check completion: success\n");
-        }
-    }
-    else
-    {
-        espbot_debug_log(LOW, "ESPBOT OTA: Check completion: failed\n");
-        espbot_upgrade_status = ESPBOT_UPGRADE_FAILED;
-        espbot_upgrade_err = upgradeError;
-        system_upgrade_deinit();
-    }
-}
-
-void ICACHE_FLASH_ATTR espbot_fwUpgrade(void)
-{
-    char *espbot_version = ESPBOT_RELEASE;
-    const char *file;
-
-    espbot_upgrade_status = ESPBOT_UPGRADE_STARTED;
-
-    uint8_t userBin = system_upgrade_userbin_check();
-    switch (userBin)
-    {
-    case UPGRADE_FW_BIN1:
-        file = "user2.bin";
-        break;
-    case UPGRADE_FW_BIN2:
-        file = "user1.bin";
-        break;
-    default:
-        espbot_debug_log(LOW, "ESPBOT OTA: cannot find userbin number\n");
-        espbot_upgrade_status = ESPBOT_UPGRADE_FAILED;
-        espbot_upgrade_err = undefinedUserBin;
-        return;
-    }
-
-    if (upgrade_info.checkVersion)
-    {
-        if (os_strcmp(upgrade_info.server_version, espbot_version) <= 0)
-        {
-            espbot_debug_log(LOW, "ESPBOT OTA: won't update, server version:%s out of date. Espbot version %s\n", upgrade_info.server_version, espbot_version);
-            espbot_upgrade_status = ESPBOT_UPGRADE_FAILED;
-            espbot_upgrade_err = svrVrsOutOfDate;
-            return;
-        }
-        else
-        {
-            espbot_debug_log(LOW, "ESPBOT OTA: there is an upgrade available with version: %s. Espbot version %s\n", upgrade_info.server_version, espbot_version);
-        }
-    }
-    else
-    {
-        espbot_debug_log(LOW, "ESPBOT OTA: there is an upgrade available with version: %s. Espbot version %s\n", upgrade_info.server_version, espbot_version);
-    }
-
-    struct upgrade_server_info *update = (struct upgrade_server_info *)esp_zalloc(sizeof(struct upgrade_server_info));
-    update->pespconn = (struct espconn *)esp_zalloc(sizeof(struct espconn));
-
-    char *tmpStr = esp_zalloc(4);
-    int ipField = 0;
-    char *ipFieldPtr = upgrade_info.ip;
-    char *dotPtr = os_strstr(ipFieldPtr, ".");
-    while (ipFieldPtr != NULL && dotPtr != NULL)
-    {
-        os_strncpy(tmpStr, ipFieldPtr, (dotPtr - ipFieldPtr));
-        update->ip[ipField] = atoi(tmpStr);
-        ipFieldPtr = dotPtr + 1;
-        dotPtr = os_strstr(ipFieldPtr, ".");
-        ipField = ipField + 1;
-        os_bzero(tmpStr, 4);
-    }
-    if (ipFieldPtr != NULL && ipField == 3)
-    {
-        os_strncpy(tmpStr, ipFieldPtr, os_strlen(ipFieldPtr));
-        update->ip[ipField] = atoi(tmpStr);
-    }
-    update->port = upgrade_info.port;
-
-    espbot_debug_log(MID, "ESPBOT OTA: FW upgrade server " IPSTR ":%d. Path: %s%s\n", IP2STR(update->ip), update->port, upgrade_info.path, file);
-
-    update->check_cb = ota_checkCompletion_cb;
-    update->check_times = 60000;
-    update->url = (uint8 *)esp_zalloc(512);
-
-    os_sprintf((char *)update->url,
-               "GET %s%s HTTP/1.1\r\n"
-               "Host: " IPSTR ":%d\r\n"
-               "Connection: close\r\n"
-               "\r\n",
-               upgrade_info.path, file, IP2STR(update->ip), update->port);
-
-    if (system_upgrade_start(update) == false)
-    {
-        espbot_debug_log(LOW, "ESPBOT OTA: cannot start upgrade\n");
-        espbot_upgrade_status = ESPBOT_UPGRADE_FAILED;
-        espbot_upgrade_err = cannotStartUpgrade;
-        esp_free(update->pespconn);
-        esp_free(update->url);
-        esp_free(update);
-    }
-    else
-    {
-        espbot_debug_log(LOW, "ESPBOT OTA: Upgrading...\n");
-    }
-    espbot_debug_checkHeap();
-}
-*/

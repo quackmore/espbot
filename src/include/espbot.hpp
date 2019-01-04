@@ -19,6 +19,9 @@ extern "C"
 #define SIG_SOFTAPMODE_STACONNECTED 2
 #define SIG_SOFTAPMODE_STADISCONNECTED 3
 
+#define ESP_REBOOT 0
+#define ESP_OTA_REBOOT 1
+
 class Espbot
 {
 private:
@@ -41,7 +44,8 @@ public:
   Espbot(){};
   ~Espbot(){};
   void init(void);
-  void reset(void);
+  void reset(int); // ESP_REBOOT     -> system_restart()
+                   // ESP_OTA_REBOOT -> system_upgrade_reboot()
   uint32 get_chip_id(void);
   uint8 get_boot_version(void);
   const char *get_sdk_version(void);

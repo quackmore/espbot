@@ -19,10 +19,8 @@ typedef enum
 {
   OTA_IDLE = 0,
   OTA_VERSION_CHECKING,
-  OTA_VERSION_CHECK_FAILED,
   OTA_VERSION_CHECKED,
   OTA_STARTED,
-  OTA_ENDED,
   OTA_SUCCESS,
   OTA_FAILED
 } Ota_status_type;
@@ -68,7 +66,6 @@ public:
   // upgrade
   void start_upgrade(void);
   Ota_status_type get_status(void);
-  void clear(void); // reset state to idle ready for a new start
 };
 
 #endif

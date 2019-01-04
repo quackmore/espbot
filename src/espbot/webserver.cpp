@@ -833,7 +833,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
     if ((0 == os_strcmp(parsed_req.url, "/api/espbot/reset")) && (parsed_req.req_method == HTTP_POST))
     {
         response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
-        espbot.reset();
+        espbot.reset(ESP_REBOOT);
         return;
     }
     if ((0 == os_strcmp(parsed_req.url, "/api/fs/info")) && (parsed_req.req_method == HTTP_GET))
@@ -1187,6 +1187,12 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
         }
         espmem.stack_mon();
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/ota/reboot")) && (parsed_req.req_method == HTTP_POST))
+    {
+        response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+        espbot.reset(ESP_OTA_REBOOT);
         return;
     }
     if ((0 == os_strcmp(parsed_req.url, "/api/ota/upgrade")) && (parsed_req.req_method == HTTP_POST))

@@ -83,7 +83,7 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
     esplog.all("heartbeat_cb\n");
     P_DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
     uint32 current_timestamp = esp_sntp.get_timestamp();
-    P_DEBUG("ESPBOT HEARTBEAT: (UT+1) [%d] %s", esp_sntp.get_timestr(current_timestamp), current_timestamp);
+    P_DEBUG("ESPBOT HEARTBEAT: (UT+1) [%d] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
     P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
 }
 
@@ -251,36 +251,39 @@ int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
 static int graceful_rst_counter = 0;
 static os_timer_t graceful_rst_timer;
 
-static void ICACHE_FLASH_ATTR graceful_reset(void)
+static void ICACHE_FLASH_ATTR graceful_reset(void *t_reset)
 {
     esplog.all("graceful_reset\n");
     graceful_rst_counter++;
-    espbot.reset();
+    espbot.reset((int)t_reset);
 }
 
-void ICACHE_FLASH_ATTR Espbot::reset(void)
+void ICACHE_FLASH_ATTR Espbot::reset(int t_reset)
 {
     esplog.all("Espbot::reset\n");
     switch (graceful_rst_counter)
     {
     case 0:
-        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 300, 0);
         break;
     case 1:
         espwebsvr.stop();
         esp_mDns.stop();
         esp_sntp.stop();
-        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 200, 0);
         break;
     case 2:
         wifi_set_opmode_current(NULL_MODE);
-        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, NULL);
+        os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 200, 0);
         break;
     case 3:
-        system_restart();
+        if (t_reset == ESP_REBOOT)
+            system_restart();
+        if (t_reset == ESP_OTA_REBOOT)
+            system_upgrade_reboot();
         break;
     default:
         break;

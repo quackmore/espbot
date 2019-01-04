@@ -185,12 +185,16 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
             os_printf_plus("[FATAL] %s", buffer);
         if (m_memory_level >= LOG_FATAL)
         {
-            char *json_ptr = (char *)esp_zalloc(36 + os_strlen(buffer));
+            uint32 timestamp = esp_sntp.get_timestamp();
+            String time_str(27);
+            if (time_str.ref)
+                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
+            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
             if (json_ptr)
             {
                 os_sprintf(json_ptr,
-                           "{\"time\": %d,\"msg\":\"[FATAL] %s\"}",
-                           system_get_time(), buffer);
+                           "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
+                           time_str.ref, buffer);
                 esp_last_errors.push_back(json_ptr, true);
             }
         }
@@ -211,12 +215,16 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
             os_printf_plus("[ERROR] %s", buffer);
         if (m_memory_level >= LOG_ERROR)
         {
-            char *json_ptr = (char *)esp_zalloc(36 + os_strlen(buffer));
+            uint32 timestamp = esp_sntp.get_timestamp();
+            String time_str(27);
+            if (time_str.ref)
+                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
+            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
             if (json_ptr)
             {
                 os_sprintf(json_ptr,
-                           "{\"time\": %d,\"msg\":\"[ERROR] %s\"}",
-                           system_get_time(), buffer);
+                           "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
+                           time_str.ref, buffer);
                 esp_last_errors.push_back(json_ptr, true);
             }
         }
@@ -237,12 +245,16 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
             os_printf_plus("[WARN] %s", buffer);
         if (m_memory_level >= LOG_WARN)
         {
-            char *json_ptr = (char *)esp_zalloc(36 + os_strlen(buffer));
+            uint32 timestamp = esp_sntp.get_timestamp();
+            String time_str(27);
+            if (time_str.ref)
+                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
+            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
             if (json_ptr)
             {
                 os_sprintf(json_ptr,
-                           "{\"time\": %d,\"msg\":\"[WARN] %s\"}",
-                           system_get_time(), buffer);
+                           "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
+                           time_str.ref, buffer);
                 esp_last_errors.push_back(json_ptr, true);
             }
         }
