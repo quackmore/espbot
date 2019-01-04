@@ -5,11 +5,28 @@
 Empty structure for esp8266 apps (NON-OS SDK and C++).
 
 Features:
++ configuration persistency
++ mDns
++ memory monitor (stack and heap)
++ OTA
++ SNTP
 + SPIFFS
-+ WIFI
-+ WEBSERVER with APIs
++ wifi management (chromecast style)
++ WEBSERVER (APIs listed below)
++ WEBCLIENT
 
-more to come ... (mDns, OTA)
+more to come ... (OTA with periodic check of new version available)
+
+# Webserver APIs
+
+checkout postman API documentation:
+
+espbot_2.0_apis
+https://documenter.getpostman.com/view/4220776/RznCsKph
+espbot_2.0_apis_single_commands
+(these are just commands that cannot be run in a test sequence)
+https://documenter.getpostman.com/view/4220776/RznCsKpj
+
 
 # Building the binaries 
 Checkout my other repo https://github.com/quackmore/esp8266_SDK_structure for details.
