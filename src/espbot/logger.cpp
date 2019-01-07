@@ -58,7 +58,7 @@ int ICACHE_FLASH_ATTR Logger::restore_cfg(void)
     }
     else
     {
-        esplog.info("Logger::restore_cfg - cfg file not found\n");
+        esplog.warn("Logger::restore_cfg - cfg file not found\n");
         return CFG_ERROR;
     }
 }
@@ -144,7 +144,7 @@ void ICACHE_FLASH_ATTR Logger::init(void)
     m_memory_level = LOG_ERROR;
     if (restore_cfg())
     {
-        esplog.info("Logger::init - starting with default configuration\n");
+        esplog.warn("Logger::init - starting with default configuration\n");
     }
 }
 
@@ -195,7 +195,7 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
                 os_sprintf(json_ptr,
                            "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
                            time_str.ref, buffer);
-                esp_last_errors.push_back(json_ptr, true);
+                esp_event_log.push_back(json_ptr, true);
             }
         }
     }
@@ -225,7 +225,7 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
                 os_sprintf(json_ptr,
                            "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
                            time_str.ref, buffer);
-                esp_last_errors.push_back(json_ptr, true);
+                esp_event_log.push_back(json_ptr, true);
             }
         }
     }
@@ -255,7 +255,7 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
                 os_sprintf(json_ptr,
                            "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
                            time_str.ref, buffer);
-                esp_last_errors.push_back(json_ptr, true);
+                esp_event_log.push_back(json_ptr, true);
             }
         }
     }
@@ -263,9 +263,7 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
 
 void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_INFO)
-        return;
-    else
+    if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
     {
         char buffer[LOG_BUF_SIZE];
         va_list al;
@@ -273,7 +271,23 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
         va_start(al, t_format);
         ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);
-        os_printf_plus("[INFO] %s", buffer);
+        if (m_serial_level >= LOG_INFO)
+            os_printf_plus("[INFO] %s", buffer);
+        if (m_memory_level >= LOG_INFO)
+        {
+            uint32 timestamp = esp_sntp.get_timestamp();
+            String time_str(27);
+            if (time_str.ref)
+                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
+            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
+            if (json_ptr)
+            {
+                os_sprintf(json_ptr,
+                           "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
+                           time_str.ref, buffer);
+                esp_event_log.push_back(json_ptr, true);
+            }
+        }
     }
 }
 

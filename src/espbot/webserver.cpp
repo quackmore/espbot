@@ -116,7 +116,7 @@ static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char
                  p_espconn, code, content_type, msg, free_msg);
     if (esp_busy_sending_data) // previous espconn_send not completed yet
     {
-        esplog.info("Websvr::response - previous espconn_send not completed yet\n");
+        esplog.debug("Websvr::response - previous espconn_send not completed yet\n");
         struct svr_response *response_data = (struct svr_response *)esp_zalloc(sizeof(struct svr_response));
         espmem.stack_mon();
         if (response_data)
@@ -271,7 +271,7 @@ static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_esp
 //  List of enabled routes:
 //  [GET]   /
 //  [GET]   /:filename
-//  [GET]   /api/debug/errorlog
+//  [GET]   /api/debug/log
 //  [GET]   /api/debug/meminfo
 //  [GET]   /api/debug/cfg
 //  [POST]  /api/debug/cfg
@@ -535,7 +535,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
 
     if (parsed_req.no_header_message || (parsed_req.url == NULL))
     {
-        esplog.info("Websvr::webserver_recv - No header message or empty url\n");
+        esplog.debug("Websvr::webserver_recv - No header message or empty url\n");
         return;
     }
     if ((0 == os_strcmp(parsed_req.url, "/")) && (parsed_req.req_method == HTTP_GET)) // home
@@ -552,28 +552,28 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         return_file(ptr_espconn, file_name);
         return;
     }
-    if ((0 == os_strcmp(parsed_req.url, "/api/debug/errorlog")) && (parsed_req.req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req.url, "/api/debug/log")) && (parsed_req.req_method == HTTP_GET))
     {
-        // check how much memory needed for last_errors
-        int last_errors_len = 0;
-        char *err_ptr = esp_last_errors.get_head();
+        // check how much memory needed for last logs
+        int esp_event_log_len = 0;
+        char *err_ptr = esp_event_log.get_head();
         while (err_ptr)
         {
-            last_errors_len += os_strlen(err_ptr);
-            err_ptr = esp_last_errors.next();
+            esp_event_log_len += os_strlen(err_ptr);
+            err_ptr = esp_event_log.next();
         }
         char *msg = (char *)esp_zalloc(16 +                           // formatting string
                                        10 +                           // heap mem figures
-                                       (3 * esp_last_errors.size()) + // errors formatting
-                                       last_errors_len);              // errors
+                                       (3 * esp_event_log.size()) + // errors formatting
+                                       esp_event_log_len);              // errors
         if (msg)
         {
-            os_sprintf(msg, "{\"errors\":[");
+            os_sprintf(msg, "{\"events\":[");
             // now add saved errors
             char *str_ptr;
             int cnt = 0;
             espmem.stack_mon();
-            err_ptr = esp_last_errors.get_head();
+            err_ptr = esp_event_log.get_head();
             while (err_ptr)
             {
                 str_ptr = msg + os_strlen(msg);
@@ -581,7 +581,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
                     os_sprintf(str_ptr, "%s", err_ptr);
                 else
                     os_sprintf(str_ptr, ",%s", err_ptr);
-                err_ptr = esp_last_errors.next();
+                err_ptr = esp_event_log.next();
                 cnt++;
             }
             str_ptr = msg + os_strlen(msg);
@@ -592,7 +592,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         else
         {
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n",
-                         16 + 10 + (3 * esp_last_errors.size()) + last_errors_len);
+                         16 + 10 + (3 * esp_event_log.size()) + esp_event_log_len);
         }
         return;
     }
@@ -1399,7 +1399,7 @@ static ICACHE_FLASH_ATTR void webserver_recon(void *arg, sint8 err)
     esplog.all("webserver_recon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
-    esplog.info("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
+    esplog.debug("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
                 pesp_conn->proto.tcp->remote_ip[1],
                 pesp_conn->proto.tcp->remote_ip[2],
                 pesp_conn->proto.tcp->remote_ip[3],
@@ -1412,7 +1412,7 @@ static ICACHE_FLASH_ATTR void webserver_discon(void *arg)
     esplog.all("webserver_discon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
-    esplog.info("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
+    esplog.debug("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
                 pesp_conn->proto.tcp->remote_ip[1],
                 pesp_conn->proto.tcp->remote_ip[2],
                 pesp_conn->proto.tcp->remote_ip[3],
@@ -1443,7 +1443,7 @@ void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
     esp_conn.proto.tcp->local_port = port;
     espconn_regist_connectcb(&esp_conn, webserver_listen);
     espconn_accept(&esp_conn);
-    esplog.info("web server started\n");
+    esplog.debug("web server started\n");
 }
 
 void ICACHE_FLASH_ATTR Websvr::stop()
@@ -1451,5 +1451,5 @@ void ICACHE_FLASH_ATTR Websvr::stop()
     esplog.all("Websvr::stop\n");
     espconn_disconnect(&esp_conn);
     espconn_delete(&esp_conn);
-    esplog.info("web server stopped\n");
+    esplog.debug("web server stopped\n");
 }

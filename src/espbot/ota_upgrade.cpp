@@ -28,14 +28,16 @@ extern "C"
 void ICACHE_FLASH_ATTR Ota_upgrade::init(void)
 {
     esplog.all("Ota_upgrade::init\n");
-    if (restore_cfg() != CFG_OK) // something went wrong while loading flash config
+    if (restore_cfg() != CFG_OK)
     {
+        // something went wrong while loading flash config
         set_host("0.0.0.0");
         m_port = 0;
         m_path = (char *)esp_zalloc(2);
         os_strncpy(m_path, "/", 1);
         m_check_version = false;
         m_reboot_on_completion = false;
+        esplog.warn("Ota_upgrade::init - starting with default configuration\n");
     }
     m_status = OTA_IDLE;
 }
@@ -252,7 +254,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
         //     esp_free(pespconn);
         //     pespconn = NULL;
         // }
-        esplog.trace("OTA successfully completed\n");
+        esplog.info("OTA successfully completed\n");
         if (esp_ota.m_reboot_on_completion)
         {
             esplog.trace("OTA - rebooting after completion\n");
@@ -348,7 +350,7 @@ int ICACHE_FLASH_ATTR Ota_upgrade::restore_cfg(void)
     }
     else
     {
-        esplog.info("Ota_upgrade::restore_cfg - cfg file not found\n");
+        esplog.warn("Ota_upgrade::restore_cfg - cfg file not found\n");
         return CFG_ERROR;
     }
 }

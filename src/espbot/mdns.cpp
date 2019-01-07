@@ -32,12 +32,12 @@ void ICACHE_FLASH_ATTR Mdns::start(void)
     os_sprintf(m_alias, "alias=%s", espbot.get_alias());
     m_info.txt_data[0] = m_alias;
     espconn_mdns_init(&m_info);
-    esplog.info("mDns started\n");
+    esplog.debug("mDns started\n");
 }
 
 void ICACHE_FLASH_ATTR Mdns::stop(void)
 {
     esplog.all("Mdns::stop\n");
     espconn_mdns_close();
-    esplog.info("mDns ended\n");
+    esplog.debug("mDns ended\n");
 }

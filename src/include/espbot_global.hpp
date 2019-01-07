@@ -21,7 +21,7 @@
 #include "webclient.hpp"
 #include "ota_upgrade.hpp"
 
-extern Str_list esp_last_errors;
+extern Str_list esp_event_log;
 extern Flashfs espfs;
 extern Esp_mem espmem;
 extern Logger esplog;

@@ -58,12 +58,12 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
     switch (evt->event)
     {
     case EVENT_STAMODE_CONNECTED:
-        esplog.info("connected to ssid %s, channel %d\n",
+        esplog.debug("connected to ssid %s, channel %d\n",
                     evt->event_info.connected.ssid,
                     evt->event_info.connected.channel);
         break;
     case EVENT_STAMODE_DISCONNECTED:
-        esplog.info("disconnect from ssid %s, reason %d\n",
+        esplog.debug("disconnect from ssid %s, reason %d\n",
                     evt->event_info.disconnected.ssid,
                     evt->event_info.disconnected.reason);
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
@@ -71,31 +71,31 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         if (!espwifi.is_timeout_timer_active())
         {
             espwifi.start_connect_timeout_timer();
-            esplog.info("will switch to SOFTAP in 10 seconds but keep trying to reconnect ...\n");
+            esplog.debug("will switch to SOFTAP in 10 seconds but keep trying to reconnect ...\n");
         }
         espwifi.start_wait_before_reconnect_timer();
         break;
     case EVENT_STAMODE_AUTHMODE_CHANGE:
-        esplog.info("authmode change: %d -> %d\n",
+        esplog.debug("authmode change: %d -> %d\n",
                     evt->event_info.auth_change.old_mode,
                     evt->event_info.auth_change.new_mode);
         break;
     case EVENT_STAMODE_DHCP_TIMEOUT:
-        esplog.info("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
+        esplog.debug("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
                     IP2STR(&evt->event_info.got_ip.ip),
                     IP2STR(&evt->event_info.got_ip.mask),
                     IP2STR(&evt->event_info.got_ip.gw));
         os_printf("\n");
         break;
     case EVENT_STAMODE_GOT_IP:
-        esplog.info("got IP:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
+        esplog.debug("got IP:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
                     IP2STR(&evt->event_info.got_ip.ip),
                     IP2STR(&evt->event_info.got_ip.mask),
                     IP2STR(&evt->event_info.got_ip.gw));
         os_printf("\n");
         // station connected to AP and got an IP address
         // whichever was wifi mode now AP mode is no longer required
-        esplog.info("ESP8266 connected as station to %s\n", espwifi.station_get_ssid());
+        esplog.debug("ESP8266 connected as station to %s\n", espwifi.station_get_ssid());
         espwifi.stop_connect_timeout_timer();
         wifi_set_opmode_current(STATION_MODE);
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, '0'); // informing everybody of
@@ -104,14 +104,14 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         espwifi.save_cfg();
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
-        esplog.info("station: " MACSTR " join, AID = %d\n",
+        esplog.debug("station: " MACSTR " join, AID = %d\n",
                     MAC2STR(evt->event_info.sta_connected.mac),
                     evt->event_info.sta_connected.aid);
         system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STACONNECTED, '0'); // informing everybody that
                                                                             // a station connected to ESP8266
         break;
     case EVENT_SOFTAPMODE_STADISCONNECTED:
-        esplog.info("station: " MACSTR " leave, AID = %d\n",
+        esplog.debug("station: " MACSTR " leave, AID = %d\n",
                     MAC2STR(evt->event_info.sta_disconnected.mac),
                     evt->event_info.sta_disconnected.aid);
         system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STADISCONNECTED, '0'); // informing everybody of
@@ -124,26 +124,26 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         switch (wifi_get_opmode())
         {
         case STATION_MODE:
-            esplog.info("wifi mode changed to STATION_MODE\n");
+            esplog.debug("wifi mode changed to STATION_MODE\n");
             break;
         case SOFTAP_MODE:
-            esplog.info("wifi mode changed to SOFTAP_MODE\n");
+            esplog.debug("wifi mode changed to SOFTAP_MODE\n");
             break;
         case STATIONAP_MODE:
-            esplog.info("wifi mode changed to STATIONAP_MODE\n");
+            esplog.debug("wifi mode changed to STATIONAP_MODE\n");
             break;
         default:
             break;
         }
         break;
     case EVENT_SOFTAPMODE_DISTRIBUTE_STA_IP:
-        esplog.info("aid %d =>" MACSTR " => " IPSTR "\r\n",
+        esplog.debug("aid %d =>" MACSTR " => " IPSTR "\r\n",
                     evt->event_info.distribute_sta_ip.aid,
                     MAC2STR(evt->event_info.distribute_sta_ip.mac),
                     IP2STR(&evt->event_info.distribute_sta_ip.ip));
         break;
     default:
-        esplog.info("unknown event %x\n", evt->event);
+        esplog.debug("unknown event %x\n", evt->event);
         break;
     }
 }
@@ -170,29 +170,29 @@ void ICACHE_FLASH_ATTR Wifi::switch_to_stationap(void)
     wifi_softap_set_dhcps_lease(&dhcp_lease);
     wifi_softap_dhcps_start();
 
-    esplog.info("Wi-Fi working as AP\n");
-    esplog.info("AP config: SSID:        %s\n", espwifi.m_ap_config.ssid);
-    esplog.info("AP config: Password:    %s\n", espwifi.m_ap_config.password);
-    esplog.info("AP config: channel:     %d\n", espwifi.m_ap_config.channel);
+    esplog.debug("Wi-Fi working as AP\n");
+    esplog.debug("AP config: SSID:        %s\n", espwifi.m_ap_config.ssid);
+    esplog.debug("AP config: Password:    %s\n", espwifi.m_ap_config.password);
+    esplog.debug("AP config: channel:     %d\n", espwifi.m_ap_config.channel);
     switch (espwifi.m_ap_config.authmode)
     {
     case AUTH_OPEN:
-        esplog.info("AP config: Security:    Disabled\n");
+        esplog.debug("AP config: Security:    Disabled\n");
         break;
     case AUTH_WEP:
-        esplog.info("AP config: Security:    WEP\n");
+        esplog.debug("AP config: Security:    WEP\n");
         break;
     case AUTH_WPA_PSK:
-        esplog.info("AP config: Security:    WPA_PSK\n");
+        esplog.debug("AP config: Security:    WPA_PSK\n");
         break;
     case AUTH_WPA2_PSK:
-        esplog.info("AP config: Security:    WPA2_PSK\n");
+        esplog.debug("AP config: Security:    WPA2_PSK\n");
         break;
     case AUTH_WPA_WPA2_PSK:
-        esplog.info("AP config: Security:    WPA_WPA2_PSK\n");
+        esplog.debug("AP config: Security:    WPA_WPA2_PSK\n");
         break;
     default:
-        esplog.info("AP config: Security:    Unknown\n");
+        esplog.debug("AP config: Security:    Unknown\n");
         break;
     }
 }
@@ -236,7 +236,7 @@ void ICACHE_FLASH_ATTR Wifi::init()
 
     if (restore_cfg() != CFG_OK) // something went wrong while loading flash config
     {
-        esplog.info("Wifi::init setting null station config\n");
+        esplog.warn("Wifi::init setting null station config\n");
         os_memset(m_station_ssid, 0, 32);
         os_memset(m_station_pwd, 0, 32);
     }
@@ -300,7 +300,7 @@ int ICACHE_FLASH_ATTR Wifi::restore_cfg(void)
     }
     else
     {
-        esplog.info("Wifi::restore_cfg - cfg file not found\n");
+        esplog.warn("Wifi::restore_cfg - cfg file not found\n");
         return CFG_ERROR;
     }
 }

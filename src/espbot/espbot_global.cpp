@@ -10,7 +10,7 @@
 #include "espbot_global.hpp"
 
 // global variables for esp8266 
-Str_list esp_last_errors(20); // actually this won't work
+Str_list esp_event_log(20);   // actually this won't work
                               // really set in espbot.cpp espbot_init
 Flashfs espfs;
 Esp_mem espmem;

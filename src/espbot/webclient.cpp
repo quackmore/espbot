@@ -77,7 +77,7 @@ static void ICACHE_FLASH_ATTR send(struct espconn *p_espconn, char *msg)
                  p_espconn, msg);
     if (espclient_busy_sending_data) // previous espconn_send not completed yet
     {
-        esplog.info("Webclnt::send - previous espconn_send not completed yet\n");
+        esplog.debug("Webclnt::send - previous espconn_send not completed yet\n");
         struct client_send *send_data = (struct client_send *)esp_zalloc(sizeof(struct client_send));
         espmem.stack_mon();
         if (send_data)
@@ -354,7 +354,7 @@ static ICACHE_FLASH_ATTR void webclient_recon(void *arg, sint8 err)
     esplog.all("webclient_recon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
-    esplog.info("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
+    esplog.debug("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
                 pesp_conn->proto.tcp->remote_ip[1],
                 pesp_conn->proto.tcp->remote_ip[2],
                 pesp_conn->proto.tcp->remote_ip[3],
@@ -367,7 +367,7 @@ static ICACHE_FLASH_ATTR void webclient_discon(void *arg)
     esplog.all("webclient_discon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
-    esplog.info("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
+    esplog.debug("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
                 pesp_conn->proto.tcp->remote_ip[1],
                 pesp_conn->proto.tcp->remote_ip[2],
                 pesp_conn->proto.tcp->remote_ip[3],
@@ -414,8 +414,6 @@ void ICACHE_FLASH_ATTR Webclnt::init(void)
 void ICACHE_FLASH_ATTR Webclnt::connect(struct ip_addr t_server, uint32 t_port)
 {
     esplog.all("Webclnt::connect\n");
-    // struct ip_info client_ip;
-    // wifi_get_ip_info(STATION_IF, &client_ip);
 
     if (m_response)
     {
@@ -455,7 +453,7 @@ void ICACHE_FLASH_ATTR Webclnt::disconnect(void)
     m_status = WEBCLNT_DISCONNECTED;
     espconn_disconnect(&m_esp_conn);
     // espconn_delete(&m_esp_conn);
-    esplog.info("web client disconnected\n");
+    esplog.debug("web client disconnected\n");
 }
 
 void ICACHE_FLASH_ATTR Webclnt::send_req(char *t_msg)

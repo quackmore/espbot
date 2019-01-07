@@ -29,14 +29,14 @@ void ICACHE_FLASH_ATTR Sntp::start(void)
     if (sntp_set_timezone(1) == false)
         esplog.error("Sntp::start - cannot set timezone\n");
     sntp_init();
-    esplog.info("Sntp started\n");
+    esplog.debug("Sntp started\n");
 }
 
 void ICACHE_FLASH_ATTR Sntp::stop(void)
 {
     esplog.all("Sntp::stop\n");
     sntp_stop();
-    esplog.info("Sntp ended\n");
+    esplog.debug("Sntp ended\n");
 }
 
 uint32 ICACHE_FLASH_ATTR Sntp::get_timestamp()

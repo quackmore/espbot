@@ -141,11 +141,12 @@ extern "C" void espbot_init(void);
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
     espmem.init();
-    uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_74880, BIT_RATE_74880);
+    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
     system_set_os_print(1); // enable log print
     print_greetings();
 
-    esp_last_errors.init(20);
+    esp_event_log.init(20);
     espfs.init();
     esplog.init();
     espbot.init();
@@ -172,7 +173,7 @@ int ICACHE_FLASH_ATTR Espbot::restore_cfg(void)
     }
     else
     {
-        esplog.error("Espbot::restore_cfg - cfg file not found\n");
+        esplog.warn("Espbot::restore_cfg - cfg file not found\n");
         return CFG_ERROR;
     }
 }
@@ -296,7 +297,7 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     // set default name
     os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
     if (restore_cfg())
-        esplog.info("no cfg available, espbot name set to %s\n", get_name());
+        esplog.warn("no cfg available, espbot name set to %s\n", get_name());
     else
         esplog.info("espbot name set to %s\n", get_name());
 
@@ -311,5 +312,5 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     m_queue = (os_event_t *)esp_zalloc(sizeof(os_event_t) * QUEUE_LEN);
     system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
 
-    esplog.info("Espbot::init complete\n");
+    esplog.debug("Espbot::init complete\n");
 }
