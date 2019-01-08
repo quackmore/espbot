@@ -562,10 +562,10 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             esp_event_log_len += os_strlen(err_ptr);
             err_ptr = esp_event_log.next();
         }
-        char *msg = (char *)esp_zalloc(16 +                           // formatting string
-                                       10 +                           // heap mem figures
+        char *msg = (char *)esp_zalloc(16 +                         // formatting string
+                                       10 +                         // heap mem figures
                                        (3 * esp_event_log.size()) + // errors formatting
-                                       esp_event_log_len);              // errors
+                                       esp_event_log_len);          // errors
         if (msg)
         {
             os_sprintf(msg, "{\"events\":[");
@@ -593,6 +593,165 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         {
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n",
                          16 + 10 + (3 * esp_event_log.size()) + esp_event_log_len);
+        }
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/debug/hexmemdump")) && (parsed_req.req_method == HTTP_GET))
+    {
+        char *address;
+        int length;
+        Json_str debug_cfg(parsed_req.req_content, parsed_req.content_len);
+        espmem.stack_mon();
+        if (debug_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (debug_cfg.find_pair("address") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'address'", false);
+                return;
+            }
+            if (debug_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'address' does not have a string value type", false);
+                return;
+            }
+            String address_hex_str(debug_cfg.get_cur_pair_value_len() + 1);
+            if (address_hex_str.ref)
+            {
+                os_strncpy(address_hex_str.ref, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            address = (char *)atoh(address_hex_str.ref);
+            if (debug_cfg.find_pair("length") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'length'", false);
+                return;
+            }
+            if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'length' does not have an integer value type", false);
+                return;
+            }
+            String length_str(debug_cfg.get_cur_pair_value_len() + 1);
+            if (length_str.ref)
+            {
+                os_strncpy(length_str.ref, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            length = atoi(length_str.ref);
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+        String msg(48 + length * 3, 0);
+        if (msg.ref)
+        {
+            os_sprintf(msg.ref,
+                       "{\"address\":\"%X\",\"length\": %d,\"content\":\"",
+                       address,
+                       length);
+            int cnt;
+            char *ptr = msg.ref + os_strlen(msg.ref);
+            for (cnt = 0; cnt < length; cnt++)
+            {
+                os_sprintf(ptr, " %X", *(address + cnt));
+                ptr = msg.ref + os_strlen(msg.ref);
+            }
+            os_sprintf(msg.ref + os_strlen(msg.ref), "\"}");
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/debug/memdump")) && (parsed_req.req_method == HTTP_GET))
+    {
+        char *address;
+        int length;
+        Json_str debug_cfg(parsed_req.req_content, parsed_req.content_len);
+        espmem.stack_mon();
+        if (debug_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (debug_cfg.find_pair("address") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'address'", false);
+                return;
+            }
+            if (debug_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'address' does not have a string value type", false);
+                return;
+            }
+            String address_hex_str(debug_cfg.get_cur_pair_value_len() + 1);
+            if (address_hex_str.ref)
+            {
+                os_strncpy(address_hex_str.ref, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            address = (char *)atoh(address_hex_str.ref);
+            if (debug_cfg.find_pair("length") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'length'", false);
+                return;
+            }
+            if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'length' does not have an integer value type", false);
+                return;
+            }
+            String length_str(debug_cfg.get_cur_pair_value_len() + 1);
+            if (length_str.ref)
+            {
+                os_strncpy(length_str.ref, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            length = atoi(length_str.ref);
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+        String msg(48 + length, 0);
+        if (msg.ref)
+        {
+            os_sprintf(msg.ref,
+                       "{\"address\":\"%X\",\"length\": %d,\"content\":\"",
+                       address,
+                       length);
+            int cnt;
+            char *ptr = msg.ref + os_strlen(msg.ref);
+            for (cnt = 0; cnt < length; cnt++)
+                os_sprintf(ptr++, "%c", *(address + cnt));
+            os_sprintf(msg.ref + os_strlen(msg.ref), "\"}");
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
         }
         return;
     }
@@ -1400,11 +1559,11 @@ static ICACHE_FLASH_ATTR void webserver_recon(void *arg, sint8 err)
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
     esplog.debug("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
-                pesp_conn->proto.tcp->remote_ip[1],
-                pesp_conn->proto.tcp->remote_ip[2],
-                pesp_conn->proto.tcp->remote_ip[3],
-                pesp_conn->proto.tcp->remote_port,
-                err);
+                 pesp_conn->proto.tcp->remote_ip[1],
+                 pesp_conn->proto.tcp->remote_ip[2],
+                 pesp_conn->proto.tcp->remote_ip[3],
+                 pesp_conn->proto.tcp->remote_port,
+                 err);
 }
 
 static ICACHE_FLASH_ATTR void webserver_discon(void *arg)
@@ -1413,10 +1572,10 @@ static ICACHE_FLASH_ATTR void webserver_discon(void *arg)
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
     esplog.debug("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
-                pesp_conn->proto.tcp->remote_ip[1],
-                pesp_conn->proto.tcp->remote_ip[2],
-                pesp_conn->proto.tcp->remote_ip[3],
-                pesp_conn->proto.tcp->remote_port);
+                 pesp_conn->proto.tcp->remote_ip[1],
+                 pesp_conn->proto.tcp->remote_ip[2],
+                 pesp_conn->proto.tcp->remote_ip[3],
+                 pesp_conn->proto.tcp->remote_port);
 }
 
 static void ICACHE_FLASH_ATTR webserver_listen(void *arg)

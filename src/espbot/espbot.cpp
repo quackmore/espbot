@@ -83,7 +83,7 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
     esplog.all("heartbeat_cb\n");
     P_DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
     uint32 current_timestamp = esp_sntp.get_timestamp();
-    P_DEBUG("ESPBOT HEARTBEAT: (UT+1) [%d] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
+    P_DEBUG("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
     P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
 }
 
