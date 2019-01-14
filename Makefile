@@ -298,6 +298,7 @@ CCFLAGS += 			\
 	-fno-exceptions \
   -Wno-write-strings \
   -DESPBOT_RELEASE=\"$(GIT_VERSION)\" \
+  -DARDUINO=1 \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 

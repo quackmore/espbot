@@ -27,7 +27,7 @@ void ICACHE_FLASH_ATTR Mdns::start(void)
     wifi_get_ip_info(STATION_IF, &ipconfig);
     m_info.host_name = espbot.get_name();
     m_info.ipAddr = ipconfig.ip.addr;
-    m_info.server_name = "espbot";
+    m_info.server_name = espbot.get_name();
     m_info.server_port = SERVER_PORT;
     os_sprintf(m_alias, "alias=%s", espbot.get_alias());
     m_info.txt_data[0] = m_alias;

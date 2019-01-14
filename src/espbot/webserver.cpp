@@ -285,6 +285,11 @@ static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_esp
 //  [POST]  /api/files/create/:filename
 //  [GET]   /api/fs/info
 //  [POST]  /api/fs/format
+//  [POST]  /api/gpio/cfg
+//  [POST]  /api/gpio/uncfg
+//  [GET]   /api/gpio/cfg
+//  [GET]   /api/gpio/read
+//  [POST]  /api/gpio/set
 //  [GET]   /api/ota/info
 //  [GET]   /api/ota/cfg
 //  [POST]  /api/ota/cfg
@@ -1162,6 +1167,382 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
             return;
         }
+    }
+    if ((os_strcmp(parsed_req.url, "/api/gpio/cfg") == 0) && (parsed_req.req_method == HTTP_POST))
+    {
+        int gpio_pin;
+        int gpio_type;
+        Json_str gpio_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (gpio_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+                return;
+            }
+            String tmp_pin(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_pin.ref)
+            {
+                os_strncpy(tmp_pin.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            if (gpio_cfg.find_pair("gpio_type") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_type'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_type' does not have a string value type", false);
+                return;
+            }
+            String tmp_type(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_type.ref)
+            {
+                os_strncpy(tmp_type.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            gpio_pin = atoi(tmp_pin.ref);
+            if ((os_strcmp(tmp_type.ref, "INPUT") == 0) || (os_strcmp(tmp_type.ref, "input") == 0))
+                gpio_type = ESPBOT_GPIO_INPUT;
+            else if ((os_strcmp(tmp_type.ref, "OUTPUT") == 0) || (os_strcmp(tmp_type.ref, "output") == 0))
+                gpio_type = ESPBOT_GPIO_OUTPUT;
+            else
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio type", false);
+                return;
+            }
+            if (esp_gpio.config(gpio_pin, gpio_type) == ESPBOT_GPIO_WRONG_IDX)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+                return;
+            }
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+
+        String msg(parsed_req.content_len, 0);
+        if (msg.ref)
+        {
+            os_strncpy(msg.ref, parsed_req.req_content, parsed_req.content_len);
+            response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
+            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        espmem.stack_mon();
+        return;
+    }
+    if ((os_strcmp(parsed_req.url, "/api/gpio/uncfg") == 0) && (parsed_req.req_method == HTTP_POST))
+    {
+        int gpio_pin;
+        int gpio_type;
+        Json_str gpio_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (gpio_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio' does not have an integer value type", false);
+                return;
+            }
+            String tmp_pin(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_pin.ref)
+            {
+                os_strncpy(tmp_pin.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            gpio_pin = atoi(tmp_pin.ref);
+            if (esp_gpio.unconfig(gpio_pin) == ESPBOT_GPIO_WRONG_IDX)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+                return;
+            }
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+
+        String msg(48, 0);
+        if (msg.ref)
+        {
+            os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
+            response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
+            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        espmem.stack_mon();
+        return;
+    }
+    if ((os_strcmp(parsed_req.url, "/api/gpio/cfg") == 0) && (parsed_req.req_method == HTTP_GET))
+    {
+        int gpio_pin;
+        int result;
+        Json_str gpio_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (gpio_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+                return;
+            }
+            String tmp_pin(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_pin.ref)
+            {
+                os_strncpy(tmp_pin.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            gpio_pin = atoi(tmp_pin.ref);
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+
+        String msg(48);
+        if (msg.ref)
+        {
+            result = esp_gpio.get_config(gpio_pin);
+            switch (result)
+            {
+            case ESPBOT_GPIO_WRONG_IDX:
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+                return;
+            case ESPBOT_GPIO_UNPROVISIONED:
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
+                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+                return;
+            case ESPBOT_GPIO_INPUT:
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"input\"}", gpio_pin);
+                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+                return;
+            case ESPBOT_GPIO_OUTPUT:
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"output\"}", gpio_pin);
+                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+                return;
+            default:
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Gpio.get_config error", false);
+                return;
+            }
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        espmem.stack_mon();
+        return;
+    }
+    if ((os_strcmp(parsed_req.url, "/api/gpio/read") == 0) && (parsed_req.req_method == HTTP_GET))
+    {
+        int gpio_pin;
+        int result;
+        Json_str gpio_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (gpio_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+                return;
+            }
+            String tmp_pin(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_pin.ref)
+            {
+                os_strncpy(tmp_pin.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            gpio_pin = atoi(tmp_pin.ref);
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+
+        String msg(48);
+        if (msg.ref)
+        {
+            result = esp_gpio.read(gpio_pin);
+            switch (result)
+            {
+            case ESPBOT_GPIO_WRONG_IDX:
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+                return;
+            case ESPBOT_GPIO_UNPROVISIONED:
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
+                break;
+            case ESPBOT_LOW:
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_status\":\"LOW\"}", gpio_pin);
+                break;
+            case ESPBOT_HIGH:
+
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_status\":\"HIGH\"}", gpio_pin);
+                break;
+            default:
+                break;
+            }
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+        espmem.stack_mon();
+        return;
+    }
+    if ((os_strcmp(parsed_req.url, "/api/gpio/set") == 0) && (parsed_req.req_method == HTTP_POST))
+    {
+        int gpio_pin;
+        int output_level;
+        int result;
+        Json_str gpio_cfg(parsed_req.req_content, parsed_req.content_len);
+        if (gpio_cfg.syntax_check() == JSON_SINTAX_OK)
+        {
+            if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+                return;
+            }
+            String tmp_pin(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_pin.ref)
+            {
+                os_strncpy(tmp_pin.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            if (gpio_cfg.find_pair("gpio_status") != JSON_NEW_PAIR_FOUND)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_status'", false);
+                return;
+            }
+            if (gpio_cfg.get_cur_pair_value_type() != JSON_STRING)
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_status' does not have a string value type", false);
+                return;
+            }
+            String tmp_level(gpio_cfg.get_cur_pair_value_len());
+            if (tmp_level.ref)
+            {
+                os_strncpy(tmp_level.ref, gpio_cfg.get_cur_pair_value(), gpio_cfg.get_cur_pair_value_len());
+            }
+            else
+            {
+                esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+                return;
+            }
+            gpio_pin = atoi(tmp_pin.ref);
+            if ((os_strcmp(tmp_level.ref, "LOW") == 0) || (os_strcmp(tmp_level.ref, "low") == 0))
+                output_level = ESPBOT_LOW;
+            else if ((os_strcmp(tmp_level.ref, "HIGH") == 0) || (os_strcmp(tmp_level.ref, "high") == 0))
+                output_level = ESPBOT_HIGH;
+            else
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio level", false);
+                return;
+            }
+            espmem.stack_mon();
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return;
+        }
+
+        String msg(48);
+        if (msg.ref)
+        {
+            result = esp_gpio.set(gpio_pin, output_level);
+            switch (result)
+            {
+            case ESPBOT_GPIO_WRONG_IDX:
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+                return;
+            case ESPBOT_GPIO_UNPROVISIONED:
+                os_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, msg.ref, true);
+                return;
+            case ESPBOT_GPIO_WRONG_LVL:
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong output level", false);
+                return;
+            case ESPBOT_GPIO_CANNOT_CHANGE_INPUT:
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot change input", false);
+                return;
+            case ESPBOT_GPIO_OK:
+                os_strncpy(msg.ref, parsed_req.req_content, parsed_req.content_len);
+                response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
+                return;
+            default:
+                break;
+            }
+            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        espmem.stack_mon();
+        return;
     }
     if ((0 == os_strcmp(parsed_req.url, "/api/ota/info")) && (parsed_req.req_method == HTTP_GET))
     {

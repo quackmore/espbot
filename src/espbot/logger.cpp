@@ -263,29 +263,32 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
 
 void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
 {
-    if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
     {
-        char buffer[LOG_BUF_SIZE];
-        va_list al;
-        espmem.stack_mon();
-        va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-        va_end(al);
-        if (m_serial_level >= LOG_INFO)
-            os_printf_plus("[INFO] %s", buffer);
-        if (m_memory_level >= LOG_INFO)
+        Profiler info_profiler("Logger::info");
+        if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
         {
-            uint32 timestamp = esp_sntp.get_timestamp();
-            String time_str(27);
-            if (time_str.ref)
-                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            char buffer[LOG_BUF_SIZE];
+            va_list al;
+            espmem.stack_mon();
+            va_start(al, t_format);
+            ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+            va_end(al);
+            if (m_serial_level >= LOG_INFO)
+                os_printf_plus("[INFO] %s", buffer);
+            if (m_memory_level >= LOG_INFO)
             {
-                os_sprintf(json_ptr,
-                           "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
-                           time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                uint32 timestamp = esp_sntp.get_timestamp();
+                String time_str(27);
+                if (time_str.ref)
+                    os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
+                char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
+                if (json_ptr)
+                {
+                    os_sprintf(json_ptr,
+                               "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
+                               time_str.ref, buffer);
+                    esp_event_log.push_back(json_ptr, true);
+                }
             }
         }
     }
@@ -354,5 +357,5 @@ ICACHE_FLASH_ATTR Profiler::~Profiler()
 {
     esplog.all("Profiler::~Profiler\n");
     m_stop_time_us = system_get_time();
-    os_printf("ESPBOT PROFILER: %s: %d\n", m_msg, (m_stop_time_us - m_start_time_us));
+    os_printf("ESPBOT PROFILER: %s: %d us\n", m_msg, (m_stop_time_us - m_start_time_us));
 }

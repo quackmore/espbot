@@ -29,6 +29,7 @@ extern "C"
 #include "logger.hpp"
 #include "json.hpp"
 #include "config.hpp"
+#include "gpio.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -152,6 +153,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     espbot.init();
     esp_ota.init();
     espwebclnt.init();
+    esp_gpio.init();
 
     espwifi.init();
 }

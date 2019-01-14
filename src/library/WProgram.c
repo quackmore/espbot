@@ -7,19 +7,19 @@
  * ----------------------------------------------------------------------------
  */
 
-#include "espbot_global.hpp"
+#include "WProgram.h"
 
-// global variables for esp8266 
-Str_list esp_event_log(20);   // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Esp_mem espmem;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Sntp esp_sntp;
-Websvr espwebsvr;
-Webclnt espwebclnt;
-Ota_upgrade esp_ota;
-Gpio esp_gpio;
+void interrupts(void)
+{
+    ets_intr_unlock();
+}
+
+void noInterrupts(void)
+{
+    ets_intr_lock();
+}
+
+void delay(uint32);
+void delayMicroseconds(uint32);
+uint32_t millis(void);
+uint32_t microsecondsToClockCycles(uint32_t);

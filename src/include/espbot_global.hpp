@@ -20,6 +20,7 @@
 #include "webserver.hpp"
 #include "webclient.hpp"
 #include "ota_upgrade.hpp"
+#include "gpio.hpp"
 
 extern Str_list esp_event_log;
 extern Flashfs espfs;
@@ -32,5 +33,6 @@ extern Sntp esp_sntp;
 extern Websvr espwebsvr;
 extern Webclnt espwebclnt;
 extern Ota_upgrade esp_ota;
+extern Gpio esp_gpio;
 
 #endif

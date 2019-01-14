@@ -21,10 +21,11 @@ ifndef PDIR # {
 GEN_IMAGES= eagle.app.v6.out
 GEN_BINS= eagle.app.v6.bin
 SPECIAL_MKTARGETS=$(APP_MKTARGETS)
-SUBDIRS=    \
-	driver    \
-	user    \
-	spiffs    \
+SUBDIRS=         \
+	driver       \
+	user         \
+	spiffs       \
+	library      \
 	espbot
 
 endif # } PDIR
@@ -34,10 +35,10 @@ LDDIR = $(SDK_DIR)/ld
 
 CCFLAGS += -Os
 
-TARGET_LDFLAGS =		\
-	-nostdlib		\
-	-Wl,-EL \
-	--longcalls \
+TARGET_LDFLAGS =		        \
+	-nostdlib		            \
+	-Wl,-EL                     \
+	--longcalls                 \
 	--text-section-literals
 
 ifeq ($(FLAVOR),debug)
@@ -48,41 +49,42 @@ ifeq ($(FLAVOR),release)
     TARGET_LDFLAGS += -g -O0
 endif
 
-COMPONENTS_eagle.app.v6 = \
-	driver/libdriver.a  \
-	user/libuser.a  \
-	spiffs/libspiffs.a  \
+COMPONENTS_eagle.app.v6 =   \
+	driver/libdriver.a      \
+	user/libuser.a          \
+	spiffs/libspiffs.a      \
+	library/liblibrary.a    \
 	espbot/libespbot.a
 
-LINKFLAGS_eagle.app.v6 = \
-	-L../lib        \
-	-nostdlib	\
-    -T$(LD_FILE)   \
-	-Wl,--no-check-sections	\
-	-Wl,--gc-sections	\
-    -u call_user_start	\
-	-Wl,-static						\
-	-Wl,--start-group					\
-	-lc					\
-	-lgcc					\
-	-lhal					\
-	-lphy	\
-	-lpp	\
-	-lnet80211	\
-	-llwip	\
-	-lwpa	\
-	-lcrypto	\
-	-lmain	\
-	-ljson	\
-	-lupgrade\
-	-lssl	\
-	-lpwm	\
-	-lsmartconfig \
-	$(DEP_LIBS_eagle.app.v6)					\
+LINKFLAGS_eagle.app.v6 =       \
+	-L../lib                   \
+	-nostdlib	               \
+    -T$(LD_FILE)               \
+	-Wl,--no-check-sections	   \
+	-Wl,--gc-sections	       \
+    -u call_user_start	       \
+	-Wl,-static				   \
+	-Wl,--start-group		   \
+	-lc					       \
+	-lgcc					   \
+	-lhal					   \
+	-lphy	                   \
+	-lpp	                   \
+	-lnet80211	               \
+	-llwip	                   \
+	-lwpa	                   \
+	-lcrypto	               \
+	-lmain	                   \
+	-lupgrade                  \
+	-lpwm	                   \
+	$(DEP_LIBS_eagle.app.v6)   \
 	-Wl,--end-group
+#	-ljson	                   \
+#	-lssl	                   \
+#	-lsmartconfig              \
 
-DEPENDS_eagle.app.v6 = \
-                $(LD_FILE) \
+DEPENDS_eagle.app.v6 =                         \
+                $(LD_FILE)                     \
                 $(LDDIR)/eagle.rom.addr.v6.ld
 
 #############################################################
