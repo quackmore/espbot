@@ -7,6 +7,7 @@ Empty structure for esp8266 apps (NON-OS SDK and C++).
 Features:
 
 + configuration persistency
++ GPIO
 + logger
 + mDns
 + memory monitor (stack and heap)
@@ -32,12 +33,17 @@ espbot_2.0_apis_single_commands
 
 https://documenter.getpostman.com/view/4220776/RznCsKpj
 
+espbot_2.0_gpio
+(for managing ESP8266 digital I/O)
+
+https://documenter.getpostman.com/view/4220776/RzthSXGC
+
 ## Building the binaries
 
 Checkout my other repo https://github.com/quackmore/esp8266_SDK_structure for details.
 
 ## License
 
-In addition to SPIFFS licence esp8266_spiffs comes with a [BEER-WARE] license.
+Espbot_2.0 comes with a [BEER-WARE] license.
 
 Enjoy.
