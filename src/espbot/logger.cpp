@@ -334,7 +334,6 @@ void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
     {
         char buffer[LOG_BUF_SIZE];
         va_list al;
-        espmem.stack_mon();
         va_start(al, t_format);
         ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
         va_end(al);

@@ -72,9 +72,11 @@ static char ICACHE_FLASH_ATTR *error_msg(int code)
 // a timer will used for postponing response
 //
 
-#define DATA_SENT_TIMER_PERIOD 500
+#define DATA_SENT_TIMER_PERIOD 100
+#define MAX_PENDING_RESPONSE_COUNT 8
 static char *send_buffer;
-static os_timer_t websvr_wait_for_data_sent;
+static os_timer_t pending_response_timer[MAX_PENDING_RESPONSE_COUNT];
+static char pending_response_timer_busy[MAX_PENDING_RESPONSE_COUNT];
 static bool esp_busy_sending_data = false;
 
 struct svr_response
@@ -84,6 +86,7 @@ struct svr_response
     char *content_type;
     char *msg;
     bool free_msg;
+    char timer_idx;
 };
 
 static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg);
@@ -92,6 +95,8 @@ static void ICACHE_FLASH_ATTR webserver_pending_response(void *arg)
 {
     esplog.all("webserver_pending_response\n");
     struct svr_response *response_data = (struct svr_response *)arg;
+    // free pending response_timer
+    pending_response_timer_busy[response_data->timer_idx] = 0;
     response(response_data->p_espconn, response_data->code, response_data->content_type, response_data->msg, response_data->free_msg);
     esp_free(response_data);
 }
@@ -102,7 +107,10 @@ static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
     struct espconn *ptr_espconn = (struct espconn *)arg;
     esp_busy_sending_data = false;
     if (send_buffer)
+    {
         esp_free(send_buffer);
+        send_buffer = NULL;
+    }
 }
 
 static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg)
@@ -121,13 +129,30 @@ static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char
         espmem.stack_mon();
         if (response_data)
         {
-            response_data->p_espconn = p_espconn;
-            response_data->code = code;
-            response_data->content_type = content_type;
-            response_data->msg = msg;
-            response_data->free_msg = free_msg;
-            os_timer_setfn(&websvr_wait_for_data_sent, (os_timer_func_t *)webserver_pending_response, (void *)response_data);
-            os_timer_arm(&websvr_wait_for_data_sent, DATA_SENT_TIMER_PERIOD, 0);
+            // look for a free pending_response_timer
+            int timer_idx;
+            for (timer_idx = 0; timer_idx < MAX_PENDING_RESPONSE_COUNT; timer_idx++)
+                if (pending_response_timer_busy[timer_idx] == 0)
+                {
+                    pending_response_timer_busy[timer_idx] = 1;
+                    break;
+                }
+            // check if there's a timer available
+            if (timer_idx >= MAX_PENDING_RESPONSE_COUNT)
+                esplog.error("Websvr::response: no pending_response timers available\n");
+            else
+            {
+                response_data->p_espconn = p_espconn;
+                response_data->code = code;
+                response_data->content_type = content_type;
+                response_data->msg = msg;
+                response_data->free_msg = free_msg;
+                response_data->timer_idx = timer_idx;
+                os_timer_disarm(&pending_response_timer[timer_idx]);
+                os_timer_setfn(&pending_response_timer[timer_idx], (os_timer_func_t *)webserver_pending_response, (void *)response_data);
+                os_timer_arm(&pending_response_timer[timer_idx], DATA_SENT_TIMER_PERIOD, 0);
+                esplog.all("Websvr::response - waiting for espconn_send to complete\n");
+            }
         }
         else
         {
@@ -179,6 +204,7 @@ static void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char
                 // on error don't count on sentcb to be called
                 esp_busy_sending_data = false;
                 esp_free(send_buffer);
+                send_buffer = NULL;
             }
             // esp_free(send_buffer); // webserver_sentcb will free it
         }
@@ -222,7 +248,7 @@ static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_esp
             {
                 char *tmp_ptr;
                 espmem.stack_mon();
-                os_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDss\":[", espwifi.get_ap_count());
+                os_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDs\":[", espwifi.get_ap_count());
                 for (int idx = 0; idx < espwifi.get_ap_count(); idx++)
                 {
                     tmp_ptr = scan_list + os_strlen(scan_list);
@@ -232,7 +258,7 @@ static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_esp
                 }
                 tmp_ptr = scan_list + os_strlen(scan_list);
                 os_sprintf(tmp_ptr, "]}");
-                response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, scan_list, true);
+                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, scan_list, true);
                 counter = 0;
                 espwifi.free_ap_list();
             }
@@ -248,6 +274,7 @@ static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_esp
         else
         {
             // not ready yet, wait for another 500 ms
+            os_timer_disarm(&wifi_scan_timeout_timer);
             os_timer_setfn(&wifi_scan_timeout_timer, (os_timer_func_t *)wifi_scan_timeout_function, ptr_espconn);
             os_timer_arm(&wifi_scan_timeout_timer, 500, 0);
             counter++;
@@ -267,39 +294,6 @@ static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_esp
 // Managing:
 // + File requests
 // + WEB API
-//
-//  List of enabled routes:
-//  [GET]   /
-//  [GET]   /:filename
-//  [GET]   /api/debug/log
-//  [GET]   /api/debug/meminfo
-//  [GET]   /api/debug/cfg
-//  [POST]  /api/debug/cfg
-//  [GET]   /api/espbot/info
-//  [GET]   /api/espbot/cfg
-//  [POST]  /api/espbot/cfg
-//  [POST]  /api/espbot/reset
-//  [GET]   /api/files/ls
-//  [GET]   /api/files/cat/:filename
-//  [POST]  /api/files/delete/:filename
-//  [POST]  /api/files/create/:filename
-//  [GET]   /api/fs/info
-//  [POST]  /api/fs/format
-//  [POST]  /api/gpio/cfg
-//  [POST]  /api/gpio/uncfg
-//  [GET]   /api/gpio/cfg
-//  [GET]   /api/gpio/read
-//  [POST]  /api/gpio/set
-//  [GET]   /api/ota/info
-//  [GET]   /api/ota/cfg
-//  [POST]  /api/ota/cfg
-//  [POST]  /api/ota/upgrade
-//  [POST]  /api/test
-//  [GET]   /api/wifi/cfg
-//  [POST]  /api/wifi/cfg
-//  [GET]   /api/wifi/scan
-//  [POST]  /api/wifi/connect
-//  [POST]  /api/wifi/disconnect
 //
 
 typedef enum
@@ -469,6 +463,29 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
     os_memcpy(parsed_req->req_content, tmp_ptr, parsed_req->content_len);
 }
 
+static char ICACHE_FLASH_ATTR *get_file_mime_type(char *filename)
+{
+    char *ptr;
+    ptr = (char *)os_strstr(filename, ".");
+    if (ptr == NULL)
+        return "text/plain";
+    else
+    {
+        if (os_strcmp(ptr, ".css") == 0)
+            return "text/css";
+        else if (os_strcmp(ptr, ".txt") == 0)
+            return "text/plain";
+        else if (os_strcmp(ptr, ".html") == 0)
+            return "text/html";
+        else if (os_strcmp(ptr, ".js") == 0)
+            return "text/javascript";
+        else if (os_strcmp(ptr, ".css") == 0)
+            return "text/css";
+        else
+            return "text/plain";
+    }
+}
+
 static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
 {
     esplog.all("webserver::return_file\n");
@@ -488,7 +505,8 @@ static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filen
             if (file_content)
             {
                 sel_file.n_read(file_content, file_size);
-                response(p_espconn, HTTP_OK, HTTP_CONTENT_TEXT, file_content, true);
+
+                response(p_espconn, HTTP_OK, get_file_mime_type(filename), file_content, true);
                 // esp_free(file_content); // dont't free the msg buffer cause it could not have been used yet
             }
             else
@@ -1031,6 +1049,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         if (espfs.is_available())
         {
             response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+            os_timer_disarm(&format_delay_timer);
             os_timer_setfn(&format_delay_timer, (os_timer_func_t *)format_function, NULL);
             os_timer_arm(&format_delay_timer, 500, 0);
             return;
@@ -1146,6 +1165,41 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             if (Ffile::exists(&espfs, file_name))
             {
                 response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "File already exists", false);
+                return;
+            }
+            Ffile sel_file(&espfs, file_name);
+            espmem.stack_mon();
+            if (sel_file.is_available())
+            {
+                sel_file.n_append(parsed_req.req_content, parsed_req.content_len);
+                response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, "", false);
+                return;
+            }
+            else
+            {
+                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
+                return;
+            }
+        }
+        else
+        {
+            response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+            return;
+        }
+    }
+    if ((0 == os_strncmp(parsed_req.url, "/api/files/append/", os_strlen("/api/files/append/"))) && (parsed_req.req_method == HTTP_POST))
+    {
+        char *file_name = parsed_req.url + os_strlen("/api/files/append/");
+        if (os_strlen(file_name) == 0)
+        {
+            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
+            return;
+        }
+        if (espfs.is_available())
+        {
+            if (!Ffile::exists(&espfs, file_name))
+            {
+                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "File does not exists", false);
                 return;
             }
             Ffile sel_file(&espfs, file_name);
@@ -1812,9 +1866,42 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
         }
         return;
     }
-    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/scan")) && (parsed_req.req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/info")) && (parsed_req.req_method == HTTP_GET))
+    {
+        String msg(44 + 32 + 42, 0);
+        if (msg.ref)
+        {
+            switch (espwifi.get_op_mode())
+            {
+            case STATION_MODE:
+                os_sprintf(msg.ref, "{\"op_mode\":\"STATION\",\"SSID\":\"%s\",", espwifi.station_get_ssid());
+                break;
+            case SOFTAP_MODE:
+                os_sprintf(msg.ref, "{\"op_mode\":\"AP\",");
+                break;
+            case STATIONAP_MODE:
+                os_sprintf(msg.ref, "{\"op_mode\":\"AP\",");
+                break;
+            default:
+                break;
+            }
+            char *ptr = msg.ref + os_strlen(msg.ref);
+            struct ip_info tmp_ip;
+            espwifi.get_ip_address(&tmp_ip);
+            char *ip_ptr = (char *)&tmp_ip.ip.addr;
+            os_sprintf(ptr, "\"ip_address\":\"%d.%d.%d.%d\"}", ip_ptr[0], ip_ptr[1], ip_ptr[2], ip_ptr[3]);
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 64);
+        }
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req.url, "/api/wifi/scan")) && (parsed_req.req_method == HTTP_GET))
     {
         // response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, NULL);
+        os_timer_disarm(&wifi_scan_timeout_timer);
         os_timer_setfn(&wifi_scan_timeout_timer, (os_timer_func_t *)wifi_scan_timeout_function, ptr_espconn);
         os_timer_arm(&wifi_scan_timeout_timer, 500, 0);
         espwifi.scan_for_ap();
@@ -1973,7 +2060,12 @@ static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
 void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
 {
     esplog.all("Websvr::start\n");
-    os_timer_disarm(&websvr_wait_for_data_sent);
+    int idx;
+    for (idx = 0; idx < MAX_PENDING_RESPONSE_COUNT; idx++)
+    {
+        os_timer_disarm(&pending_response_timer[idx]);
+        pending_response_timer_busy[idx] = 0;
+    }
     os_timer_disarm(&format_delay_timer);
     os_timer_disarm(&wifi_scan_timeout_timer);
 

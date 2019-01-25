@@ -23,46 +23,6 @@ extern "C"
 #include "json.hpp"
 #include "config.hpp"
 
-/*
- * Digital I/O map for MODEMCU, WEMOS D1 mini
- * 
- *    gpio   pin   mux
- * -----------------------
- * D1 GPIO5  pin24 GPIO5_U
- * D2 GPIO4  pin16 GPIO4_U
- * D3 GPIO0  pin15 GPIO0_U
- * D4 GPIO2  pin14 GPIO2_U
- * D5 GPIO14 pin9  MTMS_U
- * D6 GPIO12 pin10 MTDI_U
- * D7 GPIO13 pin12 MTCK_U
- * D8 GPIO15 pin13 MTDO_U
- */
-
-#define ESPBOT_D1_NUM 5
-#define ESPBOT_D2_NUM 4
-#define ESPBOT_D3_NUM 0
-#define ESPBOT_D4_NUM 2
-#define ESPBOT_D5_NUM 14
-#define ESPBOT_D6_NUM 12
-#define ESPBOT_D7_NUM 13
-#define ESPBOT_D8_NUM 15
-
-#define ESPBOT_D1_MUX PERIPHS_IO_MUX_GPIO5_U
-#define ESPBOT_D1_FUNC FUNC_GPIO5
-#define ESPBOT_D2_MUX PERIPHS_IO_MUX_GPIO4_U
-#define ESPBOT_D2_FUNC FUNC_GPIO4
-#define ESPBOT_D3_MUX PERIPHS_IO_MUX_GPIO0_U
-#define ESPBOT_D3_FUNC FUNC_GPIO0
-#define ESPBOT_D4_MUX PERIPHS_IO_MUX_GPIO2_U
-#define ESPBOT_D4_FUNC FUNC_GPIO2
-#define ESPBOT_D5_MUX PERIPHS_IO_MUX_MTMS_U
-#define ESPBOT_D5_FUNC FUNC_GPIO14
-#define ESPBOT_D6_MUX PERIPHS_IO_MUX_MTDI_U
-#define ESPBOT_D6_FUNC FUNC_GPIO12
-#define ESPBOT_D7_MUX PERIPHS_IO_MUX_MTCK_U
-#define ESPBOT_D7_FUNC FUNC_GPIO13
-#define ESPBOT_D8_MUX PERIPHS_IO_MUX_MTDO_U
-#define ESPBOT_D8_FUNC FUNC_GPIO15
 
 #define ESPBOT_INPUT_GET(input_reg, gpio_no) ((input_reg >> gpio_no) & BIT0)
 

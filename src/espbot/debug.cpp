@@ -54,7 +54,7 @@ void ICACHE_FLASH_ATTR Esp_mem::init(void)
 void ICACHE_FLASH_ATTR Esp_mem::heap_mon(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
-    esplog.all("Esp_mem::heap_mon: %d\n", currentHeap);
+    //esplog.all("Esp_mem::heap_mon: %d\n", currentHeap);
     if (m_min_heap_size > currentHeap)
         m_min_heap_size = currentHeap;
 }
@@ -62,7 +62,6 @@ void ICACHE_FLASH_ATTR Esp_mem::heap_mon(void)
 void ICACHE_FLASH_ATTR Esp_mem::stack_mon(void)
 {
     uint32 stack_var_addr = (uint32)&stack_var_addr;
-    esplog.all("Dbggr::stack_mon\n");
     if (stack_var_addr > m_stack_max_addr)
         m_stack_max_addr = stack_var_addr;
     if (stack_var_addr < m_stack_min_addr)
@@ -71,7 +70,6 @@ void ICACHE_FLASH_ATTR Esp_mem::stack_mon(void)
 
 void *Esp_mem::espbot_zalloc(size_t size)
 {
-    esplog.all("espbot_zalloc\n");
     void *addr = os_zalloc(size);
     if (addr)
     {
@@ -89,13 +87,16 @@ void *Esp_mem::espbot_zalloc(size_t size)
             espmem.stack_mon();
         }
     }
+    else
+    {
+        esplog.fatal("Esp_mem::espbot_zalloc heap exhausted\n");
+    }
     espmem.heap_mon();
     return addr;
 }
 
 void Esp_mem::espbot_free(void *addr)
 {
-    esplog.all("espbot_free\n");
     espmem.m_heap_objs--;
     os_free(addr);
     int prev_ptr = espmem.m_first_heap_item;

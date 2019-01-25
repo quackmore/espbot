@@ -59,13 +59,13 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
     {
     case EVENT_STAMODE_CONNECTED:
         esplog.debug("connected to ssid %s, channel %d\n",
-                    evt->event_info.connected.ssid,
-                    evt->event_info.connected.channel);
+                     evt->event_info.connected.ssid,
+                     evt->event_info.connected.channel);
         break;
     case EVENT_STAMODE_DISCONNECTED:
         esplog.debug("disconnect from ssid %s, reason %d\n",
-                    evt->event_info.disconnected.ssid,
-                    evt->event_info.disconnected.reason);
+                     evt->event_info.disconnected.ssid,
+                     evt->event_info.disconnected.reason);
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
                                                                          // disconnection from AP
         if (!espwifi.is_timeout_timer_active())
@@ -77,21 +77,21 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         break;
     case EVENT_STAMODE_AUTHMODE_CHANGE:
         esplog.debug("authmode change: %d -> %d\n",
-                    evt->event_info.auth_change.old_mode,
-                    evt->event_info.auth_change.new_mode);
+                     evt->event_info.auth_change.old_mode,
+                     evt->event_info.auth_change.new_mode);
         break;
     case EVENT_STAMODE_DHCP_TIMEOUT:
         esplog.debug("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
-                    IP2STR(&evt->event_info.got_ip.ip),
-                    IP2STR(&evt->event_info.got_ip.mask),
-                    IP2STR(&evt->event_info.got_ip.gw));
+                     IP2STR(&evt->event_info.got_ip.ip),
+                     IP2STR(&evt->event_info.got_ip.mask),
+                     IP2STR(&evt->event_info.got_ip.gw));
         os_printf("\n");
         break;
     case EVENT_STAMODE_GOT_IP:
         esplog.debug("got IP:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
-                    IP2STR(&evt->event_info.got_ip.ip),
-                    IP2STR(&evt->event_info.got_ip.mask),
-                    IP2STR(&evt->event_info.got_ip.gw));
+                     IP2STR(&evt->event_info.got_ip.ip),
+                     IP2STR(&evt->event_info.got_ip.mask),
+                     IP2STR(&evt->event_info.got_ip.gw));
         os_printf("\n");
         // station connected to AP and got an IP address
         // whichever was wifi mode now AP mode is no longer required
@@ -105,15 +105,15 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
         esplog.debug("station: " MACSTR " join, AID = %d\n",
-                    MAC2STR(evt->event_info.sta_connected.mac),
-                    evt->event_info.sta_connected.aid);
+                     MAC2STR(evt->event_info.sta_connected.mac),
+                     evt->event_info.sta_connected.aid);
         system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STACONNECTED, '0'); // informing everybody that
                                                                             // a station connected to ESP8266
         break;
     case EVENT_SOFTAPMODE_STADISCONNECTED:
         esplog.debug("station: " MACSTR " leave, AID = %d\n",
-                    MAC2STR(evt->event_info.sta_disconnected.mac),
-                    evt->event_info.sta_disconnected.aid);
+                     MAC2STR(evt->event_info.sta_disconnected.mac),
+                     evt->event_info.sta_disconnected.aid);
         system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STADISCONNECTED, '0'); // informing everybody of
                                                                                // a station disconnected from ESP8266
         break;
@@ -138,9 +138,9 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
         break;
     case EVENT_SOFTAPMODE_DISTRIBUTE_STA_IP:
         esplog.debug("aid %d =>" MACSTR " => " IPSTR "\r\n",
-                    evt->event_info.distribute_sta_ip.aid,
-                    MAC2STR(evt->event_info.distribute_sta_ip.mac),
-                    IP2STR(&evt->event_info.distribute_sta_ip.ip));
+                     evt->event_info.distribute_sta_ip.aid,
+                     MAC2STR(evt->event_info.distribute_sta_ip.mac),
+                     IP2STR(&evt->event_info.distribute_sta_ip.ip));
         break;
     default:
         esplog.debug("unknown event %x\n", evt->event);
@@ -479,5 +479,22 @@ void ICACHE_FLASH_ATTR Wifi::free_ap_list(void)
     {
         esp_free(m_ap_list);
         m_ap_list = NULL;
+    }
+}
+
+int ICACHE_FLASH_ATTR Wifi::get_op_mode(void)
+{
+    return wifi_get_opmode();
+}
+
+void ICACHE_FLASH_ATTR Wifi::get_ip_address(struct ip_info *t_ip)
+{
+    if (wifi_get_opmode() == STATIONAP_MODE)
+    {
+        wifi_get_ip_info(0x01, t_ip);
+    }
+    else
+    {
+        wifi_get_ip_info(0x00, t_ip);
     }
 }

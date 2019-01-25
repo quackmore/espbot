@@ -77,6 +77,9 @@ public:
   int get_ap_count(void);           // return the number of APs found
   char *get_ap_name(int);           // return the name of AP number xx (from 0 to (ap_count-1))
   void free_ap_list(void);
+
+  int get_op_mode(void);
+  void get_ip_address(struct ip_info *);
 };
 
 #endif
