@@ -11,6 +11,7 @@
 #include "gpio.h"
 #include "osapi.h"
 #include "mem.h"
+#include "hw_timer.h"
 #include "esp8266_io.h"
 #include "do_sequence.h"
 
@@ -98,6 +99,10 @@ uint32 ICACHE_FLASH_ATTR get_sequence_pulse_duration(struct do_seq *seq, int idx
 // sequence execution
 //
 
+//
+// ms pulses (SW timers)
+//
+
 void output_pulse(struct do_seq *seq)
 {
     if (seq->current_pulse < seq->pulse_max_count)
@@ -126,4 +131,51 @@ void ICACHE_FLASH_ATTR exe_sequence_ms(struct do_seq *seq)
     // save the current status of digital output
     seq->dig_output_initial_value = GPIO_INPUT_GET(seq->do_pin);
     output_pulse(seq);
+}
+
+//
+// us pulses (HW timers)
+//
+
+static struct do_seq *us_seq;
+static int us_current_pulse;
+static int us_pulse_max_count;
+static int us_do_pin;
+static char *us_pulse_level;
+static uint32 *us_pulse_duration;
+
+void output_pulse_us(void)
+{
+    if (us_current_pulse < us_pulse_max_count)
+    {
+        // executing sequence pulses
+        hw_timer_arm(us_pulse_duration[us_current_pulse]);
+        GPIO_OUTPUT_SET(us_do_pin, us_pulse_level[us_current_pulse]);
+        us_current_pulse++;
+    }
+    else
+    {
+        // restoring original digital output status
+        hw_timer_disarm();
+        GPIO_OUTPUT_SET(us_seq->do_pin, us_seq->dig_output_initial_value);
+        us_seq->end_sequence_callack(us_seq->end_sequence_callack_param);
+    }
+    // the output_pulse function execution takes 2 us
+    // during sequence pulse (while the timer is armed)
+}
+
+void ICACHE_FLASH_ATTR exe_sequence_us(struct do_seq *seq)
+{
+    hw_timer_init(NMI_SOURCE, 0);
+    hw_timer_set_func(output_pulse_us);
+    us_seq = seq;
+    us_current_pulse = 0;
+    us_pulse_max_count = seq->pulse_max_count;
+    us_do_pin = seq->do_pin;
+    us_pulse_level = seq->pulse_level;
+    us_pulse_duration = seq->pulse_duration;
+
+    // save the current status of digital output
+    us_seq->dig_output_initial_value = GPIO_INPUT_GET(us_seq->do_pin);
+    output_pulse_us();
 }

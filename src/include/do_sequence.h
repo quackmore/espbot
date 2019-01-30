@@ -46,7 +46,17 @@ int get_sequence_length(struct do_seq *seq);
 char get_sequence_pulse_level(struct do_seq *seq, int idx);
 uint32 get_sequence_pulse_duration(struct do_seq *seq, int idx);
 
-void exe_sequence_ms(struct do_seq *seq); // will use os_timer (SW timer)
-void exe_sequence_us(struct do_seq *seq); // will use hw_timer
+//
+// when using sequence with pulse duration in milliseconds please consider that 
+//  - you are using an SW timers so you can run more than one sequence at a time
+//  - pulse duration range is from 5 ms to 6.870.947 ms
+//
+// when using sequence with pulse duration in microseconds please consider that 
+//  - you are using an HW timer so you can run one sequence at a time
+//  - pulse duration range is from 10 us to 199.999 us
+//
+
+void exe_sequence_ms(struct do_seq *seq);
+void exe_sequence_us(struct do_seq *seq);
 
 #endif
