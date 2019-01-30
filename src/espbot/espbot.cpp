@@ -144,6 +144,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     espmem.init();
     uart_init(BIT_RATE_460800, BIT_RATE_460800);
     // uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
     system_set_os_print(1); // enable log print
     print_greetings();
 
@@ -300,8 +301,6 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
     if (restore_cfg())
         esplog.warn("no cfg available, espbot name set to %s\n", get_name());
-    else
-        esplog.info("espbot name set to %s\n", get_name());
 
     os_timer_disarm(&graceful_rst_timer);
 

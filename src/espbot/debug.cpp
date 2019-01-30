@@ -199,3 +199,18 @@ struct heap_item *Esp_mem::next_heap_item(int value)
     }
     return item_ptr;
 }
+
+#ifdef ESPBOT_MEM
+// C++ wrapper
+
+extern "C" void *call_espbot_zalloc(size_t size) // wrapper function
+{
+    return espmem.espbot_zalloc(size);
+}
+
+extern "C" void call_espbot_free(void *addr) // wrapper function
+{
+    espmem.espbot_free(addr);
+}
+
+#endif
