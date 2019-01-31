@@ -21,8 +21,18 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+/*
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * <quackmore-ff@yahoo.com> modified this file.  As long as you retain this notice
+ * you can do whatever you want with this stuff. If we meet some day, and you 
+ * think this stuff is worth it, you can buy me a beer in return. Quackmore
+ * ----------------------------------------------------------------------------
+ */
 
 #include "hw_timer.h"
+#include "os_type.h"
+#include "osapi.h"
 
 /******************************************************************************
 * FunctionName : hw_timer_arm
@@ -54,17 +64,13 @@ void hw_timer_set_func(void (*user_hw_timer_cb_set)(void))
 static void hw_timer_isr_cb(void *arg)
 {
     if (user_hw_timer_cb != NULL)
-    {
         (*(user_hw_timer_cb))();
-    }
 }
 
 static void hw_timer_nmi_cb(void)
 {
     if (user_hw_timer_cb != NULL)
-    {
         (*(user_hw_timer_cb))();
-    }
 }
 
 /******************************************************************************
@@ -81,24 +87,14 @@ static void hw_timer_nmi_cb(void)
 void ICACHE_FLASH_ATTR hw_timer_init(FRC1_TIMER_SOURCE_TYPE source_type, u8 req)
 {
     if (req == 1)
-    {
-        RTC_REG_WRITE(FRC1_CTRL_ADDRESS,
-                      FRC1_AUTO_LOAD | DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
-    }
+        RTC_REG_WRITE(FRC1_CTRL_ADDRESS, FRC1_AUTO_LOAD | DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
     else
-    {
-        RTC_REG_WRITE(FRC1_CTRL_ADDRESS,
-                      DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
-    }
+        RTC_REG_WRITE(FRC1_CTRL_ADDRESS, DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
 
     if (source_type == NMI_SOURCE)
-    {
         ETS_FRC_TIMER1_NMI_INTR_ATTACH(hw_timer_nmi_cb);
-    }
     else
-    {
         ETS_FRC_TIMER1_INTR_ATTACH(hw_timer_isr_cb, NULL);
-    }
 
     TM1_EDGE_INT_ENABLE();
     ETS_FRC1_INTR_ENABLE();
@@ -106,6 +102,7 @@ void ICACHE_FLASH_ATTR hw_timer_init(FRC1_TIMER_SOURCE_TYPE source_type, u8 req)
 
 void ICACHE_FLASH_ATTR hw_timer_disarm(void)
 {
+    RTC_REG_WRITE(FRC1_CTRL_ADDRESS, DIVDED_BY_16 | FRC1_DISABLE_TIMER | TM_EDGE_INT);
     TM1_EDGE_INT_DISABLE();
     ETS_FRC1_INTR_DISABLE();
 }

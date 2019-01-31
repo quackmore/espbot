@@ -11,7 +11,7 @@
 
 #include "c_types.h"
 
-#define ESPBOT_MEM 1 // will use espbot_2.0 zalloc and free
+#define ESPBOT_MEM 1 // will use espbot_2.0 zalloc and free \
                      // undefine this if you want to use sdk os_zalloc and os_free
 
 struct do_seq
@@ -47,16 +47,64 @@ char get_sequence_pulse_level(struct do_seq *seq, int idx);
 uint32 get_sequence_pulse_duration(struct do_seq *seq, int idx);
 
 //
-// when using sequence with pulse duration in milliseconds please consider that 
+// when using sequence with pulse duration in milliseconds please consider that
 //  - you are using an SW timers so you can run more than one sequence at a time
 //  - pulse duration range is from 5 ms to 6.870.947 ms
 //
-// when using sequence with pulse duration in microseconds please consider that 
+// when using sequence with pulse duration in microseconds please consider that
 //  - you are using an HW timer so you can run one sequence at a time
 //  - pulse duration range is from 10 us to 199.999 us
 //
 
 void exe_sequence_ms(struct do_seq *seq);
 void exe_sequence_us(struct do_seq *seq);
+
+// 
+// ############################ EXAMPLE ##########################
+// 
+// // end_sequence callback definition
+// static void ICACHE_FLASH_ATTR sequence_completed(void *param)
+// {
+//     struct do_seq *seq = (struct do_seq *)param;
+//     free_sequence(seq);
+//     os_printf("Test completed\n");
+// }
+// 
+// {
+//     ...
+// 
+//     // defining and running a sequence
+// 
+//     PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
+//     struct do_seq *seq = new_sequence(ESPBOT_D4_NUM, 4);
+//     set_sequence_cb(seq, sequence_completed, (void *)seq);
+// 
+//     sequence_clear(seq);
+//     sequence_add(seq, ESPBOT_LOW, 1000);
+//     sequence_add(seq, ESPBOT_HIGH, 1500);
+//     sequence_add(seq, ESPBOT_LOW, 2000);
+//     sequence_add(seq, ESPBOT_HIGH, 2500);
+// 
+//     exe_sequence_ms(seq);
+// 
+//     // printing ax existing pulse sequence
+// 
+//     int idx = 0;
+//     char level;
+//     uint32 duration;
+//     os_printf("Sequence defined as:\n");
+//     for (idx = 0; idx < get_sequence_length(seq); idx++)
+//     {
+//         level = get_sequence_pulse_level(seq, idx);
+//         duration = get_sequence_pulse_duration(seq, idx);
+//         if (level == ESPBOT_LOW)
+//             os_printf("pulse %d: level  'LOW' - duration %d\n", idx, duration);
+//         else
+//             os_printf("pulse %d: level 'HIGH' - duration %d\n", idx, duration);
+//     }
+//     os_printf("Sequence end.\n");
+// 
+//     ...
+// }
 
 #endif

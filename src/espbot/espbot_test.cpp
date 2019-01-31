@@ -259,6 +259,42 @@ void ICACHE_FLASH_ATTR run_test(int idx)
         set_sequence_cb(seq, sequence_completed, (void *)seq);
 
         sequence_clear(seq);
+        sequence_add(seq, ESPBOT_LOW, 150);
+        sequence_add(seq, ESPBOT_HIGH, 150);
+        sequence_add(seq, ESPBOT_LOW, 150);
+        sequence_add(seq, ESPBOT_HIGH, 150);
+        sequence_add(seq, ESPBOT_LOW, 150);
+        sequence_add(seq, ESPBOT_HIGH, 150);
+        sequence_add(seq, ESPBOT_LOW, 150);
+        sequence_add(seq, ESPBOT_HIGH, 150);
+        sequence_add(seq, ESPBOT_LOW, 150);
+        {
+            int idx = 0;
+            char level;
+            uint32 duration;
+            os_printf("Sequence defined as:\n");
+            for (idx = 0; idx < get_sequence_length(seq); idx++)
+            {
+                level = get_sequence_pulse_level(seq, idx);
+                duration = get_sequence_pulse_duration(seq, idx);
+                if (level == ESPBOT_LOW)
+                    os_printf("pulse %d: level  'LOW' - duration %d\n", idx, duration);
+                else
+                    os_printf("pulse %d: level 'HIGH' - duration %d\n", idx, duration);
+            }
+            os_printf("Sequence end.\n");
+        }
+        exe_sequence_ms(seq);
+    }
+    break;
+    case 5:
+    {
+        PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
+        GPIO_OUTPUT_SET(ESPBOT_D4_NUM, ESPBOT_HIGH);
+        seq = new_sequence(ESPBOT_D4_NUM, 9);
+        set_sequence_cb(seq, sequence_completed, (void *)seq);
+
+        sequence_clear(seq);
         sequence_add(seq, ESPBOT_LOW, 150000);
         sequence_add(seq, ESPBOT_HIGH, 150000);
         sequence_add(seq, ESPBOT_LOW, 150000);

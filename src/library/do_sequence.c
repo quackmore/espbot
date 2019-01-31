@@ -103,7 +103,7 @@ uint32 ICACHE_FLASH_ATTR get_sequence_pulse_duration(struct do_seq *seq, int idx
 // ms pulses (SW timers)
 //
 
-void output_pulse(struct do_seq *seq)
+static void output_pulse(struct do_seq *seq)
 {
     if (seq->current_pulse < seq->pulse_max_count)
     {
@@ -144,8 +144,9 @@ static int us_do_pin;
 static char *us_pulse_level;
 static uint32 *us_pulse_duration;
 
-void output_pulse_us(void)
+static void output_pulse_us(void)
 {
+    uint32 start_time = system_get_time();
     if (us_current_pulse < us_pulse_max_count)
     {
         // executing sequence pulses
@@ -158,22 +159,28 @@ void output_pulse_us(void)
         // restoring original digital output status
         hw_timer_disarm();
         GPIO_OUTPUT_SET(us_seq->do_pin, us_seq->dig_output_initial_value);
-        us_seq->end_sequence_callack(us_seq->end_sequence_callack_param);
+        // this is an isr function, better don't call the end sequence function here
+        os_timer_arm(&(us_seq->pulse_timer), 100, 0);
     }
     // the output_pulse function execution takes 2 us
     // during sequence pulse (while the timer is armed)
+    // starting the trigger for the end sequence callback takes 19 us
 }
 
 void ICACHE_FLASH_ATTR exe_sequence_us(struct do_seq *seq)
 {
-    hw_timer_init(NMI_SOURCE, 0);
     hw_timer_set_func(output_pulse_us);
+    hw_timer_init(FRC1_SOURCE, 0);
     us_seq = seq;
     us_current_pulse = 0;
     us_pulse_max_count = seq->pulse_max_count;
     us_do_pin = seq->do_pin;
     us_pulse_level = seq->pulse_level;
     us_pulse_duration = seq->pulse_duration;
+    os_timer_disarm(&(seq->pulse_timer));
+    os_timer_setfn(&(seq->pulse_timer),
+                   (os_timer_func_t *)seq->end_sequence_callack,
+                   seq->end_sequence_callack_param);
 
     // save the current status of digital output
     us_seq->dig_output_initial_value = GPIO_INPUT_GET(us_seq->do_pin);
