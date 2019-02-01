@@ -142,8 +142,9 @@ extern "C" void espbot_init(void);
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
     espmem.init();
-    uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    uart_init(BIT_RATE_74880, BIT_RATE_74880);
     // uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    // uart_init(BIT_RATE_460800, BIT_RATE_460800);
     system_set_os_print(1); // enable log print
     print_greetings();
 
