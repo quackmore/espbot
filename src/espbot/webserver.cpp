@@ -1843,6 +1843,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             espwifi.station_set_ssid(tmp_ssid, tmp_ssid_len);
             espwifi.station_set_pwd(wifi_cfg.get_cur_pair_value(), wifi_cfg.get_cur_pair_value_len());
             espwifi.save_cfg();
+            espwifi.connect();
             espmem.stack_mon();
         }
         else
