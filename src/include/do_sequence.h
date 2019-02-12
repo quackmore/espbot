@@ -16,9 +16,10 @@
 
 struct do_seq
 {
-    // please initialize these using new_sequence
+    // please initialize these using new_do_seq
     int do_pin;
     int pulse_max_count;
+    // please initialize these using set_do_seq_cb
     void (*end_sequence_callack)(void *);
     void *end_sequence_callack_param;
 
@@ -33,18 +34,16 @@ struct do_seq
     int dig_output_initial_value;
 };
 
-struct do_seq *new_sequence(int pin, int num_pulses); // allocating heap memory
-void free_sequence(struct do_seq *seq);               // freeing allocated memory
-void set_sequence_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param);
+struct do_seq *new_do_seq(int pin, int num_pulses); // allocating heap memory
+void free_do_seq(struct do_seq *seq);               // freeing allocated memory
+void set_do_seq_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param);
 
-void sequence_clear(struct do_seq *seq); // will clear the pulse sequence only
+void out_seq_clear(struct do_seq *seq); // will clear the pulse sequence only
 
-void sequence_add(struct do_seq *seq, char level, uint32 duration); // duration will be interpreted
-                                                                    // as millisec when do_sequence_ms is called
-                                                                    // or microsec when do_sequence_us is called
-int get_sequence_length(struct do_seq *seq);
-char get_sequence_pulse_level(struct do_seq *seq, int idx);
-uint32 get_sequence_pulse_duration(struct do_seq *seq, int idx);
+void out_seq_add(struct do_seq *seq, char level, uint32 duration);
+int get_do_seq_length(struct do_seq *seq);
+char get_do_seq_pulse_level(struct do_seq *seq, int idx);
+uint32 get_do_seq_pulse_duration(struct do_seq *seq, int idx);
 
 //
 // when using sequence with pulse duration in milliseconds please consider that
@@ -56,8 +55,8 @@ uint32 get_sequence_pulse_duration(struct do_seq *seq, int idx);
 //  - pulse duration range is from 10 us to 199.999 us
 //
 
-void exe_sequence_ms(struct do_seq *seq);
-void exe_sequence_us(struct do_seq *seq);
+void exe_do_seq_ms(struct do_seq *seq);
+void exe_do_seq_us(struct do_seq *seq);
 
 // 
 // ############################ EXAMPLE ##########################
@@ -66,7 +65,9 @@ void exe_sequence_us(struct do_seq *seq);
 // static void ICACHE_FLASH_ATTR sequence_completed(void *param)
 // {
 //     struct do_seq *seq = (struct do_seq *)param;
-//     free_sequence(seq);
+//
+//     free_do_seq(seq);                 <== don't forget to free memory
+//
 //     os_printf("Test completed\n");
 // }
 // 
@@ -76,16 +77,16 @@ void exe_sequence_us(struct do_seq *seq);
 //     // defining and running a sequence
 // 
 //     PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
-//     struct do_seq *seq = new_sequence(ESPBOT_D4_NUM, 4);
-//     set_sequence_cb(seq, sequence_completed, (void *)seq);
+//     struct do_seq *seq = new_do_seq(ESPBOT_D4_NUM, 4);
+//     set_do_seq_cb(seq, sequence_completed, (void *)seq);
 // 
-//     sequence_clear(seq);
-//     sequence_add(seq, ESPBOT_LOW, 1000);
-//     sequence_add(seq, ESPBOT_HIGH, 1500);
-//     sequence_add(seq, ESPBOT_LOW, 2000);
-//     sequence_add(seq, ESPBOT_HIGH, 2500);
+//     out_seq_clear(seq);
+//     out_seq_add(seq, ESPBOT_LOW, 1000);
+//     out_seq_add(seq, ESPBOT_HIGH, 1500);
+//     out_seq_add(seq, ESPBOT_LOW, 2000);
+//     out_seq_add(seq, ESPBOT_HIGH, 2500);
 // 
-//     exe_sequence_ms(seq);
+//     exe_do_seq_ms(seq);
 // 
 //     // printing ax existing pulse sequence
 // 
@@ -93,10 +94,10 @@ void exe_sequence_us(struct do_seq *seq);
 //     char level;
 //     uint32 duration;
 //     os_printf("Sequence defined as:\n");
-//     for (idx = 0; idx < get_sequence_length(seq); idx++)
+//     for (idx = 0; idx < get_do_seq_length(seq); idx++)
 //     {
-//         level = get_sequence_pulse_level(seq, idx);
-//         duration = get_sequence_pulse_duration(seq, idx);
+//         level = get_do_seq_pulse_level(seq, idx);
+//         duration = get_do_seq_pulse_duration(seq, idx);
 //         if (level == ESPBOT_LOW)
 //             os_printf("pulse %d: level  'LOW' - duration %d\n", idx, duration);
 //         else

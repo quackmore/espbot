@@ -20,6 +20,7 @@ extern "C"
 #include "uart.h"
 #include "mem.h"
 #include "espbot_release.h"
+#include "dio_task.h"
 }
 
 #include "debug.hpp"
@@ -155,6 +156,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     esp_ota.init();
     espwebclnt.init();
     esp_gpio.init();
+    init_dio_task();
 
     espwifi.init();
 }

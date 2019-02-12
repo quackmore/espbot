@@ -11,9 +11,11 @@
 #include "gpio.h"
 #include "osapi.h"
 #include "mem.h"
+#include "user_interface.h"
 #include "hw_timer.h"
 #include "esp8266_io.h"
 #include "di_sequence.h"
+#include "dio_task.h"
 
 #ifdef ESPBOT_MEM
 // these are espbot_2.0 memory management methods
@@ -25,38 +27,39 @@ extern void call_espbot_free(void *addr);
 #define call_espbot_zalloc(a) os_zalloc(a)
 #define call_espbot_free(a) os_free(a)
 #endif
-/*
 //
 // sequence definition
 //
 
-struct do_seq *new_sequence(int pin, int num_pulses)
+struct di_seq *new_di_seq(int pin, int num_pulses, int timeout_val, Di_timeout_unit timeout_unit)
 {
-    struct do_seq *seq = (struct do_seq *)call_espbot_zalloc(sizeof(struct do_seq));
-    seq->do_pin = pin;
-    seq->pulse_max_count = num_pulses;
-    seq->pulse_level = (char *)call_espbot_zalloc(sizeof(char) * num_pulses);
-    seq->pulse_duration = (uint32 *)call_espbot_zalloc(sizeof(uint32) * num_pulses);
+    struct di_seq *seq = (struct di_seq *)call_espbot_zalloc(sizeof(struct di_seq));
+    seq->di_pin = pin;
+    seq->pulse_max_count = num_pulses + 1;
+    seq->timeout_val = timeout_val;
+    seq->timeout_unit = timeout_unit;
+    seq->pulse_level = (char *)call_espbot_zalloc(sizeof(char) * (num_pulses + 1));
+    seq->pulse_duration = (uint32 *)call_espbot_zalloc(sizeof(uint32) * (num_pulses + 1));
     return seq;
 }
 
-void free_sequence(struct do_seq *seq)
+void free_di_seq(struct di_seq *seq)
 {
     call_espbot_free(seq->pulse_level);
     call_espbot_free(seq->pulse_duration);
     call_espbot_free(seq);
 }
 
-void set_sequence_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param)
+void set_di_seq_cb(struct di_seq *seq, void (*cb)(void *), void *cb_param)
 {
     seq->end_sequence_callack = cb;
     seq->end_sequence_callack_param = cb_param;
 }
 
-void ICACHE_FLASH_ATTR sequence_clear(struct do_seq *seq)
+void ICACHE_FLASH_ATTR seq_di_clear(struct di_seq *seq)
 {
     int idx = 0;
-    seq->pulse_count = 0;
+    seq->current_pulse = 0;
     for (idx = 0; idx < seq->pulse_max_count; idx++)
     {
         seq->pulse_level[idx] = ESPBOT_LOW;
@@ -64,22 +67,12 @@ void ICACHE_FLASH_ATTR sequence_clear(struct do_seq *seq)
     }
 }
 
-void ICACHE_FLASH_ATTR sequence_add(struct do_seq *seq, char level, uint32 duration)
+int ICACHE_FLASH_ATTR get_di_seq_length(struct di_seq *seq)
 {
-    if (seq->pulse_count < seq->pulse_max_count)
-    {
-        seq->pulse_level[seq->pulse_count] = level;
-        seq->pulse_duration[seq->pulse_count] = duration;
-        seq->pulse_count++;
-    }
+    return ((seq->current_pulse - 1));
 }
 
-int ICACHE_FLASH_ATTR get_sequence_length(struct do_seq *seq)
-{
-    return seq->pulse_count;
-}
-
-char ICACHE_FLASH_ATTR get_sequence_pulse_level(struct do_seq *seq, int idx)
+char ICACHE_FLASH_ATTR get_di_seq_pulse_level(struct di_seq *seq, int idx)
 {
     if (idx < seq->pulse_max_count)
         return seq->pulse_level[idx];
@@ -87,103 +80,91 @@ char ICACHE_FLASH_ATTR get_sequence_pulse_level(struct do_seq *seq, int idx)
         return -1;
 }
 
-uint32 ICACHE_FLASH_ATTR get_sequence_pulse_duration(struct do_seq *seq, int idx)
+uint32 ICACHE_FLASH_ATTR get_di_seq_pulse_duration(struct di_seq *seq, int idx)
 {
-    if (idx < seq->pulse_max_count)
-        return seq->pulse_duration[idx];
+    if (idx < (seq->pulse_max_count - 1))
+        return (seq->pulse_duration[idx + 1] - seq->pulse_duration[idx]);
     else
         return -1;
 }
 
 //
-// sequence execution
+// recording sequence
 //
 
-//
-// ms pulses (SW timers)
-//
-
-static void output_pulse(struct do_seq *seq)
+static void input_pulse(struct di_seq *seq)
 {
+    uint32 gpio_status;
+
+    // clear interrupt status (checkout sdk API docs)
+    gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
+    GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpio_status);
+
+    // check the allocated memory boundary
+    // before acquiring new samples
     if (seq->current_pulse < seq->pulse_max_count)
     {
-        // executing sequence pulses
-        os_timer_arm(&(seq->pulse_timer), seq->pulse_duration[seq->current_pulse], 0);
-        GPIO_OUTPUT_SET(seq->do_pin, seq->pulse_level[seq->current_pulse]);
+        seq->pulse_duration[seq->current_pulse] = system_get_time();
+        seq->pulse_level[seq->current_pulse] = GPIO_INPUT_GET(seq->di_pin);
         seq->current_pulse++;
+        if (seq->current_pulse == seq->pulse_max_count)
+        {
+            // sequence completed
+            // disable the interrupt and
+            // signal the sequence has been acquired
+            gpio_pin_intr_state_set(seq->di_pin, GPIO_PIN_INTR_DISABLE);
+            system_os_post(USER_TASK_PRIO_2, SIG_DI_SEQ_COMPLETED, (os_param_t)seq);
+        }
     }
-    else
-    {
-        // restoring original digital output status
-        os_timer_disarm(&(seq->pulse_timer));
-        GPIO_OUTPUT_SET(seq->do_pin, seq->dig_output_initial_value);
-        seq->end_sequence_callack(seq->end_sequence_callack_param);
-    }
-    // the output_pulse function execution takes 8 us
-    // during sequence pulse (while the timer is armed)
+    // isr function takes 1-2 us 
+    //                    5-6 us when system_os_post is called
 }
 
-void ICACHE_FLASH_ATTR exe_sequence_ms(struct do_seq *seq)
+static void ICACHE_FLASH_ATTR input_reading_timeout_ms(struct di_seq *seq)
 {
-    os_timer_disarm(&(seq->pulse_timer));
-    os_timer_setfn(&(seq->pulse_timer), (os_timer_func_t *)output_pulse, seq);
+    os_timer_disarm(&(seq->timeout_timer));
+    seq->ended_by_timeout = true;
+    system_os_post(USER_TASK_PRIO_2, SIG_DI_SEQ_COMPLETED, (os_param_t)seq);
+}
+
+static struct di_seq *us_seq;
+
+static void ICACHE_FLASH_ATTR input_reading_timeout_us(void)
+{
+    hw_timer_disarm();
+    us_seq->ended_by_timeout = true;
+    system_os_post(USER_TASK_PRIO_2, SIG_DI_SEQ_COMPLETED, (os_param_t)us_seq);
+}
+
+void ICACHE_FLASH_ATTR read_di_sequence(struct di_seq *seq)
+{
     seq->current_pulse = 0;
-    // save the current status of digital output
-    seq->dig_output_initial_value = GPIO_INPUT_GET(seq->do_pin);
-    output_pulse(seq);
-}
+    seq->ended_by_timeout = false;
 
-//
-// us pulses (HW timers)
-//
-
-static struct do_seq *us_seq;
-static int us_current_pulse;
-static int us_pulse_max_count;
-static int us_do_pin;
-static char *us_pulse_level;
-static uint32 *us_pulse_duration;
-
-static void output_pulse_us(void)
-{
-    uint32 start_time = system_get_time();
-    if (us_current_pulse < us_pulse_max_count)
+    if (seq->timeout_unit == TIMEOUT_MS)
     {
-        // executing sequence pulses
-        hw_timer_arm(us_pulse_duration[us_current_pulse]);
-        GPIO_OUTPUT_SET(us_do_pin, us_pulse_level[us_current_pulse]);
-        us_current_pulse++;
+        os_timer_disarm(&(seq->timeout_timer));
+        os_timer_setfn(&(seq->timeout_timer), (os_timer_func_t *)input_reading_timeout_ms, seq);
+        os_timer_arm(&(seq->timeout_timer), seq->timeout_val, 0);
     }
     else
     {
-        // restoring original digital output status
-        hw_timer_disarm();
-        GPIO_OUTPUT_SET(us_seq->do_pin, us_seq->dig_output_initial_value);
-        // this is an isr function, better don't call the end sequence function here
-        os_timer_arm(&(us_seq->pulse_timer), 100, 0);
+        us_seq = seq;
+        hw_timer_set_func(input_reading_timeout_us);
+        hw_timer_init(FRC1_SOURCE, 0);
+        hw_timer_arm(seq->timeout_val);
     }
-    // the output_pulse function execution takes 2 us
-    // during sequence pulse (while the timer is armed)
-    // starting the trigger for the end sequence callback takes 19 us
+
+    // enable interrupt on GPIO selected pin for any edge
+    ETS_GPIO_INTR_ATTACH((ets_isr_t)input_pulse, seq);
+    gpio_pin_intr_state_set(seq->di_pin, GPIO_PIN_INTR_ANYEDGE);
+    ETS_GPIO_INTR_ENABLE();
 }
 
-void ICACHE_FLASH_ATTR exe_sequence_us(struct do_seq *seq)
+void ICACHE_FLASH_ATTR stop_di_sequence_timeout(struct di_seq *seq)
 {
-    hw_timer_set_func(output_pulse_us);
-    hw_timer_init(FRC1_SOURCE, 0);
-    us_seq = seq;
-    us_current_pulse = 0;
-    us_pulse_max_count = seq->pulse_max_count;
-    us_do_pin = seq->do_pin;
-    us_pulse_level = seq->pulse_level;
-    us_pulse_duration = seq->pulse_duration;
-    os_timer_disarm(&(seq->pulse_timer));
-    os_timer_setfn(&(seq->pulse_timer),
-                   (os_timer_func_t *)seq->end_sequence_callack,
-                   seq->end_sequence_callack_param);
-
-    // save the current status of digital output
-    us_seq->dig_output_initial_value = GPIO_INPUT_GET(us_seq->do_pin);
-    output_pulse_us();
+    if (seq->timeout_unit == TIMEOUT_MS)
+        os_timer_disarm(&(seq->timeout_timer));
+    else
+        hw_timer_disarm();
 }
-*/
