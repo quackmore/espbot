@@ -17,7 +17,7 @@
 #include "di_sequence.h"
 #include "dio_task.h"
 
-#ifdef ESPBOT_MEM
+#ifdef ESPBOT
 // these are espbot_2.0 memory management methods
 // https://github.com/quackmore/espbot_2.0
 extern void *call_espbot_zalloc(size_t size);
@@ -50,10 +50,11 @@ void free_di_seq(struct di_seq *seq)
     call_espbot_free(seq);
 }
 
-void set_di_seq_cb(struct di_seq *seq, void (*cb)(void *), void *cb_param)
+void set_di_seq_cb(struct di_seq *seq, void (*cb)(void *), void *cb_param, CB_call_type cb_call)
 {
     seq->end_sequence_callack = cb;
     seq->end_sequence_callack_param = cb_param;
+    seq->callback_direct = cb_call;
 }
 
 void ICACHE_FLASH_ATTR seq_di_clear(struct di_seq *seq)
@@ -113,10 +114,13 @@ static void input_pulse(struct di_seq *seq)
             // disable the interrupt and
             // signal the sequence has been acquired
             gpio_pin_intr_state_set(seq->di_pin, GPIO_PIN_INTR_DISABLE);
-            system_os_post(USER_TASK_PRIO_2, SIG_DI_SEQ_COMPLETED, (os_param_t)seq);
+            if (seq->callback_direct == direct)
+                seq->end_sequence_callack(seq->end_sequence_callack_param);
+            else
+                system_os_post(USER_TASK_PRIO_2, SIG_DI_SEQ_COMPLETED, (os_param_t)seq);
         }
     }
-    // isr function takes 1-2 us 
+    // isr function takes 1-2 us
     //                    5-6 us when system_os_post is called
 }
 
@@ -136,7 +140,7 @@ static void ICACHE_FLASH_ATTR input_reading_timeout_us(void)
     system_os_post(USER_TASK_PRIO_2, SIG_DI_SEQ_COMPLETED, (os_param_t)us_seq);
 }
 
-void ICACHE_FLASH_ATTR read_di_sequence(struct di_seq *seq)
+void read_di_sequence(struct di_seq *seq)
 {
     seq->current_pulse = 0;
     seq->ended_by_timeout = false;

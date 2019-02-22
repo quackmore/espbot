@@ -62,6 +62,10 @@
 #define ESPBOT_D8_MUX PERIPHS_IO_MUX_MTDO_U
 #define ESPBOT_D8_FUNC FUNC_GPIO15
 
+int gpio_NUM(int);
+int gpio_MUX(int);
+int gpio_FUNC(int);
+
 //
 // Espressif SDK MACROS
 // 

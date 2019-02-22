@@ -9,10 +9,7 @@
 #ifndef __DI_SEQUENCE_H__
 #define __DI_SEQUENCE_H__
 
-#include "c_types.h"
-
-#define ESPBOT_MEM 1 // will use espbot_2.0 zalloc and free \
-                     // undefine this if you want to use sdk os_zalloc and os_free
+#include "dio_task.h"
 
 typedef enum
 {
@@ -40,6 +37,7 @@ struct di_seq
     int current_pulse;
     os_timer_t timeout_timer;
     bool ended_by_timeout;
+    bool callback_direct;
 };
 
 //
@@ -53,7 +51,7 @@ struct di_seq
 
 struct di_seq *new_di_seq(int pin, int num_pulses, int timeout_val, Di_timeout_unit timeout_unit); // allocating heap memory
 void free_di_seq(struct di_seq *seq);                                                              // freeing allocated memory
-void set_di_seq_cb(struct di_seq *seq, void (*cb)(void *), void *cb_param);
+void set_di_seq_cb(struct di_seq *seq, void (*cb)(void *), void *cb_param, CB_call_type cb_call);
 
 void seq_di_clear(struct di_seq *seq); // will clear the pulse sequence only
 
@@ -98,13 +96,13 @@ void stop_di_sequence_timeout(struct di_seq *seq);
 // }
 //
 // // the input sequence definition and reading
-// 
+//
 // {
 //     ...
 //     PIN_FUNC_SELECT(ESPBOT_D5_MUX, ESPBOT_D5_FUNC);
 //     PIN_PULLUP_EN(ESPBOT_D5_MUX);
 //     GPIO_DIS_OUTPUT(ESPBOT_D5_NUM);
-// 
+//
 //     struct di_seq *input_seq = new_di_seq(ESPBOT_D5_NUM, 9, 20, TIMEOUT_MS);
 //     set_di_seq_cb(input_seq, input_seq_completed, (void *)input_seq);
 //     read_di_sequence(input_seq);

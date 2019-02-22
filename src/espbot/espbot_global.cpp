@@ -23,3 +23,4 @@ Websvr espwebsvr;
 Webclnt espwebclnt;
 Ota_upgrade esp_ota;
 Gpio esp_gpio;
+Dht dht22;

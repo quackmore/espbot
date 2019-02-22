@@ -41,13 +41,9 @@ void ICACHE_FLASH_ATTR Esp_mem::init(void)
     int ii;
     for (ii = 0; ii < HEAP_ARRAY_SIZE; ii++)
     {
-        m_heap_array[ii].size = 0;
-        m_heap_array[ii].addr = 0;
-        m_heap_array[ii].next_item = ii + 1;
+        m_heap_array[ii].size = -1;
+        m_heap_array[ii].addr = NULL;
     }
-    m_heap_array[HEAP_ARRAY_SIZE - 1].next_item = -1;
-    m_first_heap_item = -1;
-    m_first_free_heap_item = 0;
     stack_mon();
 }
 
@@ -76,16 +72,17 @@ void *Esp_mem::espbot_zalloc(size_t size)
         espmem.m_heap_objs++;
         if (espmem.m_heap_objs > espmem.m_max_heap_objs)
             espmem.m_max_heap_objs = espmem.m_heap_objs;
-        if (espmem.m_first_free_heap_item != -1)
+        int idx;
+        for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
         {
-            int tmp_ptr = espmem.m_first_free_heap_item;
-            espmem.m_first_free_heap_item = espmem.m_heap_array[espmem.m_first_free_heap_item].next_item;
-            espmem.m_heap_array[tmp_ptr].size = size;
-            espmem.m_heap_array[tmp_ptr].addr = addr;
-            espmem.m_heap_array[tmp_ptr].next_item = espmem.m_first_heap_item;
-            espmem.m_first_heap_item = tmp_ptr;
-            espmem.stack_mon();
+            if (espmem.m_heap_array[idx].size == -1)
+            {
+                espmem.m_heap_array[idx].size = size;
+                espmem.m_heap_array[idx].addr = addr;
+                break;
+            }
         }
+        espmem.stack_mon();
     }
     else
     {
@@ -99,32 +96,17 @@ void Esp_mem::espbot_free(void *addr)
 {
     espmem.m_heap_objs--;
     os_free(addr);
-    int prev_ptr = espmem.m_first_heap_item;
-    int tmp_ptr = espmem.m_first_heap_item;
-    espmem.stack_mon();
-    while (tmp_ptr != -1)
+    int idx;
+    for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
     {
-        if (espmem.m_heap_array[tmp_ptr].addr == addr)
+        if (espmem.m_heap_array[idx].addr == addr)
         {
-            // eliminate cuurent item from heap allocated items list
-            if (tmp_ptr == espmem.m_first_heap_item)
-                espmem.m_first_heap_item = espmem.m_heap_array[tmp_ptr].next_item;
-            else
-                espmem.m_heap_array[prev_ptr].next_item = espmem.m_heap_array[tmp_ptr].next_item;
-
-            // clear the heap item
-            espmem.m_heap_array[tmp_ptr].size = 0;
-            espmem.m_heap_array[tmp_ptr].addr = 0;
-
-            // insert it into free heap items list
-            espmem.m_heap_array[tmp_ptr].next_item = espmem.m_first_free_heap_item;
-            espmem.m_first_free_heap_item = tmp_ptr;
-
+            // eliminate current item from heap allocated items list
+            espmem.m_heap_array[idx].size = -1;
             break;
         }
-        prev_ptr = tmp_ptr;
-        tmp_ptr = espmem.m_heap_array[tmp_ptr].next_item;
     }
+    espmem.stack_mon();
 }
 
 uint32 ICACHE_FLASH_ATTR Esp_mem::get_min_stack_addr(void)
@@ -160,15 +142,21 @@ uint32 ICACHE_FLASH_ATTR Esp_mem::get_mim_heap_size(void)
 uint32 ICACHE_FLASH_ATTR Esp_mem::get_used_heap_size(void)
 {
     esplog.all("Esp_mem::get_used_heap_size\n");
+    int idx;
     int used_heap = 0;
-    struct heap_item *item_ptr = next_heap_item(0);
     stack_mon();
-    while (item_ptr)
+    for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
     {
-        used_heap += item_ptr->size;
-        item_ptr = next_heap_item(1);
+        if (m_heap_array[idx].size > 0)
+            used_heap += m_heap_array[idx].size;
     }
     return used_heap;
+}
+
+uint32 ICACHE_FLASH_ATTR Esp_mem::get_heap_objs(void)
+{
+    esplog.all("Esp_mem::get_heap_objs\n");
+    return m_heap_objs;
 }
 
 uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_heap_objs(void)
@@ -177,30 +165,30 @@ uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_heap_objs(void)
     return m_max_heap_objs;
 }
 
-struct heap_item *Esp_mem::next_heap_item(int value)
+struct heap_item *Esp_mem::get_heap_item(List_item item)
 {
-    esplog.all("next_heap_item\n");
-    static struct heap_item *item_ptr = NULL;
+    esplog.all("get_heap_item\n");
+    static int idx = 0;
     stack_mon();
-    if (value == 0)
+    if (item == first)
     {
-        if (m_first_heap_item != -1)
-            item_ptr = &m_heap_array[m_first_heap_item];
+        for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
+            if (m_heap_array[idx].size != -1)
+                break;
     }
     else
     {
-        if (item_ptr)
-        {
-            if (item_ptr->next_item != -1)
-                item_ptr = &m_heap_array[item_ptr->next_item];
-            else
-                item_ptr = NULL;
-        }
+        for (idx = (idx + 1); idx < HEAP_ARRAY_SIZE; idx++)
+            if (m_heap_array[idx].size != -1)
+                break;
     }
-    return item_ptr;
+    if (idx == HEAP_ARRAY_SIZE)
+        return NULL;
+    else
+        return &(m_heap_array[idx]);
 }
 
-#ifdef ESPBOT_MEM
+#ifdef ESPBOT
 // C++ wrapper
 
 extern "C" void *call_espbot_zalloc(size_t size) // wrapper function

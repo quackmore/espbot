@@ -17,7 +17,7 @@
 #include "do_sequence.h"
 #include "dio_task.h"
 
-#ifdef ESPBOT_MEM
+#ifdef ESPBOT
 // these are espbot_2.0 memory management methods
 // https://github.com/quackmore/espbot_2.0
 extern void *call_espbot_zalloc(size_t size);
@@ -49,10 +49,11 @@ void free_do_seq(struct do_seq *seq)
     call_espbot_free(seq);
 }
 
-void set_do_seq_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param)
+void set_do_seq_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param, CB_call_type cb_call)
 {
     seq->end_sequence_callack = cb;
     seq->end_sequence_callack_param = cb_param;
+    seq->callback_direct = cb_call;
 }
 
 void ICACHE_FLASH_ATTR out_seq_clear(struct do_seq *seq)
@@ -119,8 +120,10 @@ static void output_pulse(struct do_seq *seq)
         // restoring original digital output status
         os_timer_disarm(&(seq->pulse_timer));
         GPIO_OUTPUT_SET(seq->do_pin, seq->dig_output_initial_value);
-        // seq->end_sequence_callack(seq->end_sequence_callack_param);
-        system_os_post(USER_TASK_PRIO_2, SIG_DO_SEQ_COMPLETED, (os_param_t)seq);
+        if (seq->callback_direct == direct)
+            seq->end_sequence_callack(seq->end_sequence_callack_param);
+        else
+            system_os_post(USER_TASK_PRIO_2, SIG_DO_SEQ_COMPLETED, (os_param_t)seq);
     }
     // the output_pulse function execution takes 8 us
     // during sequence pulse (while the timer is armed)
@@ -162,8 +165,10 @@ static void output_pulse_us(void)
         GPIO_OUTPUT_SET(us_seq->do_pin, us_seq->dig_output_initial_value);
         hw_timer_disarm();
         // this is an isr function, better don't call the end sequence function here
-        // os_timer_arm(&(us_seq->pulse_timer), 100, 0);
-        system_os_post(USER_TASK_PRIO_2, SIG_DO_SEQ_COMPLETED, (os_param_t)us_seq);
+        if (us_seq->callback_direct == direct)
+            us_seq->end_sequence_callack(us_seq->end_sequence_callack_param);
+        else
+            system_os_post(USER_TASK_PRIO_2, SIG_DO_SEQ_COMPLETED, (os_param_t)us_seq);
     }
     // the output_pulse function execution takes 2-3 us
     // during sequence pulse (while the timer is armed)

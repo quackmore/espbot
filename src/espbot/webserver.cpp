@@ -782,11 +782,11 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
     {
         // count the heap items
         int heap_item_count = 0;
-        struct heap_item *heap_obj_ptr = espmem.next_heap_item(0);
+        struct heap_item *heap_obj_ptr = espmem.get_heap_item(first);
         while (heap_obj_ptr)
         {
             heap_item_count++;
-            heap_obj_ptr = espmem.next_heap_item(1);
+            heap_obj_ptr = espmem.get_heap_item(next);
         }
 
         char *msg = (char *)esp_zalloc(172 +                          // formatting string
@@ -806,7 +806,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
             char *str_ptr;
             int cnt = 0;
             espmem.stack_mon();
-            heap_obj_ptr = espmem.next_heap_item(0);
+            heap_obj_ptr = espmem.get_heap_item(first);
             while (heap_obj_ptr)
             {
                 str_ptr = msg + os_strlen(msg);
@@ -818,7 +818,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
                 else
                     os_sprintf(str_ptr, ",{\"addr\":\"%X\",\"size\":%d}", heap_obj_ptr->addr, heap_obj_ptr->size);
 
-                heap_obj_ptr = espmem.next_heap_item(1);
+                heap_obj_ptr = espmem.get_heap_item(next);
             }
             str_ptr = msg + os_strlen(msg);
             os_sprintf(str_ptr, "]}");

@@ -15,7 +15,7 @@
 #include "do_sequence.h"
 #include "di_sequence.h"
 
-#ifdef ESPBOT_MEM
+#ifdef ESPBOT
 // these are espbot_2.0 memory management methods
 // https://github.com/quackmore/espbot_2.0
 extern void *call_espbot_zalloc(size_t size);
@@ -28,6 +28,12 @@ extern void call_espbot_free(void *addr);
 
 static os_event_t *dio_queue;
 
+//
+// this task is for decoupling the end sequence callback
+// from isr routines and/or timer functions
+// (that could be an isr function when hw timer is used)
+//
+
 static void ICACHE_FLASH_ATTR dio_task(os_event_t *e)
 {
     switch (e->sig)
@@ -39,10 +45,6 @@ static void ICACHE_FLASH_ATTR dio_task(os_event_t *e)
         break;
     case SIG_DI_SEQ_COMPLETED:
         stop_di_sequence_timeout((struct di_seq *)(e->par));
-        // getting here from the end of the sequence takes
-        //   90-110 us when timeout timer is expressed in ms
-        //   40     us when timeout timer is expressed in ms
-        // the difference comes from stop timeout function
 
         // calling the end of sequence callback
         ((struct di_seq *)(e->par))->end_sequence_callack(((struct di_seq *)(e->par))->end_sequence_callack_param);

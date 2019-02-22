@@ -9,14 +9,15 @@
 #ifndef __DIO_TASK_H__
 #define __DIO_TASK_H__
 
-#include "c_types.h"
-
-#define ESPBOT_MEM 1 // will use espbot_2.0 zalloc and free \
-                     // undefine this if you want to use sdk os_zalloc and os_free
-
 #define DIO_TASK_QUEUE_LEN 4
 #define SIG_DO_SEQ_COMPLETED 1
 #define SIG_DI_SEQ_COMPLETED 2
+
+typedef enum
+{
+  direct = 0,
+  task
+} CB_call_type;
 
 void init_dio_task(void);
 

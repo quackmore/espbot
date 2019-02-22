@@ -31,6 +31,7 @@ extern "C"
 #include "json.hpp"
 #include "config.hpp"
 #include "gpio.hpp"
+#include "dht.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -157,6 +158,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     espwebclnt.init();
     esp_gpio.init();
     init_dio_task();
+    dht22.init(ESPBOT_D2, DHT22, 5, 30);
 
     espwifi.init();
 }

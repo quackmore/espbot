@@ -9,10 +9,7 @@
 #ifndef __DO_SEQUENCE_H__
 #define __DO_SEQUENCE_H__
 
-#include "c_types.h"
-
-#define ESPBOT_MEM 1 // will use espbot_2.0 zalloc and free \
-                     // undefine this if you want to use sdk os_zalloc and os_free
+#include "dio_task.h"
 
 struct do_seq
 {
@@ -32,11 +29,12 @@ struct do_seq
     os_timer_t pulse_timer;
     int current_pulse;
     int dig_output_initial_value;
+    bool callback_direct;
 };
 
 struct do_seq *new_do_seq(int pin, int num_pulses); // allocating heap memory
 void free_do_seq(struct do_seq *seq);               // freeing allocated memory
-void set_do_seq_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param);
+void set_do_seq_cb(struct do_seq *seq, void (*cb)(void *), void *cb_param, CB_call_type cb_call);
 
 void out_seq_clear(struct do_seq *seq); // will clear the pulse sequence only
 
@@ -58,9 +56,9 @@ uint32 get_do_seq_pulse_duration(struct do_seq *seq, int idx);
 void exe_do_seq_ms(struct do_seq *seq);
 void exe_do_seq_us(struct do_seq *seq);
 
-// 
+//
 // ############################ EXAMPLE ##########################
-// 
+//
 // // end_sequence callback definition
 // static void ICACHE_FLASH_ATTR sequence_completed(void *param)
 // {
@@ -70,26 +68,26 @@ void exe_do_seq_us(struct do_seq *seq);
 //
 //     os_printf("Test completed\n");
 // }
-// 
+//
 // {
 //     ...
-// 
+//
 //     // defining and running a sequence
-// 
+//
 //     PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
 //     struct do_seq *seq = new_do_seq(ESPBOT_D4_NUM, 4);
 //     set_do_seq_cb(seq, sequence_completed, (void *)seq);
-// 
+//
 //     out_seq_clear(seq);
 //     out_seq_add(seq, ESPBOT_LOW, 1000);
 //     out_seq_add(seq, ESPBOT_HIGH, 1500);
 //     out_seq_add(seq, ESPBOT_LOW, 2000);
 //     out_seq_add(seq, ESPBOT_HIGH, 2500);
-// 
+//
 //     exe_do_seq_ms(seq);
-// 
+//
 //     // printing ax existing pulse sequence
-// 
+//
 //     int idx = 0;
 //     char level;
 //     uint32 duration;
@@ -104,7 +102,7 @@ void exe_do_seq_us(struct do_seq *seq);
 //             os_printf("pulse %d: level 'HIGH' - duration %d\n", idx, duration);
 //     }
 //     os_printf("Sequence end.\n");
-// 
+//
 //     ...
 // }
 
