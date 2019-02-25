@@ -94,7 +94,10 @@ static void ICACHE_FLASH_ATTR dht_reading_completed(void *param)
         // check preparation to send data into read sequence
         uint32 pulse_duration = get_di_seq_pulse_duration(dht_ptr->m_dht_in_sequence, 0);
         if ((pulse_duration < 70) || (pulse_duration > 90))
-            PRINT_ERROR("DHT [D%d] reading: missing preparation to send data\n", dht_ptr->m_pin);
+            // PRINT_ERROR("DHT [D%d] reading: missing preparation to send data\n", dht_ptr->m_pin);
+            // nah, on second thougth why you have to mind about a correct 'preparation to send data'
+            // just let it trace as an irrilevant eent
+            PRINT_TRACE("DHT [D%d] reading: missing preparation to send data\n", dht_ptr->m_pin);
         // convert read sequence to m_data
         int idx;
         char bit_idx, byte_idx;
