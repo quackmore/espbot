@@ -20,7 +20,6 @@ extern "C"
 #include "uart.h"
 #include "mem.h"
 #include "espbot_release.h"
-#include "dio_task.h"
 }
 
 #include "debug.hpp"
@@ -31,7 +30,7 @@ extern "C"
 #include "json.hpp"
 #include "config.hpp"
 #include "gpio.hpp"
-#include "dht.hpp"
+#include "app.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -62,16 +61,16 @@ static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
         esp_sntp.start();
         espwebsvr.stop(); // in case there was a web server listening on esp AP interface
         espwebsvr.start(80);
+        app_init_after_wifi();
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
         esp_mDns.stop();
         esp_sntp.stop();
+        app_deinit_on_wifi_disconnect();
         break;
     case SIG_SOFTAPMODE_STACONNECTED:
         // [wifi station+AP] station connected
-        espwebsvr.stop(); // in case there was a web server listening on esp station interface
-        espwebsvr.start(80);
         break;
     case SIG_SOFTAPMODE_STADISCONNECTED:
         // [wifi station+AP] station disconnected
@@ -157,8 +156,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     esp_ota.init();
     espwebclnt.init();
     esp_gpio.init();
-    init_dio_task();
-    dht22.init(ESPBOT_D2, DHT22, 5, 30);
+    app_init_before_wifi();
 
     espwifi.init();
 }

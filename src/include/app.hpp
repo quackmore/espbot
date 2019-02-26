@@ -6,38 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __APP_HPP__
+#define __APP_HPP__
 
-#ifndef __WEBSERVER_HPP__
-#define __WEBSERVER_HPP__
+#include "dht.hpp"
 
-extern "C"
-{
-#include "c_types.h"
-#include "espconn.h"
-}
+void app_init_before_wifi(void);
+void app_init_after_wifi(void);
+void app_deinit_on_wifi_disconnect(void);
 
-#define SERVER_PORT 80
-
-typedef enum
-{
-  up = 0,
-  down
-} Websvr_status;
-
-class Websvr
-{
-private:
-  Websvr_status m_status;
-  struct espconn esp_conn;
-  esp_tcp esptcp;
-
-public:
-  Websvr(){};
-  ~Websvr(){};
-
-  void start(uint32); // port
-  void stop(void);
-  Websvr_status get_status(void);
-};
+extern Dht dht22;
 
 #endif

@@ -35,6 +35,5 @@ extern Websvr espwebsvr;
 extern Webclnt espwebclnt;
 extern Ota_upgrade esp_ota;
 extern Gpio esp_gpio;
-extern Dht dht22;
 
 #endif

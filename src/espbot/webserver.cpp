@@ -58,6 +58,24 @@ static char ICACHE_FLASH_ATTR *error_msg(int code)
     }
 }
 
+static char ICACHE_FLASH_ATTR *json_error_msg(int code, char *msg)
+{
+    esplog.all("json_error_msg\n");
+    String err_msg(56 + os_strlen(msg), false);
+    if (err_msg.ref)
+    {
+        os_sprintf(err_msg.ref,
+                   "{\"error\":{\"code\": %d,\"message\": \"%s\",\"reason\": \"%s\"}}",
+                   code, error_msg(code), msg);
+        return err_msg.ref;
+    }
+    else
+    {
+        esplog.error("json_error_msg - not enough heap memory %d\n", (56 + os_strlen(msg)));
+        return NULL;
+    }
+}
+
 #define HTTP_CONTENT_TEXT "text/html"
 #define HTTP_CONTENT_JSON "application/json"
 
@@ -72,8 +90,8 @@ static char ICACHE_FLASH_ATTR *error_msg(int code)
 // a timer will used for postponing response
 //
 
-#define DATA_SENT_TIMER_PERIOD 100
-#define MAX_PENDING_RESPONSE_COUNT 8
+#define DATA_SENT_TIMER_PERIOD 120
+#define MAX_PENDING_RESPONSE_COUNT 12
 static char *send_buffer;
 static os_timer_t pending_response_timer[MAX_PENDING_RESPONSE_COUNT];
 static char pending_response_timer_busy[MAX_PENDING_RESPONSE_COUNT];
@@ -97,7 +115,8 @@ static void ICACHE_FLASH_ATTR webserver_pending_response(void *arg)
     struct svr_response *response_data = (struct svr_response *)arg;
     // free pending response_timer
     pending_response_timer_busy[response_data->timer_idx] = 0;
-    response(response_data->p_espconn, response_data->code, response_data->content_type, response_data->msg, response_data->free_msg);
+    if (espwebsvr.get_status() == up)
+        response(response_data->p_espconn, response_data->code, response_data->content_type, response_data->msg, response_data->free_msg);
     esp_free(response_data);
 }
 
@@ -1917,7 +1936,7 @@ static void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *precdata, unsigned
     if ((0 == os_strcmp(parsed_req.url, "/api/wifi/disconnect")) && (parsed_req.req_method == HTTP_POST))
     {
         response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
-        Wifi::switch_to_stationap();
+        Wifi::set_stationap();
         return;
     }
     if ((0 == os_strcmp(parsed_req.url, "/api/test")) && (parsed_req.req_method == HTTP_POST))
@@ -2024,6 +2043,7 @@ void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
     esp_conn.proto.tcp->local_port = port;
     espconn_regist_connectcb(&esp_conn, webserver_listen);
     espconn_accept(&esp_conn);
+    m_status = up;
     esplog.debug("web server started\n");
 }
 
@@ -2032,5 +2052,11 @@ void ICACHE_FLASH_ATTR Websvr::stop()
     esplog.all("Websvr::stop\n");
     espconn_disconnect(&esp_conn);
     espconn_delete(&esp_conn);
+    m_status = down;
     esplog.debug("web server stopped\n");
+}
+
+Websvr_status ICACHE_FLASH_ATTR Websvr::get_status(void)
+{
+    return m_status;
 }

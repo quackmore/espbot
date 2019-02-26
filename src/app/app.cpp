@@ -7,37 +7,29 @@
  * ----------------------------------------------------------------------------
  */
 
-#ifndef __WEBSERVER_HPP__
-#define __WEBSERVER_HPP__
-
+// SDK includes
 extern "C"
 {
-#include "c_types.h"
-#include "espconn.h"
+#include "mem.h"
+#include "dio_task.h"
+#include "esp8266_io.h"
 }
 
-#define SERVER_PORT 80
+#include "app.hpp"
+#include "dht.hpp"
 
-typedef enum
+Dht dht22;
+
+void ICACHE_FLASH_ATTR app_init_before_wifi(void)
 {
-  up = 0,
-  down
-} Websvr_status;
+    init_dio_task();
+    // dht22.init(ESPBOT_D2, DHT22, 5, 30);
+}
 
-class Websvr
+void ICACHE_FLASH_ATTR app_init_after_wifi(void)
 {
-private:
-  Websvr_status m_status;
-  struct espconn esp_conn;
-  esp_tcp esptcp;
+}
 
-public:
-  Websvr(){};
-  ~Websvr(){};
-
-  void start(uint32); // port
-  void stop(void);
-  Websvr_status get_status(void);
-};
-
-#endif
+void ICACHE_FLASH_ATTR app_deinit_on_wifi_disconnect()
+{
+}
