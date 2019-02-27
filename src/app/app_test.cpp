@@ -20,7 +20,8 @@ extern "C"
 #include "gpio.h"
 }
 
-#include "espbot_test.hpp"
+#include "app.hpp"
+#include "app_test.hpp"
 #include "espbot_global.hpp"
 #include "debug.hpp"
 
