@@ -6,20 +6,19 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __DIO_TASK_H__
+#define __DIO_TASK_H__
 
-#include "espbot_global.hpp"
+#define DIO_TASK_QUEUE_LEN 4
+#define SIG_DO_SEQ_COMPLETED 1
+#define SIG_DI_SEQ_COMPLETED 2
 
-// global variables for esp8266 
-Str_list esp_event_log(20);   // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Esp_mem espmem;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Sntp esp_sntp;
-Websvr espwebsvr;
-Webclnt espwebclnt;
-Ota_upgrade esp_ota;
-Gpio esp_gpio;
+typedef enum
+{
+  direct = 0,
+  task
+} CB_call_type;
+
+void init_dio_task(void);
+
+#endif

@@ -282,22 +282,23 @@ GIT_VERSION := $(shell git --no-pager describe --tags --always --dirty)
 # they will override "-Os" defined above.
 # "-Os" should be used to reduce code size
 #
-CCFLAGS += 			\
-	-g			\
-	-Wpointer-arith		\
-	-Wundef			\
-	-Werror			\
-	-Wl,-EL			\
-	-fno-inline-functions	\
-	-nostdlib       \
-	-mlongcalls	\
-	-mtext-section-literals \
-	-ffunction-sections \
-	-fdata-sections	\
-	-fno-builtin-printf \
-	-fno-exceptions \
-  -Wno-write-strings \
-  -DESPBOT_RELEASE=\"$(GIT_VERSION)\" \
+CCFLAGS += 			                         \
+	-g			                               \
+	-Wpointer-arith		                     \
+	-Wundef			                           \
+	-Werror			                           \
+	-Wl,-EL			                           \
+	-fno-inline-functions	                 \
+	-nostdlib                              \
+	-mlongcalls	                           \
+	-mtext-section-literals                \
+	-ffunction-sections                    \
+	-fdata-sections	                       \
+	-fno-builtin-printf                    \
+	-fno-exceptions                        \
+  -Wno-write-strings                     \
+  -DESPBOT=1                             \
+  -DESPBOT_RELEASE=\"$(GIT_VERSION)\"    \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 

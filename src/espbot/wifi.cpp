@@ -49,6 +49,14 @@ void ICACHE_FLASH_ATTR Wifi::start_wait_before_reconnect_timer(void)
     os_timer_arm(&m_wait_before_reconnect, WIFI_WAIT_BEFORE_RECONNECT, 0);
 }
 
+static void ICACHE_FLASH_ATTR switch_to_stationap(void)
+{
+    if (wifi_get_opmode() == STATIONAP_MODE)
+        return;
+    else
+        Wifi::set_stationap();
+}
+
 void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
 {
     esplog.all("Wifi::wifi_event_handler\n");
@@ -68,11 +76,15 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
                      evt->event_info.disconnected.reason);
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
                                                                          // disconnection from AP
-        if (!espwifi.is_timeout_timer_active())
-        {
-            espwifi.start_connect_timeout_timer();
-            esplog.debug("will switch to SOFTAP in 10 seconds but keep trying to reconnect ...\n");
-        }
+        // if (!espwifi.is_timeout_timer_active())
+        // {
+        //     espwifi.start_connect_timeout_timer();
+        //     esplog.debug("will switch to SOFTAP in 10 seconds but keep trying to reconnect ...\n");
+        // }
+        // espwifi.start_wait_before_reconnect_timer();
+        if (espwifi.is_timeout_timer_active())
+            espwifi.stop_connect_timeout_timer();
+        switch_to_stationap();
         espwifi.start_wait_before_reconnect_timer();
         break;
     case EVENT_STAMODE_AUTHMODE_CHANGE:
@@ -148,14 +160,14 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
     }
 }
 
-void ICACHE_FLASH_ATTR Wifi::switch_to_stationap(void)
+void ICACHE_FLASH_ATTR Wifi::set_stationap(void)
 {
-    esplog.all("Wifi::switch_to_stationap\n");
+    esplog.all("Wifi::set_stationap\n");
     struct ip_info ap_ip;
     struct dhcps_lease dhcp_lease;
     espmem.stack_mon();
 
-    espwifi.m_timeout_timer_active = false;
+    // espwifi.m_timeout_timer_active = false;
 
     wifi_set_opmode_current(STATIONAP_MODE);
     wifi_softap_set_config(&espwifi.m_ap_config);
@@ -195,31 +207,37 @@ void ICACHE_FLASH_ATTR Wifi::switch_to_stationap(void)
         esplog.debug("AP config: Security:    Unknown\n");
         break;
     }
+    // now start the webserver
+    espwebsvr.stop(); // in case there was a web server listening on esp station interface
+    espwebsvr.start(80);
 }
 
 void ICACHE_FLASH_ATTR Wifi::connect(void)
 {
     esplog.all("Wifi::connect\n");
     struct station_config stationConf;
-    espmem.stack_mon();
 
     if (os_strlen(espwifi.m_station_ssid) == 0 || os_strlen(espwifi.m_station_pwd) == 0)
     {
         esplog.error("Wifi::connect: no ssid or password available\n");
         return;
     }
+    bool result = wifi_station_ap_number_set(1);
+    result = wifi_station_set_reconnect_policy(false);
+    result = wifi_station_set_auto_connect(0);
+
+    // disconnect ... just in case
+    wifi_station_disconnect();
+    // setup station
     os_memset(&stationConf, 0, sizeof(stationConf));
     os_memcpy(stationConf.ssid, espwifi.m_station_ssid, 32);
     os_memcpy(stationConf.password, espwifi.m_station_pwd, 64);
     stationConf.bssid_set = 0;
     wifi_station_set_config_current(&stationConf);
     wifi_station_set_hostname(espbot.get_name());
-    if (wifi_station_get_auto_connect() != 0)
-    {
-        wifi_station_set_reconnect_policy(0);
-        wifi_station_set_auto_connect(0);
-    }
+    // connect
     wifi_station_connect();
+    espmem.stack_mon();
 }
 
 void ICACHE_FLASH_ATTR Wifi::init()
@@ -249,17 +267,18 @@ void ICACHE_FLASH_ATTR Wifi::init()
     m_timeout_timer_active = false;
 
     os_timer_disarm(&m_station_connect_timeout);
-    os_timer_setfn(&m_station_connect_timeout, (os_timer_func_t *)&Wifi::switch_to_stationap, NULL);
+    os_timer_setfn(&m_station_connect_timeout, (os_timer_func_t *)switch_to_stationap, NULL);
     os_timer_disarm(&m_wait_before_reconnect);
     os_timer_setfn(&m_wait_before_reconnect, (os_timer_func_t *)&Wifi::connect, NULL);
 
+    wifi_station_set_reconnect_policy(false);
     wifi_set_phy_mode(PHY_MODE_11N);
     wifi_set_event_handler_cb((wifi_event_handler_cb_t)wifi_event_handler);
 
-    // start as SOFTAP and switch to STATION if a valid station configuration is found in flash
+    // start as SOFTAP and try to switch to STATION
     // this will ensure that softap and station configurations are set by espbot
     // otherwise default configurations by NON OS SDK are used
-    Wifi::switch_to_stationap();
+    Wifi::set_stationap();
     Wifi::connect();
 }
 

@@ -30,6 +30,7 @@ extern "C"
 #include "json.hpp"
 #include "config.hpp"
 #include "gpio.hpp"
+#include "app.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
 {
@@ -60,16 +61,16 @@ static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
         esp_sntp.start();
         espwebsvr.stop(); // in case there was a web server listening on esp AP interface
         espwebsvr.start(80);
+        app_init_after_wifi();
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
         esp_mDns.stop();
         esp_sntp.stop();
+        app_deinit_on_wifi_disconnect();
         break;
     case SIG_SOFTAPMODE_STACONNECTED:
         // [wifi station+AP] station connected
-        espwebsvr.stop(); // in case there was a web server listening on esp station interface
-        espwebsvr.start(80);
         break;
     case SIG_SOFTAPMODE_STADISCONNECTED:
         // [wifi station+AP] station disconnected
@@ -142,9 +143,9 @@ extern "C" void espbot_init(void);
 void ICACHE_FLASH_ATTR espbot_init(void)
 {
     espmem.init();
-    uart_init(BIT_RATE_74880, BIT_RATE_74880);
+    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
     // uart_init(BIT_RATE_115200, BIT_RATE_115200);
-    // uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    uart_init(BIT_RATE_460800, BIT_RATE_460800);
     system_set_os_print(1); // enable log print
     print_greetings();
 
@@ -155,6 +156,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     esp_ota.init();
     espwebclnt.init();
     esp_gpio.init();
+    app_init_before_wifi();
 
     espwifi.init();
 }
@@ -301,8 +303,6 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
     if (restore_cfg())
         esplog.warn("no cfg available, espbot name set to %s\n", get_name());
-    else
-        esplog.info("espbot name set to %s\n", get_name());
 
     os_timer_disarm(&graceful_rst_timer);
 

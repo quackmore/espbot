@@ -7,19 +7,11 @@
  * ----------------------------------------------------------------------------
  */
 
-#include "espbot_global.hpp"
+#ifndef __ESPBOT_HTTP_ROUTES_HPP__
+#define __ESPBOT_HTTP_ROUTES_HPP__
 
-// global variables for esp8266 
-Str_list esp_event_log(20);   // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Esp_mem espmem;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Sntp esp_sntp;
-Websvr espwebsvr;
-Webclnt espwebclnt;
-Ota_upgrade esp_ota;
-Gpio esp_gpio;
+#include "webserver.hpp"
+
+void espbot_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req);
+
+#endif

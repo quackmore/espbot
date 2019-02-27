@@ -6,20 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __APP_HPP__
+#define __APP_HPP__
 
-#include "espbot_global.hpp"
+#include "dht.hpp"
 
-// global variables for esp8266 
-Str_list esp_event_log(20);   // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Esp_mem espmem;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Sntp esp_sntp;
-Websvr espwebsvr;
-Webclnt espwebclnt;
-Ota_upgrade esp_ota;
-Gpio esp_gpio;
+void app_init_before_wifi(void);
+void app_init_after_wifi(void);
+void app_deinit_on_wifi_disconnect(void);
+
+extern Dht dht22;
+
+#endif

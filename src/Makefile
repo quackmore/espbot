@@ -22,10 +22,12 @@ GEN_IMAGES= eagle.app.v6.out
 GEN_BINS= eagle.app.v6.bin
 SPECIAL_MKTARGETS=$(APP_MKTARGETS)
 SUBDIRS=         \
+	app          \
 	driver       \
-	user         \
+	espbot       \
+	library      \
 	spiffs       \
-	espbot
+	user
 
 endif # } PDIR
 
@@ -49,10 +51,12 @@ ifeq ($(FLAVOR),release)
 endif
 
 COMPONENTS_eagle.app.v6 =   \
+	app/libapp.a            \
 	driver/libdriver.a      \
-	user/libuser.a          \
+	espbot/libespbot.a      \
+	library/library.a       \
 	spiffs/libspiffs.a      \
-	espbot/libespbot.a
+	user/libuser.a
 
 LINKFLAGS_eagle.app.v6 =       \
 	-L../lib                   \

@@ -6,15 +6,12 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __ESPBOT_TEST_HPP__
-#define __ESPBOT_TEST_HPP__
 
-extern "C"
-{
-#include "ip_addr.h"
-}
+#ifndef __APP_HTTP_ROUTES_HPP__
+#define __APP_HTTP_ROUTES_HPP__
 
-void init_test(struct ip_addr, uint32, char *);
-void run_test(void);
+#include "webserver.hpp"
+
+bool app_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req);
 
 #endif

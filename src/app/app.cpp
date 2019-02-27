@@ -7,19 +7,29 @@
  * ----------------------------------------------------------------------------
  */
 
-#include "espbot_global.hpp"
+// SDK includes
+extern "C"
+{
+#include "mem.h"
+#include "dio_task.h"
+#include "esp8266_io.h"
+}
 
-// global variables for esp8266 
-Str_list esp_event_log(20);   // actually this won't work
-                              // really set in espbot.cpp espbot_init
-Flashfs espfs;
-Esp_mem espmem;
-Logger esplog;
-Espbot espbot;
-Wifi espwifi;
-Mdns esp_mDns;
-Sntp esp_sntp;
-Websvr espwebsvr;
-Webclnt espwebclnt;
-Ota_upgrade esp_ota;
-Gpio esp_gpio;
+#include "app.hpp"
+#include "dht.hpp"
+
+Dht dht22;
+
+void ICACHE_FLASH_ATTR app_init_before_wifi(void)
+{
+    init_dio_task();
+    dht22.init(ESPBOT_D2, DHT22, 5, 30);
+}
+
+void ICACHE_FLASH_ATTR app_init_after_wifi(void)
+{
+}
+
+void ICACHE_FLASH_ATTR app_deinit_on_wifi_disconnect()
+{
+}
