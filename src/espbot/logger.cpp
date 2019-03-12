@@ -276,24 +276,16 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
         if (m_memory_level >= LOG_INFO)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
-            String time_str(27);
+            Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
             char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
             if (json_ptr)
             {
-                uint32 timestamp = esp_sntp.get_timestamp();
-                Heap_chunk time_str(27);
-                if (time_str.ref)
-                    os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-                char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-                if (json_ptr)
-                {
-                    os_sprintf(json_ptr,
-                               "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
-                               time_str.ref, buffer);
-                    esp_event_log.push_back(json_ptr, true);
-                }
+                os_sprintf(json_ptr,
+                           "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
+                           time_str.ref, buffer);
+                esp_event_log.push_back(json_ptr, true);
             }
         }
     }
