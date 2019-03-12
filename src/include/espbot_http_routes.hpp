@@ -12,6 +12,7 @@
 
 #include "webserver.hpp"
 
+void init_controllers(void);
 void espbot_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req);
 
 #endif

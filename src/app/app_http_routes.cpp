@@ -13,8 +13,8 @@ extern "C"
 #include "osapi.h"
 #include "user_interface.h"
 #include "mem.h"
-#include "espbot_release.h"
 #include "ip_addr.h"
+#include "library.h"
 }
 
 #include "webserver.hpp"
@@ -25,13 +25,51 @@ extern "C"
 #include "json.hpp"
 #include "espbot_utils.hpp"
 #include "debug.hpp"
+#include "app.hpp"
 #include "app_test.hpp"
-
 
 bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req)
 {
     esplog.all("app_http_routes\n");
 
+    if ((0 == os_strcmp(parsed_req->url, "/api/info")) && (parsed_req->req_method == HTTP_GET))
+    {
+        int str_len = os_strlen(app_name) + 
+                      os_strlen(app_release) + 
+                      os_strlen(espbot.get_name()) + 
+                      os_strlen(espbot.get_version()) + 
+                      os_strlen(library_release) + 
+                      10 + 
+                      os_strlen(system_get_sdk_version()) + 
+                      10;
+        Heap_chunk msg(155 + str_len);
+        if (msg.ref)
+        {
+            os_sprintf(msg.ref, "{\"app_name\":\"%s\","
+                            "\"app_version\":\"%s\","
+                            "\"espbot_name\":\"%s\","
+                            "\"espbot_version\":\"%s\","
+                            "\"library_version\":\"%s\","
+                            "\"chip_id\":\"%d\","
+                            "\"sdk_version\":\"%s\","
+                            "\"boot_version\":\"%d\"}",
+                       app_name,
+                       app_release,
+                       espbot.get_name(),
+                       espbot.get_version(),
+                       library_release,
+                       system_get_chip_id(),
+                       system_get_sdk_version(),
+                       system_get_boot_version());
+            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 350);
+        }
+        return true;
+    }
     if ((0 == os_strcmp(parsed_req->url, "/api/test")) && (parsed_req->req_method == HTTP_POST))
     {
         int test_number;
@@ -48,7 +86,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
                 response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'test_number' does not have a INTEGER value type", false);
                 return true;
             }
-            String tmp_test_number(test_cfg.get_cur_pair_value_len());
+            Heap_chunk tmp_test_number(test_cfg.get_cur_pair_value_len());
             if (tmp_test_number.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
@@ -64,13 +102,61 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
             response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
             return true;
         }
-        String msg(36, 0);
+        Heap_chunk msg(36, dont_free);
         if (msg.ref)
         {
             os_sprintf(msg.ref, "{\"test_number\": %d}", test_number);
             response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
             // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
             run_test(test_number);
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 36);
+        }
+        return true;
+    }
+    if ((0 == os_strcmp(parsed_req->url, "/api/testresponse")) && (parsed_req->req_method == HTTP_GET))
+    {
+        espwebsvr.set_response_max_size(1024);
+        Heap_chunk message(512);
+        if (message.ref)
+        {
+            int idx;
+            char *ptr = message.ref;
+            for (idx = 0; idx < 512; idx++)
+            {
+                *ptr++ = '0' + (idx % 10);
+            }
+        }
+        else
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 512);
+        }
+        struct http_header header;
+        header.code = HTTP_OK;
+        header.content_type = HTTP_CONTENT_TEXT;
+        header.content_length = os_strlen(message.ref);
+        header.content_range_start = 0;
+        header.content_range_end = 0;
+        header.content_range_total = 0;
+        char *header_str = format_header(&header);
+
+        Heap_chunk msg(512 + os_strlen(header_str) + 1);
+        if (msg.ref)
+        {
+            // copy the header
+            os_strncpy(msg.ref, header_str, os_strlen(header_str));
+            // now the message
+            os_strncpy((msg.ref + os_strlen(header_str)), message.ref, os_strlen(message.ref));
+
+            struct http_response *p_res = (struct http_response *)esp_zalloc(sizeof(struct http_response));
+            p_res->p_espconn = ptr_espconn;
+            p_res->msg = msg.ref;
+            esplog.trace("response: *p_espconn: %X\n"
+                         "                 msg: %s\n",
+                         p_res->p_espconn, p_res->msg);
+            send_response(p_res);
         }
         else
         {

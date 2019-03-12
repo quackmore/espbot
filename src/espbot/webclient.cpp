@@ -13,7 +13,6 @@ extern "C"
 #include "osapi.h"
 #include "user_interface.h"
 #include "mem.h"
-#include "espbot_release.h"
 }
 
 #include "webclient.hpp"

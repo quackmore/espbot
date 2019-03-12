@@ -111,9 +111,14 @@ public:
   int n_read(char *t_buffer, int t_len);   // same as SPIFFS_read
                                            // will read t_len bytes from file to t_buffer
                                            // returns number of bytes read, or -1 if error
+  int n_read(char *t_buffer, int offset, int t_len);   // same as SPIFFS_lseek + SPIFFS_read
+                                                       // will read t_len bytes 
+                                                       // from file + offset to t_buffer
+                                                       // returns number of bytes read, or -1 if error
   int n_append(char *t_buffer, int t_len); // same as SPIFFS_write
                                            // will write t_len bytes from t_buffer to file
                                            // returns number of bytes written, or -1 if error
+  
 
   void clear(); // clear the whole file content
   void remove();

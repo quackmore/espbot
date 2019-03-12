@@ -19,13 +19,12 @@ class Mdns
 {
 private:
   struct mdns_info m_info;
-  char m_alias[64];
 
 public:
   Mdns(){};
   ~Mdns(){};
 
-  void start(void);
+  void start(char *app_alias);
   void stop(void);
 };
 

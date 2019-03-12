@@ -23,6 +23,7 @@
 #include "gpio.hpp"
 #include "dht.hpp"
 
+extern char *espbot_release;
 extern Str_list esp_event_log;
 extern Flashfs espfs;
 extern Esp_mem espmem;

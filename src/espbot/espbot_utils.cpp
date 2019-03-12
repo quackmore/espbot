@@ -111,6 +111,13 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
     IP4_ADDR(ip, tmp_ip[0], tmp_ip[1], tmp_ip[2], tmp_ip[3]);
 }
 
+int ICACHE_FLASH_ATTR get_rand_int(int max_value)
+{
+    esplog.all("get_rand_int\n");
+    float value = (((float)os_random()) / ((float) __UINT32_MAX__)) * ((float)max_value);
+    return (int)value;
+}
+
 ICACHE_FLASH_ATTR Str_list::Str_list(int t_max_size)
 {
     esplog.all("Str_list::Str_list\n");
@@ -241,30 +248,23 @@ char ICACHE_FLASH_ATTR *Str_list::prev(void)
         return NULL;
 }
 
-ICACHE_FLASH_ATTR String::String(int t_len)
+ICACHE_FLASH_ATTR Heap_chunk::Heap_chunk(int t_len, Free_opt t_to_be_free)
 {
-    esplog.all("String::String()\n");
-    ref = (char *)esp_zalloc(t_len + 1);
-    m_to_be_free = true;
-}
-
-ICACHE_FLASH_ATTR String::String(int t_len, bool t_to_be_free)
-{
-    esplog.all("String::String(,)\n");
+    esplog.all("Heap_chunk::Heap_chunk\n");
     ref = (char *)esp_zalloc(t_len + 1);
     m_to_be_free = t_to_be_free;
 }
 
-ICACHE_FLASH_ATTR String::~String()
+ICACHE_FLASH_ATTR Heap_chunk::~Heap_chunk()
 {
-    esplog.all("String::~String\n");
-    if (m_to_be_free)
+    esplog.all("Heap_chunk::~Heap_chunk\n");
+    if (m_to_be_free == free)
         if (ref)
             esp_free(ref);
 }
 
-int ICACHE_FLASH_ATTR String::len(void)
+int ICACHE_FLASH_ATTR Heap_chunk::len(void)
 {
-    esplog.all("String::len\n");
+    esplog.all("Heap_chunk::len\n");
     return os_strlen(ref);
 }

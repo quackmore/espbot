@@ -412,6 +412,43 @@ int ICACHE_FLASH_ATTR Ffile::n_read(char *t_buffer, int t_len)
     return (int)res;
 }
 
+// read t_len bytes from the file + offset to the t_buffer
+int ICACHE_FLASH_ATTR Ffile::n_read(char *t_buffer, int offset, int t_len)
+{
+    esplog.all("Ffile::n_read(offset)\n");
+    s32_t res = 0;
+    if (m_fs && (m_fs->is_available()))
+    {
+        if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
+        {
+            res = SPIFFS_lseek(m_fs->get_handler(), m_fd, offset, SPIFFS_SEEK_SET);
+            if (res < SPIFFS_OK)
+            {
+                P_ERROR("[ERROR]: Error %d while seeking into file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                return (int)res;
+            }
+            res = SPIFFS_read(m_fs->get_handler(), m_fd, (u8_t *)t_buffer, t_len);
+            if (res < SPIFFS_OK)
+            {
+                P_ERROR("[ERROR]: Error %d while reading from file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                return (int)res;
+            }
+        }
+        else
+        {
+            P_ERROR("[ERROR]: Cannot read from file %s, file status is %d\n", m_name, status);
+        }
+    }
+    else
+    {
+        status = FFS_F_UNAVAILABLE;
+        P_ERROR("[ERROR]: reading file on a not available file system\n");
+        res = -1;
+    }
+    espmem.stack_mon();
+    return (int)res;
+}
+
 // write (append) t_len bytes from the t_buffer to the file
 int ICACHE_FLASH_ATTR Ffile::n_append(char *t_buffer, int t_len)
 {

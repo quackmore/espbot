@@ -650,7 +650,56 @@ void ICACHE_FLASH_ATTR run_test(int idx)
         esplog.error("A new error (%d) was injected.\n", counter);
     }
     break;
+    case 256:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(256);
+        esplog.info("response buffer size set to 256 bytes\n");
+    }
+    break;
+    case 512:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(512);
+        esplog.info("response buffer size set to 512 bytes\n");
+    }
+    break;
+    case 768:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(768);
+        esplog.info("response buffer size set to 768 bytes\n");
+    }
+    break;
+    case 1024:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(1024);
+        esplog.info("response buffer size set to 1024 bytes\n");
+    }
+    break;
+    case 1280:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(1280);
+        esplog.info("response buffer size set to 1280 bytes\n");
+    }
+    break;
+    case 1536:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(1536);
+        esplog.info("response buffer size set to 1536 bytes\n");
+    }
+    break;
+    case 1792:
+    {
+        // set web server response buffer size
+        espwebsvr.set_response_max_size(1792);
+        esplog.info("response buffer size set to 1792 bytes\n");
+    }
+    break;
     default:
         break;
     }
-}
+    }

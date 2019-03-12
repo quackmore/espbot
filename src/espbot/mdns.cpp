@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "logger.hpp"
 
-void ICACHE_FLASH_ATTR Mdns::start(void)
+void ICACHE_FLASH_ATTR Mdns::start(char *app_alias)
 {
     esplog.all("Mdns::start\n");
     struct ip_info ipconfig;
@@ -29,8 +29,7 @@ void ICACHE_FLASH_ATTR Mdns::start(void)
     m_info.ipAddr = ipconfig.ip.addr;
     m_info.server_name = espbot.get_name();
     m_info.server_port = SERVER_PORT;
-    os_sprintf(m_alias, "alias=%s", espbot.get_alias());
-    m_info.txt_data[0] = m_alias;
+    m_info.txt_data[0] = app_alias;
     espconn_mdns_init(&m_info);
     esplog.debug("mDns started\n");
 }
