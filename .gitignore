@@ -1,6 +1,5 @@
 .vscode
 env.sh
-*.a
 *.bin
 *.dump
 *.S
