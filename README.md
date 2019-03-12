@@ -42,6 +42,49 @@ https://documenter.getpostman.com/view/4220776/RzthSXGC
 
 Checkout my other repo https://github.com/quackmore/esp8266_SDK_structure for details.
 
+## Integrating
+
+To integrate espbot in your project as a library use the following files:
+
++ lib/libespbot.a
++ lib/libdriver.a
++ lib/libspiffs.a
++ lib/libuser.a
+
+To import the library source files use the following files:
+
++ src/espbot
++ src/driver
++ src/spiffs
++ src/user
+
+Espot include files are:
+
++ config.hpp
++ debug.hpp
++ esp8266_spiffs.hpp
++ espbot_global.hpp
++ espbot.hpp
++ espbot_http_routes.hpp
++ espbot_utils.hpp
++ gpio.hpp
++ hw_timer.h
++ json.hpp
++ logger.hpp
++ mdns.hpp
++ ota_upgrade.hpp
++ sntp.hpp
++ spiffs_config.h
++ spiffs_flash_functions.hpp
++ spiffs.h
++ spiffs_nucleus.h
++ uart.h
++ uart_register.h
++ user_config.h
++ webclient.hpp
++ webserver.hpp
++ wifi.hpp
+
 ## License
 
 Espbot_2.0 comes with a [BEER-WARE] license.
