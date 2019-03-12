@@ -25,9 +25,9 @@ SUBDIRS=         \
 	app          \
 	driver       \
 	espbot       \
-	library      \
 	spiffs       \
 	user
+#	library      \
 
 endif # } PDIR
 
@@ -54,9 +54,9 @@ COMPONENTS_eagle.app.v6 =   \
 	app/libapp.a            \
 	driver/libdriver.a      \
 	espbot/libespbot.a      \
-	library/library.a       \
 	spiffs/libspiffs.a      \
 	user/libuser.a
+#	library/liblibrary.a       \
 
 LINKFLAGS_eagle.app.v6 =       \
 	-L../lib                   \
@@ -79,6 +79,7 @@ LINKFLAGS_eagle.app.v6 =       \
 	-lmain	                   \
 	-lupgrade                  \
 	-lpwm	                   \
+	-llibrary	                   \
 	$(DEP_LIBS_eagle.app.v6)   \
 	-Wl,--end-group
 #	-ljson	                   \

@@ -15,6 +15,9 @@ void app_init_before_wifi(void);
 void app_init_after_wifi(void);
 void app_deinit_on_wifi_disconnect(void);
 
+extern char *app_name;
+extern char *app_release;
+
 extern Dht dht22;
 
 #endif

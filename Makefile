@@ -5,7 +5,7 @@
 # Local project and SDK reference
 TOP_DIR:=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CCFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
-LDFLAGS:= -L$(SDK_DIR)/lib -L$(SDK_DIR)/ld $(LDFLAGS)
+LDFLAGS:= -L$(TOP_DIR)/lib -L$(SDK_DIR)/lib -L$(SDK_DIR)/ld $(LDFLAGS)
 
 ifeq ($(BOOT), new)
     boot = new
@@ -298,7 +298,7 @@ CCFLAGS += 			                         \
 	-fno-exceptions                        \
   -Wno-write-strings                     \
   -DESPBOT=1                             \
-  -DESPBOT_RELEASE=\"$(GIT_VERSION)\"    \
+  -DAPP_RELEASE=\"$(GIT_VERSION)\"    \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 
@@ -323,6 +323,7 @@ $$(LIBODIR)/$(1).a: $$(OBJS) $$(DEP_OBJS_$(1)) $$(DEP_LIBS_$(1)) $$(DEPENDS_$(1)
 	$$(if $$(filter %.a,$$?),cd $$(EXTRACT_DIR)_$(1); $$(foreach lib,$$(filter %.a,$$?),$$(AR) xo $$(UP_EXTRACT_DIR)/$$(lib);))
 	$$(AR) ru $$@ $$(filter %.o,$$?) $$(if $$(filter %.a,$$?),$$(EXTRACT_DIR)_$(1)/*.o)
 	$$(if $$(filter %.a,$$?),$$(RM) -r $$(EXTRACT_DIR)_$(1))
+	@cp $$(LIBODIR)/$(1).a $(TOP_DIR)/lib/$(1).a
 endef
 
 define MakeImage
