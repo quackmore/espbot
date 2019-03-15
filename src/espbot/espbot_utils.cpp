@@ -18,7 +18,7 @@ extern "C"
 
 #include "espbot_utils.hpp"
 #include "espbot_global.hpp"
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 
 int ICACHE_FLASH_ATTR atoh(char *str)
 {

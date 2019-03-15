@@ -9,7 +9,7 @@
 #ifndef __APP_HPP__
 #define __APP_HPP__
 
-#include "dht.hpp"
+#include "library_dht.hpp"
 
 void app_init_before_wifi(void);
 void app_init_after_wifi(void);

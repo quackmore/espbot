@@ -17,18 +17,17 @@ extern "C"
 // local includes
 extern "C"
 {
-#include "uart.h"
-#include "mem.h"
+#include "driver_uart.h"
 }
 
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 #include "espbot_global.hpp"
 #include "espbot.hpp"
-#include "esp8266_spiffs.hpp"
-#include "logger.hpp"
-#include "json.hpp"
-#include "config.hpp"
-#include "gpio.hpp"
+#include "spiffs_esp8266.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_json.hpp"
+#include "espbot_config.hpp"
+#include "espbot_gpio.hpp"
 #include "app.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)

@@ -13,7 +13,7 @@ extern "C"
 #include "osapi.h"
 }
 
-#include "json.hpp"
+#include "espbot_json.hpp"
 #include "espbot_global.hpp"
 
 ICACHE_FLASH_ATTR Json_str::Json_str(char *t_str, int t_len)

@@ -21,6 +21,8 @@ extern "C"
 #include "osapi.h"
 }
 
+#include "library_common_types.hpp"
+
 typedef enum
 {
   DHT11 = 11,
@@ -28,12 +30,6 @@ typedef enum
   DHT21 = 21,
   AM2301 = 21
 } Dht_type;
-
-typedef enum
-{
-  Celsius = 0,
-  Fahrenheit
-} Temp_scale;
 
 class Dht
 {
@@ -70,7 +66,6 @@ public:
   uint32_t *m_timestamp_buffer;
   int m_max_buffer_size;
   int m_buffer_idx;
-  bool m_retry;
 };
 
 #endif

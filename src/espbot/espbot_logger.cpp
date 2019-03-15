@@ -20,13 +20,13 @@ extern "C"
     int ets_vsnprintf(char *buffer, unsigned int sizeOfBuffer, const char *format, va_list argptr);
 }
 
-#include "logger.hpp"
+#include "espbot_logger.hpp"
 #include "espbot_global.hpp"
-#include "debug.hpp"
-#include "esp8266_spiffs.hpp"
+#include "espbot_debug.hpp"
+#include "spiffs_esp8266.hpp"
 #include "espbot_utils.hpp"
-#include "json.hpp"
-#include "config.hpp"
+#include "espbot_json.hpp"
+#include "espbot_config.hpp"
 
 /*
  * LOGGER

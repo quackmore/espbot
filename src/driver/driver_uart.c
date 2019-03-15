@@ -24,11 +24,11 @@
 
 #include "ets_sys.h"
 #include "osapi.h"
-#include "uart.h"
 #include "osapi.h"
-#include "uart_register.h"
 #include "mem.h"
 #include "os_type.h"
+#include "driver_uart_register.h"
+#include "driver_uart.h"
 
 /*
  * ESPBOT change: just want to use UART0 for printing debug purpose
