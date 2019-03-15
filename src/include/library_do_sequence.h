@@ -9,7 +9,7 @@
 #ifndef __DO_SEQUENCE_H__
 #define __DO_SEQUENCE_H__
 
-#include "dio_task.h"
+#include "library_dio_task.h"
 
 struct do_seq
 {

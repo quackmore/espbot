@@ -16,15 +16,15 @@ extern "C"
 #include "ip_addr.h"
 }
 
-#include "webserver.hpp"
+#include "espbot_webserver.hpp"
 #include "espbot_http_routes.hpp"
 #include "app_http_routes.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "logger.hpp"
-#include "json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_json.hpp"
 #include "espbot_utils.hpp"
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 
 static os_timer_t format_delay_timer;
 static os_timer_t wifi_scan_timeout_timer;

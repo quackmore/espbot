@@ -8,7 +8,7 @@
  */
 
 #include "spiffs_flash_functions.hpp"
-#include "esp8266_spiffs.hpp"
+#include "spiffs_esp8266.hpp"
 
 ICACHE_FLASH_ATTR Flashfs::Flashfs()
 {

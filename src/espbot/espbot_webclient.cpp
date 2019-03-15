@@ -15,13 +15,13 @@ extern "C"
 #include "mem.h"
 }
 
-#include "webclient.hpp"
+#include "espbot_webclient.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "logger.hpp"
-#include "json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_json.hpp"
 #include "espbot_utils.hpp"
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 
 //
 // HTTP sending data:

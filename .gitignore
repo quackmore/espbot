@@ -4,3 +4,8 @@ env.sh
 *.dump
 *.S
 version.txt
+lib/libapp.a
+lib/libdriver.a
+lib/libespbot.a
+lib/libspiffs.a
+lib/libuser.a

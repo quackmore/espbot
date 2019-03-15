@@ -53,37 +53,38 @@ To integrate espbot in your project as a library use the following files:
 
 To import the library source files use the following files:
 
-+ src/espbot
 + src/driver
++ src/espbot
 + src/spiffs
 + src/user
 
 Espot include files are:
 
-+ config.hpp
-+ debug.hpp
-+ esp8266_spiffs.hpp
++ driver_hw_timer.h
++ driver_uart_register.h
++ driver_uart.h
++ esp8266_io.h
++ espbot_config.hpp
++ espbot_debug.hpp
 + espbot_global.hpp
-+ espbot.hpp
++ espbot_gpio.hpp
 + espbot_http_routes.hpp
++ espbot_json.hpp
++ espbot_logger.hpp
++ espbot_mdns.hpp
++ espbot_ota.hpp
++ espbot_sntp.hpp
 + espbot_utils.hpp
-+ gpio.hpp
-+ hw_timer.h
-+ json.hpp
-+ logger.hpp
-+ mdns.hpp
-+ ota_upgrade.hpp
-+ sntp.hpp
++ espbot_webclient.hpp
++ espbot_webserver.hpp
++ espbot_wifi.hpp
++ espbot.hpp
 + spiffs_config.h
++ spiffs_esp8266.hpp
 + spiffs_flash_functions.hpp
-+ spiffs.h
 + spiffs_nucleus.h
-+ uart.h
-+ uart_register.h
++ spiffs.h
 + user_config.h
-+ webclient.hpp
-+ webserver.hpp
-+ wifi.hpp
 
 ## License
 

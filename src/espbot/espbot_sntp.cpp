@@ -15,10 +15,10 @@ extern "C"
 #include "sntp.h"
 }
 
-#include "sntp.hpp"
+#include "espbot_sntp.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "logger.hpp"
+#include "espbot_logger.hpp"
 
 void ICACHE_FLASH_ATTR Sntp::start(void)
 {

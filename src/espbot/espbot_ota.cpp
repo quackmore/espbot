@@ -18,11 +18,11 @@ extern "C"
 }
 
 #include "espbot_global.hpp"
-#include "logger.hpp"
-#include "ota_upgrade.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_ota.hpp"
 #include "espbot_utils.hpp"
-#include "debug.hpp"
-#include "config.hpp"
+#include "espbot_debug.hpp"
+#include "espbot_config.hpp"
 
 void ICACHE_FLASH_ATTR Ota_upgrade::init(void)
 {

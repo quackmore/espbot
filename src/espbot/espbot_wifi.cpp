@@ -15,14 +15,14 @@ extern "C"
 #include "mem.h"
 }
 
-#include "wifi.hpp"
+#include "espbot_wifi.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "logger.hpp"
-#include "json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_json.hpp"
 #include "espbot_utils.hpp"
-#include "debug.hpp"
-#include "config.hpp"
+#include "espbot_debug.hpp"
+#include "espbot_config.hpp"
 
 bool ICACHE_FLASH_ATTR Wifi::is_timeout_timer_active(void)
 {

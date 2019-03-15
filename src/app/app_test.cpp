@@ -14,8 +14,8 @@ extern "C"
 #include "mem.h"
 #include "user_interface.h"
 #include "ip_addr.h"
-#include "di_sequence.h"
-#include "do_sequence.h"
+#include "library_di_sequence.h"
+#include "library_do_sequence.h"
 #include "esp8266_io.h"
 #include "gpio.h"
 }
@@ -23,7 +23,7 @@ extern "C"
 #include "app.hpp"
 #include "app_test.hpp"
 #include "espbot_global.hpp"
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 
 // function for testing purpose
 

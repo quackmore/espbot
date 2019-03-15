@@ -16,7 +16,7 @@ extern "C"
 #include "spi_flash.h"
 }
 
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 #include "spiffs_flash_functions.hpp"
 
 // flash read function (checkout SPIFFS documentation)

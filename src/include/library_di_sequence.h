@@ -9,7 +9,7 @@
 #ifndef __DI_SEQUENCE_H__
 #define __DI_SEQUENCE_H__
 
-#include "dio_task.h"
+#include "library_dio_task.h"
 
 typedef enum
 {

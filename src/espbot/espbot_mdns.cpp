@@ -15,10 +15,10 @@ extern "C"
 #include "espconn.h"
 }
 
-#include "mdns.hpp"
+#include "espbot_mdns.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "logger.hpp"
+#include "espbot_logger.hpp"
 
 void ICACHE_FLASH_ATTR Mdns::start(char *app_alias)
 {

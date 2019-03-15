@@ -11,13 +11,13 @@
 extern "C"
 {
 #include "mem.h"
-#include "dio_task.h"
+#include "library_dio_task.h"
 #include "esp8266_io.h"
 }
 
 #include "app.hpp"
 #include "espbot_global.hpp"
-#include "dht.hpp"
+#include "library_dht.hpp"
 
 /*
  *  APP_RELEASE is coming from git

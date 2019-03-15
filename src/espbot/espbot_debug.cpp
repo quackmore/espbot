@@ -13,7 +13,7 @@ extern "C"
 #include "user_interface.h"
 }
 
-#include "debug.hpp"
+#include "espbot_debug.hpp"
 #include "espbot_global.hpp"
 
 /*
