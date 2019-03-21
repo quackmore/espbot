@@ -5,6 +5,7 @@
 # Local project and SDK reference
 TOP_DIR:=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CCFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
+CCPPFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
 LDFLAGS:= -L$(TOP_DIR)/lib -L$(SDK_DIR)/lib -L$(SDK_DIR)/ld $(LDFLAGS)
 
 ifeq ($(BOOT), new)
@@ -302,7 +303,31 @@ CCFLAGS += 			                         \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 
+CCPPFLAGS += 			                         \
+	-g			                               \
+	-Wpointer-arith		                     \
+	-Wundef			                           \
+	-Werror			                           \
+	-Wl,-EL			                           \
+	-fno-inline-functions	                 \
+	-nostdlib                              \
+	-mlongcalls	                           \
+	-mtext-section-literals                \
+	-ffunction-sections                    \
+	-fdata-sections	                       \
+	-fno-builtin-printf                    \
+	-fno-exceptions                        \
+	-fno-rtti                              \
+  -Wno-write-strings                     \
+  -DESPBOT=1                             \
+  -DAPP_RELEASE=\"$(GIT_VERSION)\"    \
+	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
+#	-Wall			
+
+
+
 CFLAGS = $(CCFLAGS) $(DEFINES) $(EXTRA_CCFLAGS) $(STD_CFLAGS) $(INCLUDES)
+CPPFLAGS = $(CCPPFLAGS) $(DEFINES) $(EXTRA_CCFLAGS) $(STD_CFLAGS) $(INCLUDES)
 DFLAGS = $(CCFLAGS) $(DDEFINES) $(EXTRA_CCFLAGS) $(STD_CFLAGS) $(INCLUDES)
 
 
@@ -460,7 +485,7 @@ $(OBJODIR)/%.d: %.c
 
 $(OBJODIR)/%.o: %.cpp
 	@mkdir -p $(OBJODIR);
-	$(CXX) $(if $(findstring $<,$(DSRCS)),$(DFLAGS),$(CFLAGS)) $(COPTS_$(*F)) -o $@ -c $<
+	$(CXX) $(if $(findstring $<,$(DSRCS)),$(DFLAGS),$(CPPFLAGS)) $(COPTS_$(*F)) -o $@ -c $<
 
 $(OBJODIR)/%.d: %.cpp
 	@mkdir -p $(OBJODIR);

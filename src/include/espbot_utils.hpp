@@ -28,6 +28,7 @@ extern "C"
   void decodeUrlStr(char *);
   void atoipaddr(struct ip_addr *ip, char *str);
   int get_rand_int(int max_value);
+  char *f2str(char *str, float value, int decimals);
 }
 
 class Str_list
