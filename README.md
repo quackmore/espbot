@@ -134,14 +134,12 @@ To integrate espbot in your project as a library use the following files:
 + lib/libespbot.a
 + lib/libdriver.a
 + lib/libspiffs.a
-+ lib/libuser.a
 
 To import the library source files use the following files:
 
 + src/driver
 + src/espbot
 + src/spiffs
-+ src/user
 
 Espot include files are:
 
@@ -169,7 +167,6 @@ Espot include files are:
 + spiffs_flash_functions.hpp
 + spiffs_nucleus.h
 + spiffs.h
-+ user_config.h
 
 ## License
 

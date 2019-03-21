@@ -118,6 +118,20 @@ int ICACHE_FLASH_ATTR get_rand_int(int max_value)
     return (int)value;
 }
 
+char ICACHE_FLASH_ATTR *f2str(char *str, float value, int decimals)
+{
+    int32 value_int = (int32)value;
+    float value_dec = value - value_int;
+    if (value_dec < 0)
+        value_dec = -(value_dec);
+    int idx;
+    int pow = 1;
+    for (idx = 0; idx < decimals; idx++)
+        pow = pow * 10;
+    os_sprintf(str, "%d.%d", (int32)value, (int32)(value_dec * pow));
+    return str;
+}
+
 ICACHE_FLASH_ATTR Str_list::Str_list(int t_max_size)
 {
     esplog.all("Str_list::Str_list\n");
