@@ -27,12 +27,10 @@ extern "C"
 #include "espbot_debug.hpp"
 
 static os_timer_t format_delay_timer;
-static os_timer_t wifi_scan_timeout_timer;
 
 void ICACHE_FLASH_ATTR init_controllers(void)
 {
     os_timer_disarm(&format_delay_timer);
-    os_timer_disarm(&wifi_scan_timeout_timer);
 }
 
 static void ICACHE_FLASH_ATTR format_function(void)
@@ -41,55 +39,34 @@ static void ICACHE_FLASH_ATTR format_function(void)
     espfs.format();
 }
 
-static void ICACHE_FLASH_ATTR wifi_scan_timeout_function(struct espconn *ptr_espconn)
+static void ICACHE_FLASH_ATTR wifi_scan_completed_function(void *param)
 {
-    esplog.all("webserver::wifi_scan_timeout_function\n");
-    static int counter = 0;
-    if (counter < 10) // wait for a scan completion at maximum for 5 seconds
+    struct espconn *ptr_espconn = (struct espconn *)param;
+    esplog.all("webserver::wifi_scan_completed_function\n");
+    char *scan_list = (char *)esp_zalloc(40 + ((32 + 6) * Wifi::get_ap_count()));
+    if (scan_list)
     {
-        if (espwifi.scan_for_ap_completed())
+        char *tmp_ptr;
+        espmem.stack_mon();
+        os_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDs\":[", Wifi::get_ap_count());
+        for (int idx = 0; idx < Wifi::get_ap_count(); idx++)
         {
-            char *scan_list = (char *)esp_zalloc(40 + ((32 + 6) * espwifi.get_ap_count()));
-            if (scan_list)
-            {
-                char *tmp_ptr;
-                espmem.stack_mon();
-                os_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDs\":[", espwifi.get_ap_count());
-                for (int idx = 0; idx < espwifi.get_ap_count(); idx++)
-                {
-                    tmp_ptr = scan_list + os_strlen(scan_list);
-                    if (idx > 0)
-                        *(tmp_ptr++) = ',';
-                    os_sprintf(tmp_ptr, "\"%s\"", espwifi.get_ap_name(idx));
-                }
-                tmp_ptr = scan_list + os_strlen(scan_list);
-                os_sprintf(tmp_ptr, "]}");
-                response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, scan_list, true);
-                counter = 0;
-                espwifi.free_ap_list();
-            }
-            else
-            {
-                esplog.error("Websvr::wifi_scan_timeout_function - not enough heap memory %d\n", 32 + ((32 + 3) * espwifi.get_ap_count()));
-                // may be the list was too big but there is enough heap memory for a response
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
-                counter = 0;
-                espwifi.free_ap_list();
-            }
+            tmp_ptr = scan_list + os_strlen(scan_list);
+            if (idx > 0)
+                *(tmp_ptr++) = ',';
+            os_sprintf(tmp_ptr, "\"%s\"", Wifi::get_ap_name(idx));
         }
-        else
-        {
-            // not ready yet, wait for another 500 ms
-            os_timer_disarm(&wifi_scan_timeout_timer);
-            os_timer_setfn(&wifi_scan_timeout_timer, (os_timer_func_t *)wifi_scan_timeout_function, ptr_espconn);
-            os_timer_arm(&wifi_scan_timeout_timer, 500, 0);
-            counter++;
-        }
+        tmp_ptr = scan_list + os_strlen(scan_list);
+        os_sprintf(tmp_ptr, "]}");
+        response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, scan_list, true);
+        Wifi::free_ap_list();
     }
     else
     {
-        counter = 0;
-        response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Timeout on Wifi::scan_for_ap", false);
+        esplog.error("Websvr::wifi_scan_completed_function - not enough heap memory %d\n", 32 + ((32 + 3) * Wifi::get_ap_count()));
+        // may be the list was too big but there is enough heap memory for a response
+        response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        Wifi::free_ap_list();
     }
 }
 
@@ -135,7 +112,7 @@ static void ICACHE_FLASH_ATTR free_ret_file_response(struct ret_file_response *p
 
 static void ICACHE_FLASH_ATTR send_remaining_file(void *param)
 {
-    Profiler ret_file("send_remaining_file");
+    // Profiler ret_file("send_remaining_file");
     esplog.all("webserver::send_remaining_file\n");
     struct ret_file_response *p_res = (struct ret_file_response *)param;
     free_split_msg_timer(p_res->timer_idx);
@@ -233,7 +210,7 @@ static void ICACHE_FLASH_ATTR send_remaining_file(void *param)
 
 static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
 {
-    Profiler ret_file("return_file");
+    // Profiler ret_file("return_file");
     esplog.all("webserver::return_file\n");
     if (espfs.is_available())
     {
@@ -1593,8 +1570,8 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
         {
             os_sprintf(msg,
                        "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
-                       espwifi.station_get_ssid(),
-                       espwifi.station_get_password());
+                       Wifi::station_get_ssid(),
+                       Wifi::station_get_password());
             response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
             // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
         }
@@ -1631,10 +1608,9 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
                 response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'station_pwd' does not have an integer value type", false);
                 return;
             }
-            espwifi.station_set_ssid(tmp_ssid, tmp_ssid_len);
-            espwifi.station_set_pwd(wifi_cfg.get_cur_pair_value(), wifi_cfg.get_cur_pair_value_len());
-            espwifi.save_cfg();
-            espwifi.connect();
+            Wifi::station_set_ssid(tmp_ssid, tmp_ssid_len);
+            Wifi::station_set_pwd(wifi_cfg.get_cur_pair_value(), wifi_cfg.get_cur_pair_value_len());
+            Wifi::connect();
             espmem.stack_mon();
         }
         else
@@ -1647,8 +1623,8 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
         {
             os_sprintf(msg,
                        "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
-                       espwifi.station_get_ssid(),
-                       espwifi.station_get_password());
+                       Wifi::station_get_ssid(),
+                       Wifi::station_get_password());
             response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg, true);
             // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
         }
@@ -1663,10 +1639,10 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
         Heap_chunk msg(44 + 32 + 42, dont_free);
         if (msg.ref)
         {
-            switch (espwifi.get_op_mode())
+            switch (Wifi::get_op_mode())
             {
             case STATION_MODE:
-                os_sprintf(msg.ref, "{\"op_mode\":\"STATION\",\"SSID\":\"%s\",", espwifi.station_get_ssid());
+                os_sprintf(msg.ref, "{\"op_mode\":\"STATION\",\"SSID\":\"%s\",", Wifi::station_get_ssid());
                 break;
             case SOFTAP_MODE:
                 os_sprintf(msg.ref, "{\"op_mode\":\"AP\",");
@@ -1679,7 +1655,7 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
             }
             char *ptr = msg.ref + os_strlen(msg.ref);
             struct ip_info tmp_ip;
-            espwifi.get_ip_address(&tmp_ip);
+            Wifi::get_ip_address(&tmp_ip);
             char *ip_ptr = (char *)&tmp_ip.ip.addr;
             os_sprintf(ptr, "\"ip_address\":\"%d.%d.%d.%d\"}", ip_ptr[0], ip_ptr[1], ip_ptr[2], ip_ptr[3]);
             response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
@@ -1692,11 +1668,7 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
     }
     if ((0 == os_strcmp(parsed_req->url, "/api/wifi/scan")) && (parsed_req->req_method == HTTP_GET))
     {
-        // response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, NULL);
-        os_timer_disarm(&wifi_scan_timeout_timer);
-        os_timer_setfn(&wifi_scan_timeout_timer, (os_timer_func_t *)wifi_scan_timeout_function, ptr_espconn);
-        os_timer_arm(&wifi_scan_timeout_timer, 500, 0);
-        espwifi.scan_for_ap();
+        Wifi::scan_for_ap(NULL, wifi_scan_completed_function, (void *)ptr_espconn);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, "/api/wifi/connect")) && (parsed_req->req_method == HTTP_POST))

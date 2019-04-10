@@ -32,12 +32,12 @@ extern "C"
 char *app_name = "App Example";
 char *app_release = APP_RELEASE;
 
-Dht dht22;
+Dht *dht22;
 
 void ICACHE_FLASH_ATTR app_init_before_wifi(void)
 {
     init_dio_task();
-    dht22.init(ESPBOT_D2, DHT22, 5, 30);
+    dht22 = new Dht(ESPBOT_D2, DHT22, 1000, 2000, 0, 10);
 }
 
 void ICACHE_FLASH_ATTR app_init_after_wifi(void)

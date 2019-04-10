@@ -28,7 +28,6 @@ Flashfs espfs;
 Esp_mem espmem;
 Logger esplog;
 Espbot espbot;
-Wifi espwifi;
 Mdns esp_mDns;
 Sntp esp_sntp;
 Websvr espwebsvr;

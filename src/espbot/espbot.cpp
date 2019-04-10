@@ -146,7 +146,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     esp_gpio.init();
     app_init_before_wifi();
 
-    espwifi.init();
+    Wifi::init();
 }
 
 int ICACHE_FLASH_ATTR Espbot::restore_cfg(void)

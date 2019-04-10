@@ -18,6 +18,6 @@ void app_deinit_on_wifi_disconnect(void);
 extern char *app_name;
 extern char *app_release;
 
-extern Dht dht22;
+extern Dht *dht22;
 
 #endif

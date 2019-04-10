@@ -134,6 +134,42 @@ void free_http_response(struct http_response *ptr)
     esp_free(ptr);
 }
 
+/*
+send_response
+{
+    format buffer
+    check if pending responses are needed and queue them
+    send_response_buffer
+}
+
+send_response_buffer()
+{
+    if (busy)
+        queue the buffer and espconn
+    else
+        set send busy
+        send the buffer
+}
+
+sent_cb
+{
+    set send free
+    if buffer queue is not empty
+        signal to task
+    if on espconn there is a pending response
+        signal to task
+}
+
+task
+{
+    buffer queue is not empty: 
+        pop from queue
+        send_buffer
+        check for pending response on espconn
+        pending response
+}
+*/
+
 //
 // won't check the length of the sent message
 //

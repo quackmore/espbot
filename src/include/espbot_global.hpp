@@ -28,7 +28,6 @@ extern Flashfs espfs;
 extern Esp_mem espmem;
 extern Logger esplog;
 extern Espbot espbot;
-extern Wifi espwifi;
 extern Mdns esp_mDns;
 extern Sntp esp_sntp;
 extern Websvr espwebsvr;
