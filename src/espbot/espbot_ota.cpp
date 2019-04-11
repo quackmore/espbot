@@ -32,7 +32,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::init(void)
         // something went wrong while loading flash config
         set_host("0.0.0.0");
         m_port = 0;
-        m_path = (char *)esp_zalloc(2);
+        m_path = new char[2];
         os_strncpy(m_path, "/", 1);
         m_check_version = false;
         m_reboot_on_completion = false;
@@ -59,10 +59,10 @@ void ICACHE_FLASH_ATTR Ota_upgrade::set_path(char *t_str)
     esplog.all("Ota_upgrade::set_path\n");
     if (m_path)
     {
-        esp_free(m_path);
+        delete[] m_path;
         m_path = NULL;
     }
-    m_path = (char *)esp_zalloc(os_strlen(t_str) + 1);
+    m_path = new char[os_strlen(t_str) + 1];
     if (m_path)
     {
         os_strncpy(m_path, t_str, os_strlen(t_str));
@@ -205,8 +205,8 @@ void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
             os_timer_arm(&esp_ota.m_ota_timer, 200, 0);
             return;
         }
-        upgrade_svr = (struct upgrade_server_info *)esp_zalloc(sizeof(struct upgrade_server_info));
-        url = (char *)esp_zalloc(56 + 15 + 6 + os_strlen(esp_ota.m_path));
+        upgrade_svr = new struct upgrade_server_info;
+        url = new char[56 + 15 + 6 + os_strlen(esp_ota.m_path)];
         *((uint32 *)(upgrade_svr->ip)) = esp_ota.m_host.addr;
         upgrade_svr->port = esp_ota.m_port;
         upgrade_svr->check_times = 60000;
@@ -240,12 +240,12 @@ void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
     {
         if (upgrade_svr)
         {
-            esp_free(upgrade_svr);
+            delete upgrade_svr;
             upgrade_svr = NULL;
         }
         if (url)
         {
-            esp_free(url);
+            delete[] url;
             url = NULL;
         }
         // if (pespconn)
@@ -266,12 +266,12 @@ void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
     {
         if (upgrade_svr)
         {
-            esp_free(upgrade_svr);
+            delete upgrade_svr;
             upgrade_svr = NULL;
         }
         if (url)
         {
-            esp_free(url);
+            delete[] url;
             url = NULL;
         }
         // if (pespconn)
@@ -425,23 +425,22 @@ int ICACHE_FLASH_ATTR Ota_upgrade::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)esp_zalloc(90 +
-                                              16 +
-                                              6 +
-                                              os_strlen(get_path()) +
-                                              10);
+            Heap_chunk buffer(90 +
+                              16 +
+                              6 +
+                              os_strlen(get_path()) +
+                              10);
             espmem.stack_mon();
-            if (buffer)
+            if (buffer.ref)
             {
-                os_sprintf(buffer,
+                os_sprintf(buffer.ref,
                            "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",\"check_version\":\"%s\",\"reboot_on_completion\":\"%s\"}",
                            get_host(),
                            get_port(),
                            get_path(),
                            get_check_version(),
                            get_reboot_on_completion());
-                cfgfile.n_append(buffer, os_strlen(buffer));
-                esp_free(buffer);
+                cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
             }
             else
             {

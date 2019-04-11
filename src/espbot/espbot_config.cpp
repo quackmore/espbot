@@ -35,9 +35,9 @@ ICACHE_FLASH_ATTR File_to_json::~File_to_json()
 {
     esplog.all("File_to_json::~File_to_json\n");
     if (m_cache)
-        esp_free(m_cache);
+        delete [] m_cache;
     if (m_value_str)
-        esp_free(m_value_str);
+        delete [] m_value_str;
 }
 
 bool ICACHE_FLASH_ATTR File_to_json::exists(void)
@@ -50,7 +50,7 @@ int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
 {
     esplog.all("File_to_json::find_string\n");
     if (m_value_str)
-        esp_free(m_value_str);
+        delete [] m_value_str;
     m_value_str = NULL;
     m_value_len = 0;
     if (espfs.is_available())
@@ -65,7 +65,7 @@ int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
             Ffile cfgfile(&espfs, m_filename);
             if (cfgfile.is_available())
             {
-                m_cache = (char *)esp_zalloc(Ffile::size(&espfs, m_filename) + 1);
+                m_cache = new char[Ffile::size(&espfs, m_filename) + 1];
                 if (m_cache)
                 {
                     cfgfile.n_read(m_cache, Ffile::size(&espfs, m_filename));
@@ -91,7 +91,7 @@ int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
                 if (os_strncmp(t_string, j_str.get_cur_pair_string(), j_str.get_cur_pair_string_len()) == 0)
                 {
                     m_value_len = j_str.get_cur_pair_value_len();
-                    m_value_str = (char *)esp_zalloc(m_value_len + 1);
+                    m_value_str = new char[m_value_len + 1];
                     if (m_value_str)
                     {
                         os_strncpy(m_value_str, j_str.get_cur_pair_value(), j_str.get_cur_pair_value_len());

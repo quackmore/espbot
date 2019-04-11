@@ -42,7 +42,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
                       10 +
                       os_strlen(system_get_sdk_version()) +
                       10;
-        Heap_chunk msg(155 + str_len);
+        Heap_chunk msg(155 + str_len, dont_free);
         if (msg.ref)
         {
             os_sprintf(msg.ref, "{\"app_name\":\"%s\","
@@ -142,7 +142,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         header.content_range_total = 0;
         char *header_str = format_header(&header);
 
-        Heap_chunk msg(512 + os_strlen(header_str) + 1);
+        Heap_chunk msg(512 + os_strlen(header_str) + 1, dont_free);
         if (msg.ref)
         {
             // copy the header
@@ -150,7 +150,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
             // now the message
             os_strncpy((msg.ref + os_strlen(header_str)), message.ref, os_strlen(message.ref));
 
-            struct http_response *p_res = (struct http_response *)esp_zalloc(sizeof(struct http_response));
+            struct http_response *p_res = new struct http_response;
             p_res->p_espconn = ptr_espconn;
             p_res->msg = msg.ref;
             esplog.trace("response: *p_espconn: %X\n"

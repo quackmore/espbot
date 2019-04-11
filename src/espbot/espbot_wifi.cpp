@@ -371,15 +371,14 @@ int ICACHE_FLASH_ATTR Wifi::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)esp_zalloc(200);
-            if (buffer)
+            Heap_chunk buffer(200);
+            if (buffer.ref)
             {
-                os_sprintf(buffer,
+                os_sprintf(buffer.ref,
                            "{\"station_ssid\": \"%s\",\"station_pwd\": \"%s\"}",
                            station_ssid,
                            station_pwd);
-                cfgfile.n_append(buffer, os_strlen(buffer));
-                esp_free(buffer);
+                cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
             }
             else
             {
@@ -467,7 +466,7 @@ static void ICACHE_FLASH_ATTR fill_in_ap_list(void *arg, STATUS status)
             scan_list = scan_list->next.stqe_next;
         }
         // now store APs SSID
-        ap_list = (char *)esp_zalloc(33 * ap_count);
+        ap_list = new char[33 * ap_count];
         if (ap_list)
         {
             int idx = 0;
@@ -519,7 +518,7 @@ void ICACHE_FLASH_ATTR Wifi::free_ap_list(void)
     ap_count = 0;
     if (ap_list)
     {
-        esp_free(ap_list);
+        delete[] ap_list;
         ap_list = NULL;
     }
 }

@@ -109,13 +109,12 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)esp_zalloc(64);
+            Heap_chunk buffer(64);
             espmem.stack_mon();
-            if (buffer)
+            if (buffer.ref)
             {
-                os_sprintf(buffer, "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}", m_serial_level, m_memory_level);
-                cfgfile.n_append(buffer, os_strlen(buffer));
-                esp_free(buffer);
+                os_sprintf(buffer.ref, "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}", m_serial_level, m_memory_level);
+                cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
             }
             else
             {
@@ -190,13 +189,13 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
                            time_str.ref, buffer);
-                m_log->push_back(json_ptr, override_when_full);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -220,13 +219,13 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
                            time_str.ref, buffer);
-                m_log->push_back(json_ptr, override_when_full);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -250,13 +249,13 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
                            time_str.ref, buffer);
-                m_log->push_back(json_ptr, override_when_full);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -280,13 +279,13 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
                            time_str.ref, buffer);
-                m_log->push_back(json_ptr, override_when_full);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }

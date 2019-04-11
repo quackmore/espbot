@@ -112,7 +112,7 @@ static void ICACHE_FLASH_ATTR webserver_pending_response(void *arg)
     //              response_data->p_espconn, response_data->msg, response_data->timer_idx);
     if (espwebsvr.get_status() == up)
         send_response_buffer(response_data->p_espconn, response_data->msg);
-    esp_free(response_data);
+    delete response_data;
 }
 
 static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
@@ -122,7 +122,7 @@ static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
     esp_busy_sending_data = false;
     if (send_buffer)
     {
-        esp_free(send_buffer);
+        delete[] send_buffer;
         send_buffer = NULL;
     }
 }
@@ -130,8 +130,8 @@ static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
 void free_http_response(struct http_response *ptr)
 {
     esplog.all("Websvr::free_http_response\n");
-    esp_free(ptr->msg);
-    esp_free(ptr);
+    delete[] ptr->msg;
+    delete ptr;
 }
 
 /*
@@ -180,7 +180,7 @@ void ICACHE_FLASH_ATTR send_response_buffer(struct espconn *p_espconn, char *msg
     if (esp_busy_sending_data) // previous espconn_send not completed yet
     {
         esplog.debug("Websvr::send_response_buffer - previous espconn_send not completed yet\n");
-        struct svr_response *response_data = (struct svr_response *)esp_zalloc(sizeof(struct svr_response));
+        struct svr_response *response_data = new struct svr_response;
         espmem.stack_mon();
         if (response_data)
         {
@@ -238,7 +238,7 @@ void ICACHE_FLASH_ATTR send_response_buffer(struct espconn *p_espconn, char *msg
             esplog.error("websvr::send_response: error sending response, error code %d\n", res);
             // on error don't count on sentcb to be called
             esp_busy_sending_data = false;
-            esp_free(send_buffer);
+            delete[] send_buffer;
             send_buffer = NULL;
         }
         // esp_free(send_buffer); // webserver_sentcb will free it
@@ -261,7 +261,7 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
 
         // free original message
         if (free_msg)
-            esp_free(msg);
+            delete[] msg;
         if (err_msg)
         {
             // replace original msg with the formatted one
@@ -288,8 +288,8 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
                                      "Pragma: no-cache\r\n\r\n%s",
                    code, code_msg(code), content_type, os_strlen(msg), msg);
         if (free_msg)
-            esp_free(msg); // free the msg buffer now that it has been used
-        struct http_response *p_res = (struct http_response *)esp_zalloc(sizeof(struct http_response));
+            delete[] msg; // free the msg buffer now that it has been used
+        struct http_response *p_res = new struct http_response;
         if (p_res)
         {
             p_res->p_espconn = p_espconn;
@@ -516,9 +516,9 @@ ICACHE_FLASH_ATTR Html_parsed_req::~Html_parsed_req()
 {
     esplog.all("Html_parsed_req::~Html_parsed_req\n");
     if (url)
-        esp_free(url);
+        delete[] url;
     if (req_content)
-        esp_free(req_content);
+        delete[] req_content;
 }
 
 static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *parsed_req)
@@ -526,7 +526,6 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
     esplog.all("webserver::parse_http_request\n");
     char *tmp_ptr = req;
     char *end_ptr = NULL;
-    char *tmp_str = NULL;
     espmem.stack_mon();
     int len = 0;
 
@@ -569,7 +568,7 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
     if (parsed_req->no_header_message)
     {
         parsed_req->content_len = os_strlen(tmp_ptr);
-        parsed_req->req_content = (char *)esp_zalloc(parsed_req->content_len + 1);
+        parsed_req->req_content = new char[parsed_req->content_len + 1];
         if (parsed_req->req_content == NULL)
         {
             esplog.error("websvr::parse_http_request - not enough heap memory\n");
@@ -589,7 +588,7 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
         return;
     }
     len = end_ptr - tmp_ptr;
-    parsed_req->url = (char *)esp_zalloc(len + 1);
+    parsed_req->url = new char[len + 1];
     if (parsed_req->url == NULL)
     {
         esplog.error("websvr::parse_http_request - not enough heap memory\n");
@@ -617,14 +616,17 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
         return;
     }
     len = end_ptr - tmp_ptr;
-    tmp_str = (char *)esp_zalloc(len + 1);
-    if (tmp_str == NULL)
+    Heap_chunk tmp_str(len + 1);
+    if (tmp_str.ref == NULL)
     {
         esplog.error("websvr::parse_http_request - not enough heap memory\n");
         return;
     }
-    parsed_req->content_len = atoi(tmp_str);
-    esp_free(tmp_str);
+    os_strncpy(tmp_str.ref, tmp_ptr, len);
+    int message_length = atoi(tmp_str.ref);
+
+    // PENDING: actually the message length is not used
+    // and the effective length ic calculated below
 
     // checkout for request content
     tmp_ptr = (char *)os_strstr(tmp_ptr, "\r\n\r\n");
@@ -635,7 +637,7 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
     }
     tmp_ptr += 4;
     parsed_req->content_len = os_strlen(tmp_ptr);
-    parsed_req->req_content = (char *)esp_zalloc(parsed_req->content_len + 1);
+    parsed_req->req_content = new char[parsed_req->content_len + 1];
     if (parsed_req->req_content == NULL)
     {
         esplog.error("websvr::parse_http_request - not enough heap memory\n");

@@ -46,7 +46,7 @@ void ICACHE_FLASH_ATTR init_test(struct ip_addr ip, uint32 port, char *request)
     esplog.all("init_test\n");
     os_memcpy(&ota_server_ip, &ip, sizeof(struct ip_addr));
     ota_server_port = port;
-    ota_request = (char *)esp_zalloc(48 + 12 + os_strlen(request));
+    ota_request = new char[48 + 12 + os_strlen(request)];
     if (ota_request == NULL)
     {
         os_printf("os_zalloc error\n");

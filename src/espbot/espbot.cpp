@@ -28,6 +28,7 @@ extern "C"
 #include "espbot_json.hpp"
 #include "espbot_config.hpp"
 #include "espbot_gpio.hpp"
+#include "espbot_utils.hpp"
 #include "app.hpp"
 
 static void ICACHE_FLASH_ATTR print_greetings(void)
@@ -79,7 +80,7 @@ static void ICACHE_FLASH_ATTR heartbeat_cb(void)
     esplog.all("heartbeat_cb\n");
     P_DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
     uint32 current_timestamp = esp_sntp.get_timestamp();
-    P_DEBUG("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
+    P_DEBUG("ESPBOT HEARTBEAT: [%d] [UTC+1] %s\n", current_timestamp, esp_sntp.get_timestr(current_timestamp));
     P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
 }
 
@@ -205,13 +206,12 @@ int ICACHE_FLASH_ATTR Espbot::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)esp_zalloc(64);
+            Heap_chunk buffer(64);
             espmem.stack_mon();
-            if (buffer)
+            if (buffer.ref)
             {
-                os_sprintf(buffer, "{\"espbot_name\": \"%s\"}", m_name);
-                cfgfile.n_append(buffer, os_strlen(buffer));
-                esp_free(buffer);
+                os_sprintf(buffer.ref, "{\"espbot_name\": \"%s\"}", m_name);
+                cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
             }
             else
             {
@@ -299,7 +299,7 @@ void ICACHE_FLASH_ATTR Espbot::init(void)
     os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
 
     // setup the task
-    m_queue = (os_event_t *)esp_zalloc(sizeof(os_event_t) * QUEUE_LEN);
+    m_queue = new os_event_t[QUEUE_LEN];
     system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
 
     esplog.debug("Espbot::init complete\n");

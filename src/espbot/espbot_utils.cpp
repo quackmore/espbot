@@ -95,16 +95,15 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
             return;
         }
         len = end_ptr - tmp_ptr;
-        tmp_str = (char *)esp_zalloc(len + 1);
-        if (tmp_str == NULL)
+        Heap_chunk tmp_str(len + 1);
+        if (tmp_str.ref == NULL)
         {
             esplog.error("str_to_ipaddr - not enough heap memory\n");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;
         }
-        os_strncpy(tmp_str, tmp_ptr, len);
-        tmp_ip[cnt] = atoi(tmp_str);
-        esp_free(tmp_str);
+        os_strncpy(tmp_str.ref, tmp_ptr, len);
+        tmp_ip[cnt] = atoi(tmp_str.ref);
         tmp_ptr = end_ptr + 1;
         cnt++;
     } while (cnt <= 3);
@@ -114,7 +113,7 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
 int ICACHE_FLASH_ATTR get_rand_int(int max_value)
 {
     esplog.all("get_rand_int\n");
-    float value = (((float)os_random()) / ((float) __UINT32_MAX__)) * ((float)max_value);
+    float value = (((float)os_random()) / ((float)__UINT32_MAX__)) * ((float)max_value);
     return (int)value;
 }
 
@@ -135,7 +134,7 @@ char ICACHE_FLASH_ATTR *f2str(char *str, float value, int decimals)
 ICACHE_FLASH_ATTR Heap_chunk::Heap_chunk(int t_len, Free_opt t_to_be_free)
 {
     esplog.all("Heap_chunk::Heap_chunk\n");
-    ref = (char *)esp_zalloc(t_len + 1);
+    ref = new char[t_len + 1];
     m_to_be_free = t_to_be_free;
 }
 
@@ -144,7 +143,7 @@ ICACHE_FLASH_ATTR Heap_chunk::~Heap_chunk()
     esplog.all("Heap_chunk::~Heap_chunk\n");
     if (m_to_be_free == free)
         if (ref)
-            esp_free(ref);
+            delete [] ref;
 }
 
 int ICACHE_FLASH_ATTR Heap_chunk::len(void)
