@@ -142,6 +142,7 @@ void ICACHE_FLASH_ATTR Logger::init(void)
     esplog.all("Logger::init\n");
     m_serial_level = LOG_INFO;
     m_memory_level = LOG_ERROR;
+    m_log = new List<char>(20, delete_content);
     if (restore_cfg())
     {
         esplog.warn("Logger::init - starting with default configuration\n");
@@ -195,7 +196,7 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
                 os_sprintf(json_ptr,
                            "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr, override_when_full);
             }
         }
     }
@@ -225,7 +226,7 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
                 os_sprintf(json_ptr,
                            "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr, override_when_full);
             }
         }
     }
@@ -255,7 +256,7 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
                 os_sprintf(json_ptr,
                            "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr, override_when_full);
             }
         }
     }
@@ -263,32 +264,29 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
 
 void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
 {
+    if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
     {
-        Profiler info_profiler("Logger::info");
-        if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
+        char buffer[LOG_BUF_SIZE];
+        va_list al;
+        espmem.stack_mon();
+        va_start(al, t_format);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        va_end(al);
+        if (m_serial_level >= LOG_INFO)
+            os_printf_plus("[INFO] %s", buffer);
+        if (m_memory_level >= LOG_INFO)
         {
-            char buffer[LOG_BUF_SIZE];
-            va_list al;
-            espmem.stack_mon();
-            va_start(al, t_format);
-            ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
-            va_end(al);
-            if (m_serial_level >= LOG_INFO)
-                os_printf_plus("[INFO] %s", buffer);
-            if (m_memory_level >= LOG_INFO)
+            uint32 timestamp = esp_sntp.get_timestamp();
+            Heap_chunk time_str(27);
+            if (time_str.ref)
+                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
+            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
+            if (json_ptr)
             {
-                uint32 timestamp = esp_sntp.get_timestamp();
-                Heap_chunk time_str(27);
-                if (time_str.ref)
-                    os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-                char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-                if (json_ptr)
-                {
-                    os_sprintf(json_ptr,
-                               "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
-                               time_str.ref, buffer);
-                    esp_event_log.push_back(json_ptr, true);
-                }
+                os_sprintf(json_ptr,
+                           "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
+                           time_str.ref, buffer);
+                m_log->push_back(json_ptr, override_when_full);
             }
         }
     }
@@ -339,6 +337,21 @@ void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
         va_end(al);
         os_printf_plus("[ALL] %s", buffer);
     }
+}
+
+char ICACHE_FLASH_ATTR *Logger::get_log_head()
+{
+    return m_log->front();
+}
+
+char ICACHE_FLASH_ATTR *Logger::get_log_next()
+{
+    return m_log->next();
+}
+
+int ICACHE_FLASH_ATTR Logger::get_log_size()
+{
+    return m_log->size();
 }
 
 /*

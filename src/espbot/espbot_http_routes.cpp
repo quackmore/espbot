@@ -348,17 +348,17 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
     if ((0 == os_strcmp(parsed_req->url, "/api/debug/log")) && (parsed_req->req_method == HTTP_GET))
     {
         // check how much memory needed for last logs
-        int esp_event_log_len = 0;
-        char *err_ptr = esp_event_log.get_head();
+        int logger_log_len = 0;
+        char *err_ptr = esplog.get_log_head();
         while (err_ptr)
         {
-            esp_event_log_len += os_strlen(err_ptr);
-            err_ptr = esp_event_log.next();
+            logger_log_len += os_strlen(err_ptr);
+            err_ptr = esplog.get_log_next();
         }
         char *msg = (char *)esp_zalloc(16 +                         // formatting string
                                        10 +                         // heap mem figures
-                                       (3 * esp_event_log.size()) + // errors formatting
-                                       esp_event_log_len);          // errors
+                                       (3 * esplog.get_log_size()) + // errors formatting
+                                       logger_log_len);          // errors
         if (msg)
         {
             os_sprintf(msg, "{\"events\":[");
@@ -366,7 +366,7 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
             char *str_ptr;
             int cnt = 0;
             espmem.stack_mon();
-            err_ptr = esp_event_log.get_head();
+            err_ptr = esplog.get_log_head();
             while (err_ptr)
             {
                 str_ptr = msg + os_strlen(msg);
@@ -374,7 +374,7 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
                     os_sprintf(str_ptr, "%s", err_ptr);
                 else
                     os_sprintf(str_ptr, ",%s", err_ptr);
-                err_ptr = esp_event_log.next();
+                err_ptr = esplog.get_log_next();
                 cnt++;
             }
             str_ptr = msg + os_strlen(msg);
@@ -385,7 +385,7 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
         else
         {
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n",
-                         16 + 10 + (3 * esp_event_log.size()) + esp_event_log_len);
+                         16 + 10 + (3 * esplog.get_log_size()) + logger_log_len);
         }
         return;
     }
@@ -551,26 +551,23 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
     if ((0 == os_strcmp(parsed_req->url, "/api/debug/meminfo")) && (parsed_req->req_method == HTTP_GET))
     {
         // count the heap items
-        int heap_item_count = 0;
-        struct heap_item *heap_obj_ptr = espmem.get_heap_item(first);
-        while (heap_obj_ptr)
-        {
-            heap_item_count++;
-            heap_obj_ptr = espmem.get_heap_item(next);
-        }
+        int heap_item_count = espmem.get_heap_objs();
+        struct heap_item *heap_obj_ptr;
 
-        char *msg = (char *)esp_zalloc(172 +                          // formatting string
-                                       (42 * (heap_item_count + 1))); // heap objects
+        char *msg = (char *)esp_zalloc(184 +                          // formatting string
+                                        62 +                          // values
+                                       (42 * heap_item_count)); // heap objects
         if (msg)
         {
             os_sprintf(msg,
-                       "{\"stack_max_addr\":\"%X\",\"stack_min_addr\":\"%X\",\"heap_start_addr\":\"%X\",\"heap_used_size\": %d,\"heap_max_size\": %d,\"heap_min_size\": %d,\"heap_max_obj\": %d,\"heap_obj_list\": [",
+                       "{\"stack_max_addr\":\"%X\",\"stack_min_addr\":\"%X\",\"heap_start_addr\":\"%X\",\"heap_used_size\": %d,\"heap_max_size\": %d,\"heap_min_size\": %d,\"heap_objs\": %d,\"heap_max_objs\": %d,\"heap_obj_list\": [",
                        espmem.get_max_stack_addr(),
                        espmem.get_min_stack_addr(),
                        espmem.get_start_heap_addr(),
                        espmem.get_used_heap_size(),
                        espmem.get_max_heap_size(),
                        espmem.get_mim_heap_size(),
+                       espmem.get_heap_objs(),
                        espmem.get_max_heap_objs());
             // now add saved errors
             char *str_ptr;
@@ -598,7 +595,7 @@ void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_pars
         else
         {
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n",
-                         172 + (42 * heap_item_count));
+                         184 + 62 + (42 * heap_item_count));
         }
         return;
     }

@@ -137,7 +137,6 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     system_set_os_print(1); // enable log print
     print_greetings();
 
-    esp_event_log.init(20);
     espfs.init();
     esplog.init();
     espbot.init();

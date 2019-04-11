@@ -46,5 +46,9 @@ uint32 ICACHE_FLASH_ATTR Sntp::get_timestamp()
 
 char ICACHE_FLASH_ATTR *Sntp::get_timestr(uint32 t_time)
 {
-    return sntp_get_real_time(t_time);
+    char *time_str = sntp_get_real_time(t_time);
+    char *tmp_ptr = os_strstr(time_str,"\n");
+    if(tmp_ptr)
+        *tmp_ptr = '\0';
+    return time_str;
 }

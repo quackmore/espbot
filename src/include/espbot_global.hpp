@@ -10,10 +10,10 @@
 #define __ESPBOT_GLOBAL_HPP__
 
 
+#include "espbot_logger.hpp"
 #include "espbot_debug.hpp"
 #include "espbot.hpp"
 #include "spiffs_esp8266.hpp"
-#include "espbot_logger.hpp"
 #include "espbot_wifi.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_sntp.hpp"
@@ -23,7 +23,6 @@
 #include "espbot_gpio.hpp"
 
 extern char *espbot_release;
-extern Str_list esp_event_log;
 extern Flashfs espfs;
 extern Esp_mem espmem;
 extern Logger esplog;
