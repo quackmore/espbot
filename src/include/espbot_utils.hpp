@@ -18,10 +18,6 @@ extern "C"
   int atoh(char *);
 }
 
-// default library
-// int atoi(char *);
-// int atoh(char *);
-
 // my own
 extern "C"
 {
@@ -30,37 +26,6 @@ extern "C"
   int get_rand_int(int max_value);
   char *f2str(char *str, float value, int decimals);
 }
-
-class Str_list
-{
-private:
-  struct List_el
-  {
-    char *content;
-    bool to_be_free;
-    struct List_el *next;
-    struct List_el *prev;
-  };
-  struct List_el *m_head;
-  struct List_el *m_tail;
-  struct List_el *m_cursor;
-  int m_size;
-  int m_max_size; // if -1 there is no max size
-                  // if X then once the size grows to up X
-                  //      a new push will pop an element to the other side
-
-public:
-  Str_list(int t_max_size);
-  ~Str_list();
-  void init(int t_max_size); // same as constructor
-  int size();
-  void push_back(char *, bool);
-  void pop_front();
-  char *get_head();
-  char *get_tail();
-  char *next();
-  char *prev();
-};
 
 typedef enum
 {

@@ -16,28 +16,29 @@ extern "C"
 #include "osapi.h"
 }
 
-#include "library_common_types.hpp"
+#include "library_sensor.hpp"
 
-class Max6675
+class Max6675 : public Esp8266_Sensor
 {
 public:
-  Max6675();
+  // cs_pin           => the gpio pin D1.. D8 for CS
+  // sck_pin          => the gpio pin D1.. D8 for SCK
+  // so_pin           => the gpio pin D1.. D8 for SO
+  // id               => sensor indentifier
+  // poll_interval    => in milliseconds (0 -> no polling)
+  // buffer_length    => max number of stored readings  
+  Max6675(int cs_pin, int sck_pin, int so_pin, int id, int poll_interval, int buffer_length);
   ~Max6675();
-  // pin           => the gpio pin D1.. D8
-  // poll_interval => in seconds (min 2 seconds)
-  //                  init will start polling the sensor every poll_interval seconds
-  // buffer_length => samples history
-  //                  each sample inlude: - timestamp
-  //                                      - temperature value
-  //                                      - humidity value
-  //                                      - invalid flag (true meaning the values are not affordable)
-  void init(int cs_pin, int sck_pin, int so_pin, int poll_interval, int buffer_length);
-  float get_temperature(Temp_scale scale, int idx = 0); // idx = 0 => latest sample
-  uint32_t get_timestamp(int idx = 0);                  // ...
-  bool get_invalid(int idx = 0);                        // ...
-  
+
+  int get_max_events_count(void);
+  void force_reading(void (*callback)(void *), void *param);
+  void getEvent(sensors_event_t *, int idx = 0); // idx = 0 => latest sample
+                                                 // idx = 1 => previous sample
+  void getSensor(sensor_t *);
+
   // this is private but into public section
-  // for making variables accessible to timer callback function
+  // for easy access from timer callback functions
+  int m_id;
   uint16_t m_data;
   int m_cs;
   int m_sck;
@@ -51,7 +52,10 @@ public:
   bool *m_invalid_buffer;
   int m_max_buffer_size;
   int m_buffer_idx;
-  bool m_retry;
+  bool m_force_reading;
+  void (*m_force_reading_cb)(void *param);
+  void *m_force_reading_param;
+  bool m_reading_ongoing;
 };
 
 #endif

@@ -153,9 +153,11 @@ Espot include files are:
 + espbot_gpio.hpp
 + espbot_http_routes.hpp
 + espbot_json.hpp
++ espbot_list.hpp
 + espbot_logger.hpp
 + espbot_mdns.hpp
 + espbot_ota.hpp
++ espbot_queue.hpp
 + espbot_sntp.hpp
 + espbot_utils.hpp
 + espbot_webclient.hpp

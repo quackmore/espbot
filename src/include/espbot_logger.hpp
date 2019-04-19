@@ -14,7 +14,7 @@ extern "C"
 #include "c_types.h"
 }
 
-#include "espbot_utils.hpp"
+#include "espbot_list.hpp"
 
 #define LOG_OFF 0
 #define LOG_FATAL 1
@@ -42,6 +42,8 @@ private:
   int m_serial_level;
   int m_memory_level;
 
+  List<char> *m_log;
+
   int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
   int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
                                   // return CFG_REQUIRES_UPDATE when cfg require update
@@ -64,6 +66,10 @@ public:
   void debug(const char *, ...);
   void trace(const char *, ...);
   void all(const char *, ...);
+
+  char *get_log_head();
+  char *get_log_next();
+  int get_log_size();
 };
 
 class Profiler

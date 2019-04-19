@@ -6,17 +6,23 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __LIBRARY_H__
-#define __LIBRARY_H__
+#ifndef __LIBRARY_HPP__
+#define __LIBRARY_HPP__
+
+extern char *library_release;
 
 #ifdef ESPBOT
 
-#include "c_types.h"
-// these are espbot_2.0 memory management methods
-// https://github.com/quackmore/espbot_2.0
-void *call_espbot_zalloc(size_t size);
-void call_espbot_free(void *addr);
+extern "C"
+{
+    #include "c_types.h"
+    // these are espbot_2.0 memory management methods
+    // https://github.com/quackmore/espbot_2.0
+    extern void *call_espbot_zalloc(size_t size);
+    extern void call_espbot_free(void *addr);
+}
 
+#include "espbot_global.hpp"
 #define PRINT_FATAL(...) esplog.fatal(__VA_ARGS__)
 #define PRINT_ERROR(...) esplog.error(__VA_ARGS__)
 #define PRINT_WARN(...) esplog.warn(__VA_ARGS__)
@@ -28,9 +34,13 @@ void call_espbot_free(void *addr);
 
 #else
 
+extern "C"
+{
+#include "user_interface.h"
 #define call_espbot_zalloc(a) os_zalloc(a)
 #define call_espbot_free(a) os_free(a)
 #define getTimestamp() system_get_time();
+}
 
 #define PRINT_FATAL(...) os_printf(__VA_ARGS__)
 #define PRINT_ERROR(...) os_printf(__VA_ARGS__)

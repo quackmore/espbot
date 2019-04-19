@@ -109,13 +109,12 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            char *buffer = (char *)esp_zalloc(64);
+            Heap_chunk buffer(64);
             espmem.stack_mon();
-            if (buffer)
+            if (buffer.ref)
             {
-                os_sprintf(buffer, "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}", m_serial_level, m_memory_level);
-                cfgfile.n_append(buffer, os_strlen(buffer));
-                esp_free(buffer);
+                os_sprintf(buffer.ref, "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}", m_serial_level, m_memory_level);
+                cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
             }
             else
             {
@@ -142,6 +141,7 @@ void ICACHE_FLASH_ATTR Logger::init(void)
     esplog.all("Logger::init\n");
     m_serial_level = LOG_INFO;
     m_memory_level = LOG_ERROR;
+    m_log = new List<char>(20, delete_content);
     if (restore_cfg())
     {
         esplog.warn("Logger::init - starting with default configuration\n");
@@ -179,7 +179,7 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_FATAL)
             os_printf_plus("[FATAL] %s", buffer);
@@ -189,13 +189,13 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -209,7 +209,7 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_ERROR)
             os_printf_plus("[ERROR] %s", buffer);
@@ -219,13 +219,13 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -239,7 +239,7 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_WARN)
             os_printf_plus("[WARN] %s", buffer);
@@ -249,13 +249,13 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -269,7 +269,7 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_INFO)
             os_printf_plus("[INFO] %s", buffer);
@@ -279,13 +279,13 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
             Heap_chunk time_str(27);
             if (time_str.ref)
                 os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            char *json_ptr = (char *)esp_zalloc(36 + 24 + os_strlen(buffer));
-            if (json_ptr)
+            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
+            if (json_ptr.ref)
             {
-                os_sprintf(json_ptr,
+                os_sprintf(json_ptr.ref,
                            "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
                            time_str.ref, buffer);
-                esp_event_log.push_back(json_ptr, true);
+                m_log->push_back(json_ptr.ref, override_when_full);
             }
         }
     }
@@ -301,7 +301,7 @@ void ICACHE_FLASH_ATTR Logger::debug(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         os_printf_plus("[DEBUG] %s", buffer);
     }
@@ -317,7 +317,7 @@ void ICACHE_FLASH_ATTR Logger::trace(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         os_printf_plus("[TRACE] %s", buffer);
     }
@@ -332,10 +332,25 @@ void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         os_printf_plus("[ALL] %s", buffer);
     }
+}
+
+char ICACHE_FLASH_ATTR *Logger::get_log_head()
+{
+    return m_log->front();
+}
+
+char ICACHE_FLASH_ATTR *Logger::get_log_next()
+{
+    return m_log->next();
+}
+
+int ICACHE_FLASH_ATTR Logger::get_log_size()
+{
+    return m_log->size();
 }
 
 /*

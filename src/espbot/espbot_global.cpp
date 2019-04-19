@@ -21,14 +21,10 @@
 
 char *espbot_release = APP_RELEASE;
 
-// global variables for esp8266 
-Str_list esp_event_log(20);   // actually this won't work
-                              // really set in espbot.cpp espbot_init
 Flashfs espfs;
 Esp_mem espmem;
 Logger esplog;
 Espbot espbot;
-Wifi espwifi;
 Mdns esp_mDns;
 Sntp esp_sntp;
 Websvr espwebsvr;

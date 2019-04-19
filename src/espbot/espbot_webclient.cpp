@@ -52,7 +52,7 @@ static void ICACHE_FLASH_ATTR webclient_pending_request(void *arg)
     esplog.all("webclient_pending_request\n");
     struct client_send *request_data = (struct client_send *)arg;
     send(request_data->ptr_espconn, request_data->msg);
-    esp_free(request_data);
+    delete request_data;
 }
 
 static void ICACHE_FLASH_ATTR webclient_sentcb(void *arg)
@@ -63,7 +63,7 @@ static void ICACHE_FLASH_ATTR webclient_sentcb(void *arg)
     espclient_busy_sending_data = false;
     if (send_buffer)
     {
-        esp_free(send_buffer);
+        delete[] send_buffer;
         send_buffer = NULL;
     }
 }
@@ -77,7 +77,7 @@ static void ICACHE_FLASH_ATTR send(struct espconn *p_espconn, char *msg)
     if (espclient_busy_sending_data) // previous espconn_send not completed yet
     {
         esplog.debug("Webclnt::send - previous espconn_send not completed yet\n");
-        struct client_send *send_data = (struct client_send *)esp_zalloc(sizeof(struct client_send));
+        struct client_send *send_data = new struct client_send;
         espmem.stack_mon();
         if (send_data)
         {
@@ -102,7 +102,7 @@ static void ICACHE_FLASH_ATTR send(struct espconn *p_espconn, char *msg)
             esplog.error("Webclnt::send - error sending response, error code %d\n", res);
             // on error don't count on sentcb to be called
             espclient_busy_sending_data = false;
-            esp_free(msg);
+            delete[] msg;
         }
     }
 }
@@ -181,15 +181,16 @@ static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_res
         return;
     }
     len = end_ptr - tmp_ptr;
-    tmp_str = (char *)esp_zalloc(len + 1);
-    if (tmp_str == NULL)
     {
-        esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-        return;
+        Heap_chunk tmp_str(len + 1);
+        if (tmp_str.ref == NULL)
+        {
+            esplog.error("webclnt::parse_http_response - not enough heap memory\n");
+            return;
+        }
+        os_strncpy(tmp_str.ref, tmp_ptr, len);
+        parsed_response->http_code = atoi(tmp_str.ref);
     }
-    os_strncpy(tmp_str, tmp_ptr, len);
-    parsed_response->http_code = atoi(tmp_str);
-    esp_free(tmp_str);
 
     // now the content-length
     tmp_ptr = request;
@@ -208,15 +209,14 @@ static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_res
             return;
         }
         len = end_ptr - tmp_ptr;
-        tmp_str = (char *)esp_zalloc(len + 1);
-        if (tmp_str == NULL)
+        Heap_chunk tmp_str(len + 1);
+        if (tmp_str.ref == NULL)
         {
             esplog.error("webclnt::parse_http_response - not enough heap memory\n");
             return;
         }
-        os_strncpy(tmp_str, tmp_ptr, len);
-        parsed_response->content_len = atoi(tmp_str);
-        esp_free(tmp_str);
+        os_strncpy(tmp_str.ref, tmp_ptr, len);
+        parsed_response->content_len = atoi(tmp_str.ref);
     }
     // now Content-Range (if any)
     tmp_ptr = request;
@@ -242,15 +242,16 @@ static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_res
             return;
         }
         len = end_ptr - tmp_ptr;
-        tmp_str = (char *)esp_zalloc(len + 1);
-        if (tmp_str == NULL)
         {
-            esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-            return;
+            Heap_chunk tmp_str(len + 1);
+            if (tmp_str.ref == NULL)
+            {
+                esplog.error("webclnt::parse_http_response - not enough heap memory\n");
+                return;
+            }
+            os_strncpy(tmp_str.ref, tmp_ptr, len);
+            parsed_response->content_range_start = atoi(tmp_str.ref);
         }
-        os_strncpy(tmp_str, tmp_ptr, len);
-        parsed_response->content_range_start = atoi(tmp_str);
-        esp_free(tmp_str);
         // range end
         tmp_ptr++;
         end_ptr = (char *)os_strstr(tmp_ptr, "/");
@@ -260,15 +261,16 @@ static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_res
             return;
         }
         len = end_ptr - tmp_ptr;
-        tmp_str = (char *)esp_zalloc(len + 1);
-        if (tmp_str == NULL)
         {
-            esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-            return;
+            Heap_chunk tmp_str(len + 1);
+            if (tmp_str.ref == NULL)
+            {
+                esplog.error("webclnt::parse_http_response - not enough heap memory\n");
+                return;
+            }
+            os_strncpy(tmp_str.ref, tmp_ptr, len);
+            parsed_response->content_range_start = atoi(tmp_str.ref);
         }
-        os_strncpy(tmp_str, tmp_ptr, len);
-        parsed_response->content_range_start = atoi(tmp_str);
-        esp_free(tmp_str);
         // range size
         tmp_ptr++;
         end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
@@ -278,15 +280,16 @@ static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_res
             return;
         }
         len = end_ptr - tmp_ptr;
-        tmp_str = (char *)esp_zalloc(len + 1);
-        if (tmp_str == NULL)
         {
-            esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-            return;
+            Heap_chunk tmp_str(len + 1);
+            if (tmp_str.ref == NULL)
+            {
+                esplog.error("webclnt::parse_http_response - not enough heap memory\n");
+                return;
+            }
+            os_strncpy(tmp_str.ref, tmp_ptr, len);
+            parsed_response->content_range_size = atoi(tmp_str.ref);
         }
-        os_strncpy(tmp_str, tmp_ptr, len);
-        parsed_response->content_range_size = atoi(tmp_str);
-        esp_free(tmp_str);
     }
     // finally the body
     tmp_ptr = request;
@@ -298,7 +301,7 @@ static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_res
     }
     tmp_ptr += 4;
     len = os_strlen(tmp_ptr);
-    parsed_response->body = (char *)esp_zalloc(len + 1);
+    parsed_response->body = new char[len + 1];
     if (parsed_response->body == NULL)
     {
         esplog.error("webclnt::parse_http_response - not enough heap memory\n");
@@ -314,7 +317,7 @@ static void ICACHE_FLASH_ATTR webclient_recv(void *arg, char *precdata, unsigned
     struct espconn *ptr_espconn = (struct espconn *)arg;
     espmem.stack_mon();
     esplog.trace("received msg: %s\n", precdata);
-    Html_parsed_response *parsed_response = (Html_parsed_response *)esp_zalloc(sizeof(Html_parsed_response));
+    Html_parsed_response *parsed_response = new Html_parsed_response;
     if (parsed_response)
     {
         init_html_parsed_response(parsed_response);
@@ -354,11 +357,11 @@ static ICACHE_FLASH_ATTR void webclient_recon(void *arg, sint8 err)
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
     esplog.debug("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
-                pesp_conn->proto.tcp->remote_ip[1],
-                pesp_conn->proto.tcp->remote_ip[2],
-                pesp_conn->proto.tcp->remote_ip[3],
-                pesp_conn->proto.tcp->remote_port,
-                err);
+                 pesp_conn->proto.tcp->remote_ip[1],
+                 pesp_conn->proto.tcp->remote_ip[2],
+                 pesp_conn->proto.tcp->remote_ip[3],
+                 pesp_conn->proto.tcp->remote_port,
+                 err);
 }
 
 static ICACHE_FLASH_ATTR void webclient_discon(void *arg)
@@ -367,10 +370,10 @@ static ICACHE_FLASH_ATTR void webclient_discon(void *arg)
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
     esplog.debug("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
-                pesp_conn->proto.tcp->remote_ip[1],
-                pesp_conn->proto.tcp->remote_ip[2],
-                pesp_conn->proto.tcp->remote_ip[3],
-                pesp_conn->proto.tcp->remote_port);
+                 pesp_conn->proto.tcp->remote_ip[1],
+                 pesp_conn->proto.tcp->remote_ip[2],
+                 pesp_conn->proto.tcp->remote_ip[3],
+                 pesp_conn->proto.tcp->remote_port);
 }
 
 static void ICACHE_FLASH_ATTR webclient_connected(void *arg)
@@ -416,7 +419,7 @@ void ICACHE_FLASH_ATTR Webclnt::connect(struct ip_addr t_server, uint32 t_port)
 
     if (m_response)
     {
-        esp_free(m_response);
+        delete m_response;
         m_response = NULL;
     }
 
@@ -528,10 +531,10 @@ void ICACHE_FLASH_ATTR Webclnt::free_response(void)
     {
         if (m_response->body)
         {
-            esp_free(m_response->body);
+            delete[] m_response->body;
             m_response->body = NULL;
         }
-        esp_free(m_response);
+        delete m_response;
         m_response = NULL;
     }
 }

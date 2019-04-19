@@ -46,7 +46,7 @@ void ICACHE_FLASH_ATTR init_test(struct ip_addr ip, uint32 port, char *request)
     esplog.all("init_test\n");
     os_memcpy(&ota_server_ip, &ip, sizeof(struct ip_addr));
     ota_server_port = port;
-    ota_request = (char *)esp_zalloc(48 + 12 + os_strlen(request));
+    ota_request = new char[48 + 12 + os_strlen(request)];
     if (ota_request == NULL)
     {
         os_printf("os_zalloc error\n");
@@ -601,45 +601,6 @@ void ICACHE_FLASH_ATTR run_test(int idx)
         set_di_seq_cb(dht_input, dht_reading_completed, (void *)dht_input, task);
 
         exe_do_seq_us(seq);
-    }
-    break;
-    case 11:
-    {
-        // Dht class test
-        int idx;
-        os_printf("DHT22 samples\n");
-        for (idx = 0; idx < 30; idx++)
-        {
-            if (dht22.get_invalid(idx))
-                os_printf("--- %d (invalid) %d %d %s",
-                          idx,
-                          (int)(dht22.get_temperature(Celsius, idx) * 10),
-                          (int)(dht22.get_humidity(idx) * 10),
-                          esp_sntp.get_timestr(dht22.get_timestamp(idx)));
-            else
-                os_printf("--- %d           %d %d %s",
-                          idx,
-                          (int)(dht22.get_temperature(Celsius, idx) * 10),
-                          (int)(dht22.get_humidity(idx) * 10),
-                          esp_sntp.get_timestr(dht22.get_timestamp(idx)));
-        }
-        os_printf("DHT22 end\n");
-    }
-    break;
-    case 12:
-    {
-        // Dht class test
-        os_printf("Latest DHT22 reading\n");
-        if (dht22.get_invalid())
-            os_printf("--- (invalid) %d %d %s",
-                      (int)(dht22.get_temperature(Celsius) * 10),
-                      (int)(dht22.get_humidity() * 10),
-                      esp_sntp.get_timestr(dht22.get_timestamp()));
-        else
-            os_printf("---           %d %d %s",
-                      (int)(dht22.get_temperature(Celsius) * 10),
-                      (int)(dht22.get_humidity() * 10),
-                      esp_sntp.get_timestr(dht22.get_timestamp()));
     }
     break;
     case 13:
