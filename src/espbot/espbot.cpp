@@ -70,6 +70,10 @@ static void ICACHE_FLASH_ATTR espbot_coordinator_task(os_event_t *e)
     case SIG_SOFTAPMODE_STADISCONNECTED:
         // [wifi station+AP] station disconnected
         break;
+    case SIG_HTTP_CHECK_PENDING_RESPONSE:
+        // getting here from webserver after send callback completed
+        webserver_check_pending_response();
+        break;
     default:
         break;
     }
@@ -142,6 +146,7 @@ void ICACHE_FLASH_ATTR espbot_init(void)
     esplog.init();
     espbot.init();
     esp_ota.init();
+    espwebsvr.init();
     espwebclnt.init();
     esp_gpio.init();
     app_init_before_wifi();

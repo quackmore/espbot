@@ -69,17 +69,17 @@ Queue<T>::Queue(int max_size)
   m_front = 0;
   m_back = 0;
   m_content = new T *[m_max_size];
-  if (m_content == NULL)
-  {
-    PRINT_ERROR("Queue - not enough heap memory [%d]\n", max_size);
-  }
+  // if (m_content == NULL)
+  // {
+  //   PRINT_ERROR("Queue - not enough heap memory [%d]\n", max_size);
+  // }
 }
 
 template <class T>
 Queue<T>::~Queue()
 {
   if (m_content)
-    delete m_content;
+    delete[] m_content;
 }
 
 template <class T>
@@ -149,6 +149,8 @@ Queue_err Queue<T>::pop()
   m_front++;
   if (m_front == m_max_size)
     m_front = 0;
+  if (m_size == 0)
+    m_back = m_front;
   return Queue_ok;
 }
 

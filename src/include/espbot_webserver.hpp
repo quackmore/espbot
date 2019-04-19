@@ -16,6 +16,8 @@ extern "C"
 #include "espconn.h"
 }
 
+#include "espbot_queue.hpp"
+
 #define SERVER_PORT 80
 
 // HTTP status codes
@@ -50,30 +52,38 @@ struct http_response
 {
   struct espconn *p_espconn;
   char *msg;
-  char *remaining_msg;
-  int timer_idx;
 };
 
-void free_http_response(struct http_response *);
+struct http_split_response
+{
+  struct espconn *p_espconn;
+  char *content;
+  int content_size;
+  int content_transferred;
+  void (*action_function)(struct http_split_response *);
+};
+
+extern Queue<struct http_split_response> *pending_response;
+
+void webserver_check_pending_response(void);
 
 char *error_msg(int code);                 // returns error code description
 char *json_error_msg(int code, char *msg); // returns error code as a json obj
+
 // quick format response and send
 //    free_msg must be false when passing a "string" allocated into text or data segment
 //    free_msg must be true when passing an heap allocated string
 void response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg);
+
 // or
 // format header string
 char *format_header(struct http_header *);
 // send_response will take care of splitting the message according to the buffer size
 // and will repeadetely call send_response_buffer
-void send_response(struct http_response *);
+// will try to free the msg buffer after is has been sent
+void send_response(struct espconn *p_espconn, char *msg);
 // send_response_buffer will manage calling espconn_send avoiding new calls before completion
 void send_response_buffer(struct espconn *p_espconn, char *msg);
-
-int get_free_split_msg_timer(void); // return <0 idx when no available timer is found
-os_timer_t *get_split_msg_timer(int);
-void free_split_msg_timer(int);
 
 //
 // variables and methods for managing http requests
@@ -120,7 +130,8 @@ class Websvr
 public:
   Websvr(){};
   ~Websvr(){};
-
+  
+  void init(void);
   void start(uint32); // port
   void stop(void);
   Websvr_status get_status(void);

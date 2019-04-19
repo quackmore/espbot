@@ -16,6 +16,7 @@ extern "C"
 #include "ip_addr.h"
 }
 
+#include "espbot_queue.hpp"
 #include "espbot_webserver.hpp"
 #include "espbot_http_routes.hpp"
 #include "espbot.hpp"
@@ -73,102 +74,113 @@ char ICACHE_FLASH_ATTR *json_error_msg(int code, char *msg)
 //
 // befor sending a response the flag will be checked
 // when the flag is found set (espconn_send not done yet)
-// a timer will used for postponing response
+// the response is queued
 //
 
-#define DATA_SENT_TIMER_PERIOD 40
-#define MAX_PENDING_RESPONSE_COUNT 10
-
+static Queue<struct http_response> *pending_send;
 static char *send_buffer;
 static bool esp_busy_sending_data = false;
-static os_timer_t pending_response_timer[MAX_PENDING_RESPONSE_COUNT];
-static bool pending_response_timer_busy[MAX_PENDING_RESPONSE_COUNT];
 
 static os_timer_t clear_busy_sending_data_timer;
 
 static void ICACHE_FLASH_ATTR clear_busy_sending_data(void *arg)
 {
-    esplog.all("Websvr::clear_busy_sending_data\n");
+    esplog.trace("Websvr - espconn_send timeout\n");
+    // something went wrong an this timeout was triggered
+    // clear the flag, the buffer and trigger a check of the pending responses queue
+    os_timer_disarm(&clear_busy_sending_data_timer);
+    if (send_buffer)
+    {
+        // esplog.trace("Websvr - clear_busy_sending_data: deleting send_buffer %X\n", send_buffer);  
+        delete[] send_buffer;
+        send_buffer = NULL;
+    }
     esp_busy_sending_data = false;
+    system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
 }
 
-struct svr_response
+void ICACHE_FLASH_ATTR webserver_check_pending_response(void)
 {
-    struct espconn *p_espconn;
-    char *msg;
-    bool free_msg;
-    char timer_idx;
-};
-
-static void ICACHE_FLASH_ATTR webserver_pending_response(void *arg)
-{
-    struct svr_response *response_data = (struct svr_response *)arg;
-    // free pending response_timer
-    pending_response_timer_busy[response_data->timer_idx] = false;
-    esplog.all("Websvr::webserver_pending_response\n");
-    // esplog.trace("response: *p_espconn: %X\n"
-    //              "                 msg: %s\n"
-    //              "           timer_idx: %d\n",
-    //              response_data->p_espconn, response_data->msg, response_data->timer_idx);
-    if (espwebsvr.get_status() == up)
-        send_response_buffer(response_data->p_espconn, response_data->msg);
-    delete response_data;
+    esplog.all("Websvr::webserver_check_pending_response\n");
+    if (espwebsvr.get_status() == down)
+    {
+        // meanwhile the server went down
+        esplog.trace("Websvr - clearing pending send and response queues\n");
+        // clear the pending send queue
+        struct http_response *p_pending_send = pending_send->front();
+        while (p_pending_send)
+        {
+            pending_send->pop();
+            delete[] p_pending_send->msg;
+            delete p_pending_send;
+            p_pending_send = pending_send->front();
+        }
+        // clear the split response queue
+        struct http_split_response *p_pending_response = pending_response->front();
+        while (p_pending_response)
+        {
+            pending_response->pop();
+            delete[] p_pending_response->content;
+            delete p_pending_response;
+            p_pending_response = pending_response->front();
+        }
+        return;
+    }
+    // the server is up!
+    // check pending send queue
+    struct http_response *p_pending_send = pending_send->front();
+    if (p_pending_send)
+    {
+        esplog.trace("pending send found: *p_espconn: %X, msg len: %d\n",
+                     p_pending_send->p_espconn, os_strlen(p_pending_send->msg));
+        send_response_buffer(p_pending_send->p_espconn, p_pending_send->msg);
+        // the send procedure will clear the buffer so just delete the http_response
+        // esplog.trace("Websvr - webserver_check_pending_response: deleting p_pending_send\n");  
+        delete p_pending_send;
+        pending_send->pop();
+        // a pending response was found
+        // wait for next pending response check so skip any other code
+        return;
+    }
+    // no pending send was found
+    // check other pending actions (such as long messages that required to be split)
+    struct http_split_response *p_pending_response = pending_response->front();
+    if (p_pending_response)
+    {
+        esplog.trace("pending split response found: *p_espconn: %X\n"
+                     "                            content_size: %d\n"
+                     "                     content_transferred: %d\n"
+                     "                         action_function: %X\n",
+                     p_pending_response->p_espconn,
+                     p_pending_response->content_size,
+                     p_pending_response->content_transferred,
+                     p_pending_response->action_function);
+        p_pending_response->action_function(p_pending_response);
+        // don't free the content yet
+        // esplog.trace("Websvr - webserver_check_pending_response: deleting p_pending_response\n");  
+        delete p_pending_response;
+        pending_response->pop();
+        // serving just one pending_response, so that just one espconn_send is engaged
+        // next one will be triggered by a espconn_send completion
+    }
 }
 
 static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
 {
     esplog.all("Websvr::webserver_sentcb\n");
     struct espconn *ptr_espconn = (struct espconn *)arg;
-    esp_busy_sending_data = false;
+    // clear the flag and the timeout timer
+    os_timer_disarm(&clear_busy_sending_data_timer);
+    // clear the message_buffer
     if (send_buffer)
     {
+        // esplog.trace("Websvr - webserver_sentcb: deleting send_buffer %X\n", send_buffer);  
         delete[] send_buffer;
         send_buffer = NULL;
     }
+    esp_busy_sending_data = false;
+    system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
 }
-
-void free_http_response(struct http_response *ptr)
-{
-    esplog.all("Websvr::free_http_response\n");
-    delete[] ptr->msg;
-    delete ptr;
-}
-
-/*
-send_response
-{
-    format buffer
-    check if pending responses are needed and queue them
-    send_response_buffer
-}
-
-send_response_buffer()
-{
-    if (busy)
-        queue the buffer and espconn
-    else
-        set send busy
-        send the buffer
-}
-
-sent_cb
-{
-    set send free
-    if buffer queue is not empty
-        signal to task
-    if on espconn there is a pending response
-        signal to task
-}
-
-task
-{
-    buffer queue is not empty: 
-        pop from queue
-        send_buffer
-        check for pending response on espconn
-        pending response
-}
-*/
 
 //
 // won't check the length of the sent message
@@ -176,73 +188,53 @@ task
 void ICACHE_FLASH_ATTR send_response_buffer(struct espconn *p_espconn, char *msg)
 {
     // Profiler ret_file("send_response_buffer");
-    system_soft_wdt_feed();
+    ETS_INTR_LOCK();
     if (esp_busy_sending_data) // previous espconn_send not completed yet
     {
-        esplog.debug("Websvr::send_response_buffer - previous espconn_send not completed yet\n");
-        struct svr_response *response_data = new struct svr_response;
+        ETS_INTR_UNLOCK();
+        esplog.trace("Websvr::send_response_buffer - previous espconn_send not completed yet\n");
+        struct http_response *response_data = new struct http_response;
         espmem.stack_mon();
         if (response_data)
         {
-            // look for a free pending_response_timer
-            int timer_idx;
-            for (timer_idx = 0; timer_idx < MAX_PENDING_RESPONSE_COUNT; timer_idx++)
-                if (!pending_response_timer_busy[timer_idx])
-                {
-                    // reserve the timer
-                    pending_response_timer_busy[timer_idx] = true;
-                    break;
-                }
-            // check if an available timer was found
-            if (timer_idx >= MAX_PENDING_RESPONSE_COUNT)
-                esplog.error("Websvr::send_response: no pending_response timers available\n");
-            else
-            {
-                response_data->p_espconn = p_espconn;
-                response_data->msg = msg;
-                response_data->timer_idx = timer_idx;
-                // esplog.trace("response: *p_espconn: %X\n"
-                //              "                 msg: %s\n"
-                //              "           timer_idx: %d\n",
-                //              p_espconn, msg, timer_idx);
-                os_timer_disarm(&pending_response_timer[timer_idx]);
-                os_timer_setfn(&pending_response_timer[timer_idx], (os_timer_func_t *)webserver_pending_response, (void *)response_data);
-                // calculate random timer between DATA_SENT_TIMER_PERIOD and 2*DATA_SENT_TIMER_PERIOD
-                int timer_value = DATA_SENT_TIMER_PERIOD + get_rand_int(DATA_SENT_TIMER_PERIOD);
-                os_timer_arm(&pending_response_timer[timer_idx], timer_value, 0);
-                esplog.all("Websvr::send_response - waiting for espconn_send to complete\n");
-            }
+            response_data->p_espconn = p_espconn;
+            response_data->msg = msg;
+            Queue_err result = pending_send->push(response_data);
+            if (result == Queue_full)
+                esplog.error("Websvr::send_response_buffer: pending send queue is full\n");
         }
         else
         {
-            esplog.error("Websvr::send_response: not enough heap memory (%d)\n", sizeof(struct svr_response));
+            esplog.error("Websvr::send_response_buffer: not enough heap memory (%d)\n", sizeof(struct http_response));
         }
     }
     else // previous espconn_send completed
     {
-        esplog.all("webserver::send_response_buffer\n");
-        esplog.trace("response: *p_espconn: %X\n"
-                     "                 msg: %s\n",
-                     p_espconn, msg);
         esp_busy_sending_data = true;
+        ETS_INTR_UNLOCK();
+        esplog.trace("espconn_send: *p_espconn: %X\n"
+                     "                     msg: %s\n",
+                     p_espconn,
+                     msg);
         // set a timeout timer for clearing the esp_busy_sending_data in case something goes wrong
         os_timer_disarm(&clear_busy_sending_data_timer);
         os_timer_setfn(&clear_busy_sending_data_timer, (os_timer_func_t *)clear_busy_sending_data, NULL);
-        os_timer_arm(&clear_busy_sending_data_timer, 10000, 0);
+        os_timer_arm(&clear_busy_sending_data_timer, 2000, 0);
 
         send_buffer = msg;
         sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, os_strlen(send_buffer));
         espmem.stack_mon();
         if (res)
         {
-            esplog.error("websvr::send_response: error sending response, error code %d\n", res);
-            // on error don't count on sentcb to be called
-            esp_busy_sending_data = false;
-            delete[] send_buffer;
-            send_buffer = NULL;
+            esplog.error("websvr::send_response_buffer: error sending response, error code %d\n", res);
+            // nevermind about sentcb, there is a timeout now
+            // esp_busy_sending_data = false;
+            // delete[] send_buffer;
+            // send_buffer = NULL;
         }
         // esp_free(send_buffer); // webserver_sentcb will free it
     }
+    system_soft_wdt_feed();
 }
 
 void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg)
@@ -252,9 +244,9 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
     esplog.trace("response: *p_espconn: %X\n"
                  "                code: %d\n"
                  "        content-type: %s\n"
-                 "                 msg: %s\n"
+                 "          msg length: %d\n"
                  "            free_msg: %d\n",
-                 p_espconn, code, content_type, msg, free_msg);
+                 p_espconn, code, content_type, os_strlen(msg), free_msg);
     if (code >= HTTP_BAD_REQUEST) // format error msg as json
     {
         char *err_msg = json_error_msg(code, msg);
@@ -273,186 +265,199 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
             return;
         }
     }
-    // allocate a buffer
+    // header max size
     // HTTP...        ->  40 + 3 + 22 =  65
     // Content-Type   ->  20 + 17     =  37
     // Content-Length ->  22 + 15     =  47
     // Pragma         ->  24          =  24
     //                                = 173
-    Heap_chunk complete_msg((173 + os_strlen(msg)), dont_free);
-    if (complete_msg.ref)
+    
+    // Heap_chunk complete_msg((173 + os_strlen(msg)), dont_free);
+    // if (complete_msg.ref)
+    // {
+    //     os_sprintf(complete_msg.ref, "HTTP/1.0 %d %s\r\nServer: espbot/2.0\r\n"
+    //                                  "Content-Type: %s\r\n"
+    //                                  "Content-Length: %d\r\n"
+    //                                  "Pragma: no-cache\r\n\r\n%s",
+    //                code, code_msg(code), content_type, os_strlen(msg), msg);
+    //     if (free_msg)
+    //     {
+    //         esplog.trace("Websvr - response: deleting msg\n");  
+    //         delete[] msg; // free the msg buffer now that it has been used
+    //     }
+    //     send_response(p_espconn, complete_msg.ref);
+    //     espmem.stack_mon();
+    // }
+    // else
+    // {
+    //     esplog.error("websvr::response: not enough heap memory (%d)\n", (173 + os_strlen(msg)));
+    // }
+
+    // send separately the header from the content
+    // to avoid allocating twice the memory for the message
+    // especially very large ones
+    Heap_chunk msg_header(173, dont_free);
+    if (msg_header.ref)
     {
-        os_sprintf(complete_msg.ref, "HTTP/1.0 %d %s\r\nServer: espbot/2.0\r\n"
-                                     "Content-Type: %s\r\n"
-                                     "Content-Length: %d\r\n"
-                                     "Pragma: no-cache\r\n\r\n%s",
-                   code, code_msg(code), content_type, os_strlen(msg), msg);
+        os_sprintf(msg_header.ref, "HTTP/1.0 %d %s\r\nServer: espbot/2.0\r\n"
+                                   "Content-Type: %s\r\n"
+                                   "Content-Length: %d\r\n"
+                                   "Pragma: no-cache\r\n\r\n",
+                   code, code_msg(code), content_type, os_strlen(msg));
+        send_response_buffer(p_espconn, msg_header.ref);
         if (free_msg)
-            delete[] msg; // free the msg buffer now that it has been used
-        struct http_response *p_res = new struct http_response;
-        if (p_res)
         {
-            p_res->p_espconn = p_espconn;
-            p_res->msg = complete_msg.ref;
-            send_response(p_res);
+            if (os_strlen(msg))
+                send_response(p_espconn, msg);
         }
         else
         {
-            esplog.error("websvr::response: not enough heap memory (%d)\n", sizeof(struct http_response));
+            if (os_strlen(msg))
+            { 
+                // response message is not allocated on heap
+                // copy it to a buffer
+                Heap_chunk msg_short(os_strlen(msg), dont_free);
+                if (msg_header.ref)
+                {
+                    os_strcpy(msg_short.ref, msg);
+                    send_response(p_espconn, msg_short.ref);
+                }
+                else
+                {
+                    esplog.error("websvr::response: not enough heap memory (%d)\n", os_strlen(msg));
+                }
+            }
         }
         espmem.stack_mon();
     }
     else
     {
-        esplog.error("websvr::response: not enough heap memory (%d)\n", (173 + os_strlen(msg)));
+        esplog.error("websvr::response: not enough heap memory (%d)\n", 173);
     }
 }
 
-#define MAX_SPLIT_RESPONSE_TIMER 12
-static os_timer_t split_msg_timer[MAX_SPLIT_RESPONSE_TIMER];
-static bool split_msg_timer_busy[MAX_SPLIT_RESPONSE_TIMER];
+Queue<struct http_split_response> *pending_response;
 
-int get_free_split_msg_timer(void)
+static void ICACHE_FLASH_ATTR send_remaining_msg(struct http_split_response *p_sr)
 {
-    esplog.all("webserver::get_free_split_msg_timer\n");
-    int timer_idx;
-    for (timer_idx = 0; timer_idx < MAX_SPLIT_RESPONSE_TIMER; timer_idx++)
-        if (!split_msg_timer_busy[timer_idx])
-        {
-            split_msg_timer_busy[timer_idx] = true;
-            break;
-        }
-    if (timer_idx >= MAX_SPLIT_RESPONSE_TIMER)
-        return -1;
-    else
-        return timer_idx;
-}
-
-os_timer_t ICACHE_FLASH_ATTR *get_split_msg_timer(int idx)
-{
-    esplog.all("webserver::get_split_msg_timer\n");
-    split_msg_timer_busy[idx] = true;
-    return &split_msg_timer[idx];
-}
-
-void ICACHE_FLASH_ATTR free_split_msg_timer(int idx)
-{
-    esplog.all("webserver::free_split_msg_timer\n");
-    split_msg_timer_busy[idx] = false;
-}
-
-static void ICACHE_FLASH_ATTR send_remaining_msg(void *param)
-{
-    // Profiler ret_file("send_remaining_msg");
     esplog.all("webserver::send_remaining_msg\n");
-    struct http_response *p_response = (struct http_response *)param;
-    // free the timer
-    free_split_msg_timer(p_response->timer_idx);
-    // check if meanwhile the http server went down
-    if (espwebsvr.get_status() == down)
+
+    if ((p_sr->content_size - p_sr->content_transferred) > espwebsvr.get_response_max_size())
     {
-        free_http_response(p_response);
-        return;
-    }
-    // allocate a buffer
-    int buffer_size;
-    if (os_strlen(p_response->remaining_msg) > espwebsvr.get_response_max_size())
-        buffer_size = espwebsvr.get_response_max_size();
-    else
-        buffer_size = os_strlen(p_response->remaining_msg);
-    Heap_chunk msg(buffer_size, dont_free);
-    if (msg.ref)
-    {
-        // esplog.trace("response: *p_espconn: %X\n"
-        //              "                 msg: %s\n",
-        //              p_response->p_espconn, p_response->remaining_msg);
-        os_strncpy(msg.ref, p_response->remaining_msg, buffer_size);
-        send_response_buffer(p_response->p_espconn, msg.ref);
-        // check if the message was not completely sent
-        if (os_strlen(p_response->remaining_msg) > buffer_size)
+        // the message is bigger than response_max_size
+        // will split the message
+        int buffer_size = espwebsvr.get_response_max_size();
+        Heap_chunk buffer(buffer_size + 1, dont_free);
+        if (buffer.ref)
         {
-            p_response->remaining_msg = p_response->remaining_msg + buffer_size;
-            // look for a free split_response_timer
-            int timer_idx = get_free_split_msg_timer();
-            // check if there's a timer available
-            if (timer_idx < 0)
+            struct http_split_response *p_pending_response = new struct http_split_response;
+            if (p_pending_response)
             {
-                free_http_response(p_response);
-                esplog.error("Websvr::response: no split_response_timer available\n");
+                os_strncpy(buffer.ref, p_sr->content + p_sr->content_transferred, buffer_size);
+                // setup the remaining message
+                p_pending_response->p_espconn = p_sr->p_espconn;
+                p_pending_response->content = p_sr->content;
+                p_pending_response->content_size = p_sr->content_size;
+                p_pending_response->content_transferred = p_sr->content_transferred + buffer_size;
+                p_pending_response->action_function = send_remaining_msg;
+                Queue_err result = pending_response->push(p_pending_response);
+                if (result == Queue_full)
+                    esplog.error("Websvr::send_response_buffer: pending response queue is full\n");
+
+                esplog.trace("send_remaining_msg: *p_espconn: %X\n"
+                             "msg (splitted) len: %d\n",
+                             p_sr->p_espconn, os_strlen(buffer.ref));
+                send_response_buffer(p_sr->p_espconn, buffer.ref);
             }
             else
-            { // start a timer and pass remaining message description
-                p_response->timer_idx = timer_idx;
-                os_timer_t *split_timer = get_split_msg_timer(timer_idx);
-                os_timer_disarm(split_timer);
-                os_timer_setfn(split_timer, (os_timer_func_t *)send_remaining_msg, (void *)p_response);
-                // calculate random timer between DATA_SENT_TIMER_PERIOD and 2*DATA_SENT_TIMER_PERIOD
-                int timer_value = DATA_SENT_TIMER_PERIOD + get_rand_int(DATA_SENT_TIMER_PERIOD);
-                os_timer_arm(split_timer, timer_value, 0);
+            {
+                esplog.error("websvr::send_remaining_msg: not enough heap memory (%d)\n", sizeof(struct http_split_response));
+                delete[] buffer.ref;
+                delete[] p_sr->content;
             }
         }
         else
         {
-            free_http_response(p_response);
+            esplog.error("websvr::send_remaining_msg: not enough heap memory (%d)\n", buffer_size);
+            delete[] p_sr->content;
         }
     }
     else
     {
-        free_http_response(p_response);
-        esplog.error("websvr::response: not enough heap memory (%d)\n", buffer_size);
+        // this is the last piece of the message
+        int buffer_size = espwebsvr.get_response_max_size();
+        Heap_chunk buffer(buffer_size + 1, dont_free);
+        if (buffer.ref)
+        {
+            os_strncpy(buffer.ref, p_sr->content + p_sr->content_transferred, buffer_size);
+            esplog.trace("send_remaining_msg: *p_espconn: %X\n"
+                         "          msg (last piece) len: %d\n",
+                         p_sr->p_espconn, os_strlen(buffer.ref));
+            send_response_buffer(p_sr->p_espconn, buffer.ref);
+        }
+        else
+        {
+            esplog.error("websvr::send_remaining_msg: not enough heap memory (%d)\n", buffer_size);
+        }
+        // esplog.trace("Websvr - send_remaining_msg: deleting p_sr->content\n");  
+        delete[] p_sr->content;
     }
 }
 
 //
 // will split the message when the length is greater than webserver response_max_size
 //
-void ICACHE_FLASH_ATTR send_response(struct http_response *p_response)
+void ICACHE_FLASH_ATTR send_response(struct espconn *p_espconn, char *msg)
 {
     // Profiler ret_file("send_response");
     esplog.all("webserver::send_response\n");
-    int buffer_size;
-    if (os_strlen(p_response->msg) > espwebsvr.get_response_max_size())
-        buffer_size = espwebsvr.get_response_max_size();
-    else
-        buffer_size = os_strlen(p_response->msg);
-    Heap_chunk buffer(buffer_size + 1, dont_free);
-    if (buffer.ref)
+    if (os_strlen(msg) > espwebsvr.get_response_max_size())
     {
-        os_strncpy(buffer.ref, p_response->msg, buffer_size);
-        esplog.trace("response: *p_espconn: %X\n"
-                     "                 msg: %s\n",
-                     p_response->p_espconn, buffer.ref);
-        send_response_buffer(p_response->p_espconn, buffer.ref);
-        // check if the message was not completely sent
-        if (os_strlen(p_response->msg) > buffer_size)
+        // the message is bigger than response_max_size
+        // will split the message
+        int buffer_size = espwebsvr.get_response_max_size();
+        Heap_chunk buffer(buffer_size + 1, dont_free);
+        if (buffer.ref)
         {
-            p_response->remaining_msg = p_response->msg + buffer_size;
-            // look for a free split_response_timer
-            int timer_idx = get_free_split_msg_timer();
-            // check if there's a timer available
-            if (timer_idx < 0)
+            struct http_split_response *p_pending_response = new struct http_split_response;
+            if (p_pending_response)
             {
-                free_http_response(p_response);
-                esplog.error("Websvr::response: no split_response_timer available\n");
+                os_strncpy(buffer.ref, msg, buffer_size);
+                // setup the remaining message
+                p_pending_response->p_espconn = p_espconn;
+                p_pending_response->content = msg;
+                p_pending_response->content_size = os_strlen(msg);
+                p_pending_response->content_transferred = buffer_size;
+                p_pending_response->action_function = send_remaining_msg;
+                Queue_err result = pending_response->push(p_pending_response);
+                if (result == Queue_full)
+                    esplog.error("Websvr::send_response_buffer: pending response queue is full\n");
+
+                esplog.trace("send_response: *p_espconn: %X\n"
+                             "       msg (splitted) len: %d\n",
+                             p_espconn, os_strlen(buffer.ref));
+                send_response_buffer(p_espconn, buffer.ref);
             }
             else
-            { // start a timer and pass remaining message description
-                p_response->timer_idx = timer_idx;
-                os_timer_t *split_timer = get_split_msg_timer(timer_idx);
-                os_timer_disarm(split_timer);
-                os_timer_setfn(split_timer, (os_timer_func_t *)send_remaining_msg, (void *)p_response);
-                // calculate random timer between DATA_SENT_TIMER_PERIOD and 2*DATA_SENT_TIMER_PERIOD
-                int timer_value = DATA_SENT_TIMER_PERIOD + get_rand_int(DATA_SENT_TIMER_PERIOD);
-                os_timer_arm(split_timer, timer_value, 0);
+            {
+                esplog.error("websvr::send_response: not enough heap memory (%d)\n", sizeof(struct http_split_response));
+                delete[] buffer.ref;
+                delete[] msg;
             }
         }
         else
-            free_http_response(p_response);
+        {
+            esplog.error("websvr::send_response: not enough heap memory (%d)\n", buffer_size);
+            delete[] msg;
+        }
     }
     else
     {
-        free_http_response(p_response);
-        esplog.error("websvr::response: not enough heap memory (%d)\n", buffer_size);
+        // no need to split the message, just send it
+        esplog.trace("send_response: *p_espconn: %X\n"
+                     "           msg (full) len: %d\n",
+                     p_espconn, os_strlen(msg));
+        send_response_buffer(p_espconn, msg);
     }
 }
 
@@ -716,25 +721,23 @@ static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
     espconn_regist_disconcb(pesp_conn, webserver_discon);
 }
 
-void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
+void ICACHE_FLASH_ATTR Websvr::init(void)
 {
-    esplog.all("Websvr::start\n");
-    // setup a timer pool for managing delayed espconn_send
-    int idx;
-    for (idx = 0; idx < MAX_PENDING_RESPONSE_COUNT; idx++)
-    {
-        os_timer_disarm(&pending_response_timer[idx]);
-        pending_response_timer_busy[idx] = false;
-    }
-
-    for (idx = 0; idx < MAX_SPLIT_RESPONSE_TIMER; idx++)
-    {
-        os_timer_disarm(&split_msg_timer[idx]);
-        split_msg_timer_busy[idx] = false;
-    }
+    esplog.all("Websvr::init\n");
 
     // setup specific controllers timer
     init_controllers();
+
+    pending_send = new Queue<struct http_response>(8);
+    pending_response = new Queue<struct http_split_response>(4);
+
+    // setup the default response buffer size
+    m_send_response_max_size = 256;
+}
+
+void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
+{
+    esplog.all("Websvr::start\n");
 
     // setup sdk TCP variables
     m_esp_conn.type = ESPCONN_TCP;
@@ -743,9 +746,6 @@ void ICACHE_FLASH_ATTR Websvr::start(uint32 port)
     m_esp_conn.proto.tcp->local_port = port;
     espconn_regist_connectcb(&m_esp_conn, webserver_listen);
     espconn_accept(&m_esp_conn);
-
-    // setup the default response buffer size
-    m_send_response_max_size = 1024;
 
     // now the server is up
     m_status = up;
@@ -758,6 +758,22 @@ void ICACHE_FLASH_ATTR Websvr::stop()
     espconn_disconnect(&m_esp_conn);
     espconn_delete(&m_esp_conn);
     m_status = down;
+    struct http_response *p_send = pending_send->front();
+    while (p_send)
+    {
+        delete[] p_send->msg;
+        delete p_send;
+        pending_send->pop();
+        p_send = pending_send->front();
+    }
+    struct http_split_response *p_split = pending_response->front();
+    while (p_split)
+    {
+        delete[] p_split->content;
+        delete p_split;
+        pending_response->pop();
+        p_split = pending_response->front();
+    }
     esplog.debug("web server stopped\n");
 }
 

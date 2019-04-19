@@ -179,7 +179,7 @@ void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_FATAL)
             os_printf_plus("[FATAL] %s", buffer);
@@ -209,7 +209,7 @@ void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_ERROR)
             os_printf_plus("[ERROR] %s", buffer);
@@ -239,7 +239,7 @@ void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_WARN)
             os_printf_plus("[WARN] %s", buffer);
@@ -269,7 +269,7 @@ void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_INFO)
             os_printf_plus("[INFO] %s", buffer);
@@ -301,7 +301,7 @@ void ICACHE_FLASH_ATTR Logger::debug(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         os_printf_plus("[DEBUG] %s", buffer);
     }
@@ -317,7 +317,7 @@ void ICACHE_FLASH_ATTR Logger::trace(const char *t_format, ...)
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         os_printf_plus("[TRACE] %s", buffer);
     }
@@ -332,7 +332,7 @@ void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
         char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE, t_format, al);
+        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
         va_end(al);
         os_printf_plus("[ALL] %s", buffer);
     }

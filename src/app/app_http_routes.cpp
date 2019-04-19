@@ -66,7 +66,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         }
         else
         {
-            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 350);
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 155 + str_len);
         }
         return true;
     }
@@ -150,13 +150,10 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
             // now the message
             os_strncpy((msg.ref + os_strlen(header_str)), message.ref, os_strlen(message.ref));
 
-            struct http_response *p_res = new struct http_response;
-            p_res->p_espconn = ptr_espconn;
-            p_res->msg = msg.ref;
-            esplog.trace("response: *p_espconn: %X\n"
-                         "                 msg: %s\n",
-                         p_res->p_espconn, p_res->msg);
-            send_response(p_res);
+            esplog.trace("calling send_response: *p_espconn: %X\n"
+                         "                              msg: %s\n",
+                         ptr_espconn, msg.ref);
+            send_response(ptr_espconn, msg.ref);
         }
         else
         {
