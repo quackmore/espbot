@@ -1,4 +1,3 @@
-.vscode
 env.sh
 *.bin
 *.dump
@@ -9,3 +8,6 @@ lib/libdriver.a
 lib/libespbot.a
 lib/libspiffs.a
 lib/libuser.a
+!.vscode
+.vscode/*
+!.vscode/tasks.json
