@@ -8,151 +8,24 @@ CCFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
 CCPPFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
 LDFLAGS:= -L$(TOP_DIR)/lib -L$(SDK_DIR)/lib -L$(SDK_DIR)/ld $(LDFLAGS)
 
-ifeq ($(BOOT), new)
-    boot = new
-else
-    ifeq ($(BOOT), old)
-        boot = old
-    else
-        boot = none
-    endif
-endif
-
-ifeq ($(APP), 1)
-    app = 1
-else
-    ifeq ($(APP), 2)
-        app = 2
-    else
-        app = 0
-    endif
-endif
-
-ifeq ($(SPI_SPEED), 26.7)
-    freqdiv = 1
-else
-    ifeq ($(SPI_SPEED), 20)
-        freqdiv = 2
-    else
-        ifeq ($(SPI_SPEED), 80)
-            freqdiv = 15
-        else
-            freqdiv = 0
-        endif
-    endif
-endif
-
-ifeq ($(SPI_MODE), QOUT)
-    mode = 1
-else
-    ifeq ($(SPI_MODE), DIO)
-        mode = 2
-    else
-        ifeq ($(SPI_MODE), DOUT)
-            mode = 3
-        else
-            mode = 0
-        endif
-    endif
-endif
-
-addr = 0x01000
-
-ifeq ($(SPI_SIZE_MAP), 1)
-  size_map = 1
-  flash = 256
-else
-  ifeq ($(SPI_SIZE_MAP), 2)
-    size_map = 2
-    flash = 1024
-    ifeq ($(app), 2)
-      addr = 0x81000
-    endif
-  else
-    ifeq ($(SPI_SIZE_MAP), 3)
-      size_map = 3
-      flash = 2048
-      ifeq ($(app), 2)
-        addr = 0x81000
-      endif
-    else
-      ifeq ($(SPI_SIZE_MAP), 4)
-        size_map = 4
-        flash = 4096
-        ifeq ($(app), 2)
-          addr = 0x81000
-        endif
-      else
-        ifeq ($(SPI_SIZE_MAP), 5)
-          size_map = 5
-          flash = 2048
-          ifeq ($(app), 2)
-            addr = 0x101000
-          endif
-        else
-          ifeq ($(SPI_SIZE_MAP), 6)
-            size_map = 6
-            flash = 4096
-            ifeq ($(app), 2)
-              addr = 0x101000
-            endif
-          else
-            ifeq ($(SPI_SIZE_MAP), 8)
-              size_map = 8
-              flash = 8192
-              ifeq ($(app), 2)
-                addr = 0x101000
-              endif
-            else
-              ifeq ($(SPI_SIZE_MAP), 9)
-                size_map = 9
-                flash = 16384
-                ifeq ($(app), 2)
-                  addr = 0x101000
-                endif
-              else
-                size_map = 0
-                flash = 512
-                ifeq ($(app), 2)
-                addr = 0x41000
-                endif
-              endif
-            endif
-          endif
-        endif
-      endif
-    endif
-  endif
-endif
+boot = $(BOOT)
+app = $(APP)
+freqdiv = $(FREQDIV)
+mode = $(MODE)
+size_map = $(SPI_SIZE_MAP)
+flash = $(FLASH_SIZE)
+user_start_addr = 0x01000
 
 LD_FILE = $(LDDIR)/eagle.app.v6.ld
 
 ifneq ($(boot), none)
   ifneq ($(app),0)
-      ifeq ($(size_map), 6)
-        LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).2048.app$(app).ld
-      else
-        ifeq ($(size_map), 5)
-          LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).2048.app$(app).ld
-        else
-          ifeq ($(size_map), 4)
-            LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).1024.app$(app).ld
-          else
-            ifeq ($(size_map), 3)
-              LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).1024.app$(app).ld
-            else
-              ifeq ($(size_map), 2)
-                LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).1024.app$(app).ld
-              else
-                ifeq ($(size_map), 0)
-                  LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).512.app$(app).ld
-                endif
-              endif
-            endif
-          endif
-        endif
-      endif
-      BIN_NAME = user$(app).$(flash).$(boot).$(size_map)
+		ifeq ($(LD_REF), 2048)
+			LD_FILE = $(TOP_DIR)/ld/eagle.app.v6.$(boot).$(LD_REF).app$(app).ld
+    else
+			LD_FILE = $(LDDIR)/eagle.app.v6.$(boot).$(LD_REF).app$(app).ld
+		endif
+		BIN_NAME = user$(app).$(flash).$(boot).$(size_map)
   endif
 else
     app = 0
@@ -160,9 +33,50 @@ endif
 
 ifdef DEBUG
 	CCFLAGS += -ggdb -O0
+	CCPPFLAGS += -ggdb -O0
 	LDFLAGS += -ggdb
 else
 	CCFLAGS += -Os
+endif
+
+#############################################################
+# Define binary start address when app == 1 or app == 2 
+#
+
+ifeq ($(size_map), 2)
+    ifeq ($(app), 2)
+        user_start_addr=0x41000
+    endif
+endif
+ifeq ($(size_map), 3)
+    ifeq ($(app), 2)
+        user_start_addr=0x81000
+    endif
+endif
+ifeq ($(size_map), 4)
+    ifeq ($(app), 2)
+        user_start_addr=0x81000
+    endif
+endif
+ifeq ($(size_map), 5)
+    ifeq ($(app), 2)
+        user_start_addr=0x101000
+    endif
+endif
+ifeq ($(size_map), 6)
+    ifeq ($(app), 2)
+        user_start_addr=0x101000
+    endif
+endif
+ifeq ($(size_map), 8)
+    ifeq ($(app), 2)
+        user_start_addr=0x101000
+    endif
+endif
+ifeq ($(size_map), 9)
+    ifeq ($(app), 2)
+        user_start_addr=0x101000
+    endif
 endif
 
 #############################################################
@@ -179,7 +93,7 @@ ifeq ($(OS),Windows_NT)
 		NM = xt-nm
 		CPP = xt-cpp
 		OBJCOPY = xt-objcopy
-        OBJDUMP = xt-objdump
+    OBJDUMP = xt-objdump
 		CCFLAGS += --rename-section .text=.irom0.text --rename-section .literal=.irom0.literal
 	else 
 		# It is gcc, may be cygwin
@@ -215,12 +129,12 @@ else
 	endif
 	CCFLAGS += -ffunction-sections -fno-jump-tables -fdata-sections
 	AR = xtensa-lx106-elf-ar
-	CC = $(WRAPCC) xtensa-lx106-elf-gcc
-	CXX = $(WRAPCC) xtensa-lx106-elf-g++
+	CC = xtensa-lx106-elf-gcc
+	CXX = xtensa-lx106-elf-g++
 	NM = xtensa-lx106-elf-nm
-	CPP = $(WRAPCC) xtensa-lx106-elf-gcc -E
+	CPP = xtensa-lx106-elf-gcc -E
 	OBJCOPY = xtensa-lx106-elf-objcopy
-    OBJDUMP = xtensa-lx106-elf-objdump
+	OBJDUMP = xtensa-lx106-elf-objdump
 	FIRMWAREDIR = ../bin/
 	UNAME_S := $(shell uname -s)
 	
@@ -243,7 +157,7 @@ else
 	endif
 endif
 #############################################################
-ESPTOOL ?= esptool.py
+ESPTOOL = esptool.py
 
 
 CSRCS ?= $(wildcard *.c)
@@ -392,29 +306,31 @@ ifeq ($(app), 0)
 	@echo "eagle.flash.bin-------->0x00000"
 	@echo "eagle.irom0text.bin---->0x10000"
 else
-    ifneq ($(boot), new)
+  ifneq ($(boot), new)
 		@python $(SDK_DIR)/tools/gen_appbin.py $< 1 $(mode) $(freqdiv) $(size_map) $(app)
 		@echo "Support boot_v1.1 and +"
-    else
+  else
 		@python $(SDK_DIR)/tools/gen_appbin.py $< 2 $(mode) $(freqdiv) $(size_map) $(app)
 
-    	ifeq ($(size_map), 6)
-		@echo "Support boot_v1.4 and +"
-        else
-            ifeq ($(size_map), 5)
-		@echo "Support boot_v1.4 and +"
-            else
-		@echo "Support boot_v1.2 and +"
-            endif
-        endif
+    ifeq ($(size_map), 6)
+		  @echo "Support boot_v1.4 and +"
+    else
+      ifeq ($(size_map), 5)
+	    	@echo "Support boot_v1.4 and +"
+      else
+		    @echo "Support boot_v1.2 and +"
+      endif
     endif
+  endif
 
+	@echo $(GIT_VERSION) > ../bin/upgrade/www/version.txt
+	@cp eagle.app.flash.bin ../bin/upgrade/www/user$(app).bin
 	@mv eagle.app.flash.bin ../bin/upgrade/$(BIN_NAME).bin
 	@rm eagle.app.v6.*
 	@echo "Generate $(BIN_NAME).bin successully in folder bin/upgrade."
 	@echo "boot.bin------------>0x00000"
 	@echo "(Pick up boot.bin in folder $(SDK_DIR)/bin)"
-	@echo "$(BIN_NAME).bin--->$(addr)"
+	@echo "$(BIN_NAME).bin--->$(user_start_addr)"
 endif
 
 	@echo "!!!"
@@ -439,22 +355,20 @@ clobber: $(SPECIAL_CLOBBER)
 	$(RM) -r $(ODIR)
 
 flash:
-	@echo "use one of the following targets to flash the firmware"
-	@echo "  make flash512k - for ESP with 512kB flash size"
-	@echo "  make flash4m   - for ESP with   4MB flash size"
-
-flash512k:
-	$(MAKE) -e FLASHOPTIONS="-fm qio -fs  4m -ff 40m" flashinternal
-
-flash4m:
-	$(MAKE) -e FLASHOPTIONS="-fm dio -fs 32m -ff 40m" flashinternal
-
-flashinternal:
-ifndef PDIR
-	$(MAKE) -C ./app flashinternal
+ifeq ($(app), 0)
+	$(ESPTOOL) --port $(ESPPORT) $(FLASH_OPTIONS) 0x00000 bin/eagle.flash.bin 0x10000 bin/eagle.irom0text.bin
 else
-	$(ESPTOOL) --port $(ESPPORT) write_flash $(FLASHOPTIONS) 0x00000 $(FIRMWAREDIR)0x00000.bin 0x10000 $(FIRMWAREDIR)0x10000.bin
+	$(ESPTOOL) --port $(ESPPORT) $(FLASH_OPTIONS) $(user_start_addr) bin/upgrade/$(BIN_NAME).bin
 endif
+
+flash_erase:
+	$(ESPTOOL) --port $(ESPPORT) erase_flash
+
+flash_boot:
+	$(ESPTOOL) --port $(ESPPORT) $(FLASH_OPTIONS) 0x00000 $(SDK_DIR)/bin/boot_v1.7.bin
+
+flash_init:
+	$(ESPTOOL) --port $(ESPPORT) $(FLASH_OPTIONS) $(FLASH_INIT)
 
 .subdirs:
 	@set -e; $(foreach d, $(SUBDIRS), $(MAKE) -C $(d);)
