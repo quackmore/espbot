@@ -174,12 +174,15 @@ echo "spi speed: $spi_speed MHz"
 echo ""
 
 echo "STEP 4: choose spi mode(0=QIO, 1=QOUT, 2=DIO, 3=DOUT)"
-echo "enter (0/1/2/3, default 2):"
+echo "enter (0/1/2/3, default 0-QIO):"
 read input
 
 if [ -z "$input" ]; then
-    spi_mode="dio"
-    mode=2
+    spi_mode="qio"
+    mode=0
+elif [ $input == 0 ]; then
+    spi_mode="qio"
+    mode=0
 elif [ $input == 1 ]; then
     spi_mode="quot"
     mode=1
@@ -190,8 +193,8 @@ elif [ $input == 3 ]; then
     spi_mode="dout"
     mode=3
 else
-    spi_mode="dio"
-    mode=2
+    spi_mode="qio"
+    mode=0
 fi
 
 echo "spi mode: $spi_mode"
