@@ -176,7 +176,7 @@ static void ICACHE_FLASH_ATTR send_remaining_file(struct http_split_response *p_
     }
 }
 
-static void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
+void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
 {
     esplog.all("webserver::return_file\n");
     if (!espfs.is_available())
