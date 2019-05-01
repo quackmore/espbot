@@ -14,5 +14,6 @@
 
 void init_controllers(void);
 void espbot_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req);
+void return_file(struct espconn *p_espconn, char *filename);
 
 #endif
