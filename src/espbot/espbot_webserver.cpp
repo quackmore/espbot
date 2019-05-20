@@ -66,6 +66,21 @@ char ICACHE_FLASH_ATTR *json_error_msg(int code, char *msg)
     }
 }
 
+ICACHE_FLASH_ATTR Http_header::Http_header()
+{
+    m_content_type = NULL;
+    m_acrh = NULL;
+    m_origin = NULL;
+}
+
+ICACHE_FLASH_ATTR Http_header::~Http_header()
+{
+    if(m_acrh)
+        delete[] m_acrh;
+    if(m_origin)
+        delete[] m_origin;
+}
+
 //
 // HTTP responding:
 // ----------------
@@ -91,7 +106,7 @@ static void ICACHE_FLASH_ATTR clear_busy_sending_data(void *arg)
     os_timer_disarm(&clear_busy_sending_data_timer);
     if (send_buffer)
     {
-        // esplog.trace("Websvr - clear_busy_sending_data: deleting send_buffer %X\n", send_buffer);  
+        // esplog.trace("Websvr - clear_busy_sending_data: deleting send_buffer %X\n", send_buffer);
         delete[] send_buffer;
         send_buffer = NULL;
     }
@@ -135,7 +150,7 @@ void ICACHE_FLASH_ATTR webserver_check_pending_response(void)
                      p_pending_send->p_espconn, os_strlen(p_pending_send->msg));
         send_response_buffer(p_pending_send->p_espconn, p_pending_send->msg);
         // the send procedure will clear the buffer so just delete the http_response
-        // esplog.trace("Websvr - webserver_check_pending_response: deleting p_pending_send\n");  
+        // esplog.trace("Websvr - webserver_check_pending_response: deleting p_pending_send\n");
         delete p_pending_send;
         pending_send->pop();
         // a pending response was found
@@ -157,7 +172,7 @@ void ICACHE_FLASH_ATTR webserver_check_pending_response(void)
                      p_pending_response->action_function);
         p_pending_response->action_function(p_pending_response);
         // don't free the content yet
-        // esplog.trace("Websvr - webserver_check_pending_response: deleting p_pending_response\n");  
+        // esplog.trace("Websvr - webserver_check_pending_response: deleting p_pending_response\n");
         delete p_pending_response;
         pending_response->pop();
         // serving just one pending_response, so that just one espconn_send is engaged
@@ -174,7 +189,7 @@ static void ICACHE_FLASH_ATTR webserver_sentcb(void *arg)
     // clear the message_buffer
     if (send_buffer)
     {
-        // esplog.trace("Websvr - webserver_sentcb: deleting send_buffer %X\n", send_buffer);  
+        // esplog.trace("Websvr - webserver_sentcb: deleting send_buffer %X\n", send_buffer);
         delete[] send_buffer;
         send_buffer = NULL;
     }
@@ -271,7 +286,7 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
     // Content-Length ->  22 + 15     =  47
     // Pragma         ->  24          =  24
     //                                = 173
-    
+
     // Heap_chunk complete_msg((173 + os_strlen(msg)), dont_free);
     // if (complete_msg.ref)
     // {
@@ -282,7 +297,7 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
     //                code, code_msg(code), content_type, os_strlen(msg), msg);
     //     if (free_msg)
     //     {
-    //         esplog.trace("Websvr - response: deleting msg\n");  
+    //         esplog.trace("Websvr - response: deleting msg\n");
     //         delete[] msg; // free the msg buffer now that it has been used
     //     }
     //     send_response(p_espconn, complete_msg.ref);
@@ -296,13 +311,13 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
     // send separately the header from the content
     // to avoid allocating twice the memory for the message
     // especially very large ones
-    Heap_chunk msg_header(173, dont_free);
+    Heap_chunk msg_header(187, dont_free);
     if (msg_header.ref)
     {
         os_sprintf(msg_header.ref, "HTTP/1.0 %d %s\r\nServer: espbot/2.0\r\n"
                                    "Content-Type: %s\r\n"
                                    "Content-Length: %d\r\n"
-                                   "Pragma: no-cache\r\n\r\n",
+                                   "Access-Control-Allow-Origin: *\r\n\r\n",
                    code, code_msg(code), content_type, os_strlen(msg));
         send_response_buffer(p_espconn, msg_header.ref);
         if (free_msg)
@@ -313,7 +328,7 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
         else
         {
             if (os_strlen(msg))
-            { 
+            {
                 // response message is not allocated on heap
                 // copy it to a buffer
                 Heap_chunk msg_short(os_strlen(msg), dont_free);
@@ -332,7 +347,7 @@ void ICACHE_FLASH_ATTR response(struct espconn *p_espconn, int code, char *conte
     }
     else
     {
-        esplog.error("websvr::response: not enough heap memory (%d)\n", 173);
+        esplog.error("websvr::response: not enough heap memory (%d)\n", 187);
     }
 }
 
@@ -399,7 +414,7 @@ static void ICACHE_FLASH_ATTR send_remaining_msg(struct http_split_response *p_s
         {
             esplog.error("websvr::send_remaining_msg: not enough heap memory (%d)\n", buffer_size);
         }
-        // esplog.trace("Websvr - send_remaining_msg: deleting p_sr->content\n");  
+        // esplog.trace("Websvr - send_remaining_msg: deleting p_sr->content\n");
         delete[] p_sr->content;
     }
 }
@@ -461,7 +476,7 @@ void ICACHE_FLASH_ATTR send_response(struct espconn *p_espconn, char *msg)
     }
 }
 
-char ICACHE_FLASH_ATTR *format_header(struct http_header *p_header)
+char ICACHE_FLASH_ATTR *format_header(class Http_header *p_header)
 {
     esplog.all("webserver::format_header\n");
     // allocate a buffer
@@ -471,32 +486,57 @@ char ICACHE_FLASH_ATTR *format_header(struct http_header *p_header)
     // Content-Range  ->  32 + 15     =  47
     // Pragma         ->  24          =  24
     //                                = 196
-    Heap_chunk header_msg(196, dont_free);
+    int header_length = 196;
+    if(p_header->m_acrh)
+    {
+        header_length += 37; // Access-Control-Request-Headers string format
+        header_length += os_strlen(p_header->m_acrh);
+        header_length += os_strlen("Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
+    }
+
+    if(p_header->m_origin)
+    {
+        header_length += 34; // Origin string format
+        header_length += os_strlen(p_header->m_origin);
+    }
+
+    Heap_chunk header_msg(header_length, dont_free);
     if (header_msg.ref)
     {
         // setup the header
         char *ptr = header_msg.ref;
         os_sprintf(ptr, "HTTP/1.0 %d %s\r\nServer: espbot/2.0\r\n",
-                   p_header->code, code_msg(p_header->code));
+                   p_header->m_code, code_msg(p_header->m_code));
         ptr = ptr + os_strlen(ptr);
-        os_sprintf(ptr, "Content-Type: %s\r\n", p_header->content_type);
+        os_sprintf(ptr, "Content-Type: %s\r\n", p_header->m_content_type);
         ptr = ptr + os_strlen(ptr);
-        if (p_header->content_range_total > 0)
+        if (p_header->m_content_range_total > 0)
         {
-            os_sprintf(ptr, "Content-Range: bytes %d-%d/%d\r\n", p_header->content_range_total, p_header->content_range_total, p_header->content_range_total);
+            os_sprintf(ptr, "Content-Range: bytes %d-%d/%d\r\n", p_header->m_content_range_total, p_header->m_content_range_total, p_header->m_content_range_total);
             ptr = ptr + os_strlen(ptr);
         }
-        os_sprintf(ptr, "Content-Length: %d\r\n", p_header->content_length);
+        os_sprintf(ptr, "Content-Length: %d\r\n", p_header->m_content_length);
         ptr = ptr + os_strlen(ptr);
         // os_sprintf(ptr, "Date: Wed, 28 Nov 2018 12:00:00 GMT\r\n");
         // os_printf("---->msg: %s\n", msg.ref);
-        ptr = ptr + os_strlen(ptr);
+        if (p_header->m_origin)
+        {
+            os_sprintf(ptr, "Access-Control-Allow-Origin: %s\r\n", p_header->m_origin);
+            ptr = ptr + os_strlen(ptr);
+        }
+        if (p_header->m_acrh)
+        {
+            os_sprintf(ptr, "Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
+            ptr = ptr + os_strlen(ptr);
+            os_sprintf(ptr, "Access-Control-Allow-Headers: Content-Type,%s\r\n", p_header->m_acrh);
+            ptr = ptr + os_strlen(ptr);
+        }
         os_sprintf(ptr, "Pragma: no-cache\r\n\r\n");
         return header_msg.ref;
     }
     else
     {
-        esplog.error("websvr::format_header: not enough heap memory (%d)\n", 196);
+        esplog.error("websvr::format_header: not enough heap memory (%d)\n", header_length);
         return NULL;
     }
 }
@@ -512,6 +552,8 @@ ICACHE_FLASH_ATTR Html_parsed_req::Html_parsed_req()
     esplog.all("Html_parsed_req::Html_parsed_req\n");
     no_header_message = false;
     req_method = HTTP_UNDEFINED;
+    acrh = NULL;
+    origin = NULL;
     url = NULL;
     content_len = 0;
     req_content = NULL;
@@ -520,6 +562,10 @@ ICACHE_FLASH_ATTR Html_parsed_req::Html_parsed_req()
 ICACHE_FLASH_ATTR Html_parsed_req::~Html_parsed_req()
 {
     esplog.all("Html_parsed_req::~Html_parsed_req\n");
+    if (acrh)
+        delete[] acrh;
+    if (origin)
+        delete[] origin;
     if (url)
         delete[] url;
     if (req_content)
@@ -565,6 +611,11 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
         parsed_req->req_method = HTTP_DELETE;
         tmp_ptr += 7;
     }
+    else if (os_strncmp(tmp_ptr, "OPTIONS ", 8) == 0)
+    {
+        parsed_req->req_method = HTTP_OPTIONS;
+        tmp_ptr += 8;
+    }
     else
     {
         parsed_req->no_header_message = true;
@@ -601,7 +652,62 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
     }
     os_memcpy(parsed_req->url, tmp_ptr, len);
 
+    // checkout Access-Control-Request-Headers
+    tmp_ptr = req;
+    tmp_ptr = (char *)os_strstr(tmp_ptr, "Access-Control-Request-Headers: ");
+    if (tmp_ptr == NULL)
+    {
+        tmp_ptr = req;
+        tmp_ptr = (char *)os_strstr(tmp_ptr, "access-control-request-headers: ");
+    }
+    if (tmp_ptr != NULL)
+    {
+        tmp_ptr += 32;
+        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        if (end_ptr == NULL)
+        {
+            esplog.error("websvr::parse_http_request - cannot find Access-Control-Request-Headers\n");
+            return;
+        }
+        len = end_ptr - tmp_ptr;
+        parsed_req->acrh = new char[len + 1];
+        if (parsed_req->acrh == NULL)
+        {
+            esplog.error("websvr::parse_http_request - not enough heap memory\n");
+            return;
+        }
+        os_strncpy(parsed_req->acrh, tmp_ptr, len);
+    }
+
+    // checkout Origin
+    tmp_ptr = req;
+    tmp_ptr = (char *)os_strstr(tmp_ptr, "Origin: ");
+    if (tmp_ptr == NULL)
+    {
+        tmp_ptr = req;
+        tmp_ptr = (char *)os_strstr(tmp_ptr, "origin: ");
+    }
+    if (tmp_ptr != NULL)
+    {
+        tmp_ptr += 8;
+        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        if (end_ptr == NULL)
+        {
+            esplog.error("websvr::parse_http_request - cannot find origin\n");
+            return;
+        }
+        len = end_ptr - tmp_ptr;
+        parsed_req->origin = new char[len + 1];
+        if (parsed_req->origin == NULL)
+        {
+            esplog.error("websvr::parse_http_request - not enough heap memory\n");
+            return;
+        }
+        os_strncpy(parsed_req->origin, tmp_ptr, len);
+    }
+
     // checkout Content-Length
+    tmp_ptr = req;
     tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Length: ");
     if (tmp_ptr == NULL)
     {
@@ -610,30 +716,33 @@ static void ICACHE_FLASH_ATTR parse_http_request(char *req, Html_parsed_req *par
         if (tmp_ptr == NULL)
         {
             esplog.trace("websvr::parse_http_request - didn't find any Content-Length\n");
-            return;
         }
     }
-    tmp_ptr += 16;
-    end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
-    if (end_ptr == NULL)
+    if (tmp_ptr != NULL)
     {
-        esplog.error("websvr::parse_http_request - cannot find Content-Length value\n");
-        return;
+        tmp_ptr += 16;
+        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        if (end_ptr == NULL)
+        {
+            esplog.error("websvr::parse_http_request - cannot find Content-Length value\n");
+            return;
+        }
+        len = end_ptr - tmp_ptr;
+        Heap_chunk tmp_str(len + 1);
+        if (tmp_str.ref == NULL)
+        {
+            esplog.error("websvr::parse_http_request - not enough heap memory\n");
+            return;
+        }
+        os_strncpy(tmp_str.ref, tmp_ptr, len);
+        parsed_req->h_content_len = atoi(tmp_str.ref);
     }
-    len = end_ptr - tmp_ptr;
-    Heap_chunk tmp_str(len + 1);
-    if (tmp_str.ref == NULL)
-    {
-        esplog.error("websvr::parse_http_request - not enough heap memory\n");
-        return;
-    }
-    os_strncpy(tmp_str.ref, tmp_ptr, len);
-    int message_length = atoi(tmp_str.ref);
 
-    // PENDING: actually the message length is not used
+    // PENDING: actually the header content length is not used
     // and the effective length ic calculated below
 
     // checkout for request content
+    tmp_ptr = req;
     tmp_ptr = (char *)os_strstr(tmp_ptr, "\r\n\r\n");
     if (tmp_ptr == NULL)
     {

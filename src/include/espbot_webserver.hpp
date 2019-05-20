@@ -38,14 +38,19 @@ extern "C"
 // exposed for coding http controllers
 //
 
-struct http_header
+class Http_header
 {
-  int code;
-  char *content_type;
-  int content_length;
-  int content_range_start;
-  int content_range_end;
-  int content_range_total;
+public:
+  Http_header();
+  ~Http_header();
+  int m_code;
+  char *m_content_type;
+  char *m_acrh;
+  char *m_origin;
+  int m_content_length;
+  int m_content_range_start;
+  int m_content_range_end;
+  int m_content_range_total;
 };
 
 struct http_response
@@ -77,7 +82,7 @@ void response(struct espconn *p_espconn, int code, char *content_type, char *msg
 
 // or
 // format header string
-char *format_header(struct http_header *);
+char *format_header(class Http_header *);
 // send_response will take care of splitting the message according to the buffer size
 // and will repeadetely call send_response_buffer
 // will try to free the msg buffer after is has been sent
@@ -97,6 +102,7 @@ typedef enum
   HTTP_PUT,
   HTTP_PATCH,
   HTTP_DELETE,
+  HTTP_OPTIONS,
   HTTP_UNDEFINED
 } Html_methods;
 
@@ -111,6 +117,9 @@ public:
                           // e.g. like Safari browser does)
   Html_methods req_method;
   char *url;
+  char *acrh;
+  char *origin;
+  int h_content_len;
   int content_len;
   char *req_content;
 };
@@ -130,7 +139,7 @@ class Websvr
 public:
   Websvr(){};
   ~Websvr(){};
-  
+
   void init(void);
   void start(uint32); // port
   void stop(void);

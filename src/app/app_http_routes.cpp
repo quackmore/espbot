@@ -133,13 +133,13 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         {
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", 512);
         }
-        struct http_header header;
-        header.code = HTTP_OK;
-        header.content_type = HTTP_CONTENT_TEXT;
-        header.content_length = os_strlen(message.ref);
-        header.content_range_start = 0;
-        header.content_range_end = 0;
-        header.content_range_total = 0;
+        Http_header header;
+        header.m_code = HTTP_OK;
+        header.m_content_type = HTTP_CONTENT_TEXT;
+        header.m_content_length = os_strlen(message.ref);
+        header.m_content_range_start = 0;
+        header.m_content_range_end = 0;
+        header.m_content_range_total = 0;
         char *header_str = format_header(&header);
 
         Heap_chunk msg(512 + os_strlen(header_str) + 1, dont_free);

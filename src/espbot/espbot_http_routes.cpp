@@ -197,13 +197,13 @@ void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
         return;
     }
     // let's start with the header
-    struct http_header header;
-    header.code = HTTP_OK;
-    header.content_type = get_file_mime_type(filename);
-    header.content_length = file_size;
-    header.content_range_start = 0;
-    header.content_range_end = 0;
-    header.content_range_total = 0;
+    Http_header header;
+    header.m_code = HTTP_OK;
+    header.m_content_type = get_file_mime_type(filename);
+    header.m_content_length = file_size;
+    header.m_content_range_start = 0;
+    header.m_content_range_end = 0;
+    header.m_content_range_total = 0;
     char *header_str = format_header(&header);
     if (header_str == NULL)
     {
@@ -281,10 +281,49 @@ void ICACHE_FLASH_ATTR return_file(struct espconn *p_espconn, char *filename)
     }
 }
 
+void ICACHE_FLASH_ATTR preflight_response(struct espconn *p_espconn, Html_parsed_req *parsed_req)
+{
+    esplog.all("webserver::preflight_response\n");
+    Http_header header;
+    header.m_code = HTTP_OK;
+    header.m_content_type = get_file_mime_type(HTTP_CONTENT_TEXT);
+    header.m_origin = new char[os_strlen(parsed_req->origin) + 1];
+    if (header.m_origin == NULL)
+    {
+        response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        return;
+    }
+    os_strcpy(header.m_origin, parsed_req->origin);
+    header.m_acrh = new char[os_strlen(parsed_req->acrh) + 1];
+    if (header.m_acrh == NULL)
+    {
+        response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        return;
+    }
+    os_strcpy(header.m_acrh, parsed_req->acrh);
+    header.m_content_length = 0;
+    header.m_content_range_start = 0;
+    header.m_content_range_end = 0;
+    header.m_content_range_total = 0;
+    char *header_str = format_header(&header);
+    if (header_str == NULL)
+    {
+        response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        return;
+    }
+    // ok send the header
+    send_response_buffer(p_espconn, header_str);
+}
+
 void ICACHE_FLASH_ATTR espbot_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req)
 {
     esplog.all("espbot_http_routes\n");
 
+    if (parsed_req->req_method == HTTP_OPTIONS) // HTTP CORS
+    {
+        preflight_response(ptr_espconn, parsed_req);
+        return;
+    }
     if ((0 == os_strcmp(parsed_req->url, "/")) && (parsed_req->req_method == HTTP_GET)) // home
     {
         // home: look for index.html
