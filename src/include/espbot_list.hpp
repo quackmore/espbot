@@ -41,6 +41,7 @@ public:
   T *prev();
   List_err push_front(T *, List_param ovr = dont_ovverride_when_full);
   List_err push_back(T *, List_param ovr = dont_ovverride_when_full);
+  List_err remove();
   List_err pop_front();
   List_err pop_back();
 
@@ -218,6 +219,38 @@ List_err List<T>::push_back(T *elem, List_param ovr)
   {
     return list_alloc_fail;
   }
+}
+
+template <class T>
+List_err List<T>::remove()
+{
+  if (m_cursor)
+  {
+    m_size--;
+    if (m_delete_content)
+      delete m_cursor->content;
+    struct list_el *el_ptr = m_cursor;
+    if (m_cursor == m_front)
+    {
+      m_front = m_cursor->next;
+      if (m_front)
+        m_front->prev = NULL;
+      delete el_ptr;
+      return list_ok;
+    }
+    if (m_cursor == m_back)
+    {
+      m_back = m_cursor->prev;
+      if (m_back)
+        m_front->next = NULL;
+      delete el_ptr;
+      return list_ok;
+    }
+    (m_cursor->prev)->next = m_cursor->next;
+    (m_cursor->next)->prev = m_cursor->prev;
+    delete el_ptr;
+  }
+  return list_ok;
 }
 
 template <class T>
