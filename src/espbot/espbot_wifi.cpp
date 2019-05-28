@@ -227,7 +227,8 @@ void ICACHE_FLASH_ATTR Wifi::connect(void)
     }
     bool result = wifi_station_ap_number_set(1);
     result = wifi_station_set_reconnect_policy(false);
-    result = wifi_station_set_auto_connect(0);
+    if (wifi_station_get_auto_connect() != 0)
+        result = wifi_station_set_auto_connect(0);
 
     // disconnect ... just in case
     wifi_station_disconnect();
@@ -336,9 +337,12 @@ void ICACHE_FLASH_ATTR Wifi::init()
     os_timer_disarm(&wait_before_reconnect);
     os_timer_setfn(&wait_before_reconnect, (os_timer_func_t *)&Wifi::connect, NULL);
 
-    wifi_station_set_auto_connect(0);
+    if (wifi_station_get_auto_connect() != 0)
+        wifi_station_set_auto_connect(0);
+
     wifi_station_set_reconnect_policy(false);
-    wifi_set_phy_mode(PHY_MODE_11N);
+    if (wifi_get_phy_mode() != PHY_MODE_11N)
+        wifi_set_phy_mode(PHY_MODE_11N);
     wifi_set_event_handler_cb((wifi_event_handler_cb_t)wifi_event_handler);
 
     // start as SOFTAP and try to switch to STATION
