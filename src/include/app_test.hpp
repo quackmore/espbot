@@ -15,7 +15,7 @@ extern "C"
 }
 
 void init_test(struct ip_addr, uint32, char *);
-void run_test(void);
+void test_webclient(void);
 void run_test(int);
 
 #endif

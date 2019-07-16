@@ -6,7 +6,8 @@
 TOP_DIR:=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CCFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
 CCPPFLAGS:= -I$(TOP_DIR)/src/include -I$(SDK_DIR)/include
-LDFLAGS:= -L$(TOP_DIR)/lib -L$(SDK_DIR)/lib -L$(SDK_DIR)/ld $(LDFLAGS)
+#LDFLAGS:= -L$(TOP_DIR)/lib -L$(SDK_DIR)/lib -L$(SDK_DIR)/ld $(LDFLAGS)
+LDFLAGS:= -L$(TOP_DIR)/lib -L$(SDK_DIR)/lib $(LDFLAGS)
 
 boot = $(BOOT)
 app = $(APP)
@@ -203,7 +204,6 @@ CCFLAGS += 			                         \
 	-Wundef			                           \
 	-Werror			                           \
 	-Wl,-EL			                           \
-	-fno-inline-functions	                 \
 	-nostdlib                              \
 	-mlongcalls	                           \
 	-mtext-section-literals                \
@@ -216,6 +216,7 @@ CCFLAGS += 			                         \
   -DAPP_RELEASE=\"$(GIT_VERSION)\"    \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
+#	-fno-inline-functions	                 \
 
 CCPPFLAGS += 			                         \
 	-g			                               \
@@ -223,7 +224,6 @@ CCPPFLAGS += 			                         \
 	-Wundef			                           \
 	-Werror			                           \
 	-Wl,-EL			                           \
-	-fno-inline-functions	                 \
 	-nostdlib                              \
 	-mlongcalls	                           \
 	-mtext-section-literals                \
@@ -237,6 +237,7 @@ CCPPFLAGS += 			                         \
   -DAPP_RELEASE=\"$(GIT_VERSION)\"    \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
+#	-fno-inline-functions	                 \
 
 
 

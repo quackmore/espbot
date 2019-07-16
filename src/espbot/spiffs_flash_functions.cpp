@@ -20,7 +20,7 @@ extern "C"
 #include "spiffs_flash_functions.hpp"
 
 // flash read function (checkout SPIFFS documentation)
-s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
+s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 {
     // P_TRACE("[TRACE]: spiffs read called --------------------------------------\n");
     SpiFlashOpResult res;
@@ -91,7 +91,7 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 }
 
 // flash write function (checkout SPIFFS documentation)
-s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
+s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
 {
     // P_TRACE("[TRACE]: spiffs write called -------------------------------------\n");
     SpiFlashOpResult res;
@@ -198,7 +198,7 @@ s32_t ICACHE_FLASH_ATTR esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src
 }
 
 // flash erase function (checkout SPIFFS documentation)
-s32_t ICACHE_FLASH_ATTR esp_spiffs_erase(u32_t t_addr, u32_t t_size)
+s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size)
 {
     // P_TRACE("[TRACE]: spiffs erase called ------------------------------------\n");
     SpiFlashOpResult res;

@@ -61,7 +61,7 @@ private:
 };
 
 template <class T>
-List<T>::List(int max_size, List_param del)
+inline List<T>::List(int max_size, List_param del)
 {
   m_max_size = max_size;
   m_delete_content = del;
@@ -71,7 +71,7 @@ List<T>::List(int max_size, List_param del)
 }
 
 template <class T>
-List<T>::~List()
+inline List<T>::~List()
 {
   struct list_el *ptr, *tmp_ptr;
   ptr = m_front;
@@ -86,7 +86,7 @@ List<T>::~List()
 }
 
 template <class T>
-bool List<T>::empty()
+inline bool List<T>::empty()
 {
   if (m_size == 0)
     return true;
@@ -95,7 +95,7 @@ bool List<T>::empty()
 }
 
 template <class T>
-bool List<T>::full()
+inline bool List<T>::full()
 {
   if (m_size == m_max_size)
     return true;
@@ -104,13 +104,13 @@ bool List<T>::full()
 }
 
 template <class T>
-int List<T>::size()
+inline int List<T>::size()
 {
   return m_size;
 }
 
 template <class T>
-T *List<T>::front()
+inline T *List<T>::front()
 {
   m_cursor = m_front;
   if (m_front)
@@ -120,7 +120,7 @@ T *List<T>::front()
 }
 
 template <class T>
-T *List<T>::back()
+inline T *List<T>::back()
 {
   m_cursor = m_back;
   if (m_back)
@@ -130,7 +130,7 @@ T *List<T>::back()
 }
 
 template <class T>
-T *List<T>::next()
+inline T *List<T>::next()
 {
   if (m_cursor)
   {
@@ -144,7 +144,7 @@ T *List<T>::next()
 }
 
 template <class T>
-T *List<T>::prev()
+inline T *List<T>::prev()
 {
   if (m_cursor)
   {
@@ -158,7 +158,7 @@ T *List<T>::prev()
 }
 
 template <class T>
-List_err List<T>::push_front(T *elem, List_param ovr)
+inline List_err List<T>::push_front(T *elem, List_param ovr)
 {
   struct list_el *el_ptr = new struct list_el;
   if (el_ptr)
@@ -190,7 +190,7 @@ List_err List<T>::push_front(T *elem, List_param ovr)
 }
 
 template <class T>
-List_err List<T>::push_back(T *elem, List_param ovr)
+inline List_err List<T>::push_back(T *elem, List_param ovr)
 {
   struct list_el *el_ptr = new struct list_el;
   if (el_ptr)
@@ -222,7 +222,7 @@ List_err List<T>::push_back(T *elem, List_param ovr)
 }
 
 template <class T>
-List_err List<T>::remove()
+inline List_err List<T>::remove()
 {
   if (m_cursor)
   {
@@ -235,6 +235,8 @@ List_err List<T>::remove()
       m_front = m_cursor->next;
       if (m_front)
         m_front->prev = NULL;
+      if (m_size == 0)
+        m_back = NULL;
       delete el_ptr;
       return list_ok;
     }
@@ -242,7 +244,9 @@ List_err List<T>::remove()
     {
       m_back = m_cursor->prev;
       if (m_back)
-        m_front->next = NULL;
+        m_back->next = NULL;
+      if (m_size == 0)
+        m_front = NULL;
       delete el_ptr;
       return list_ok;
     }
@@ -254,7 +258,7 @@ List_err List<T>::remove()
 }
 
 template <class T>
-List_err List<T>::pop_front()
+inline List_err List<T>::pop_front()
 {
   struct list_el *el_ptr = m_front;
   if (m_front)
@@ -277,7 +281,7 @@ List_err List<T>::pop_front()
 }
 
 template <class T>
-List_err List<T>::pop_back()
+inline List_err List<T>::pop_back()
 {
   struct list_el *el_ptr = m_back;
   if (m_back)

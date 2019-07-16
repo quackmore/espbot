@@ -47,8 +47,7 @@ extern UartDevice UartDev;
  * Parameters   : uart_no, use UART0 or UART1 defined ahead
  * Returns      : NONE
 *******************************************************************************/
-LOCAL void ICACHE_FLASH_ATTR
-uart_config(uint8 uart_no)
+LOCAL void uart_config(uint8 uart_no)
 {
     if (uart_no == UART1)
     {
@@ -110,8 +109,7 @@ uart_config(uint8 uart_no)
 /*
  * ESPBOT change: just keeping SDK api interface for uart_init
  */
-void ICACHE_FLASH_ATTR
-uart_init(UartBautRate uart0_br, UartBautRate uart1_br)
+void uart_init(UartBautRate uart0_br, UartBautRate uart1_br)
 {
     UartDev.baut_rate = uart0_br;
     uart_config(UART0);

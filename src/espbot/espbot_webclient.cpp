@@ -15,6 +15,7 @@ extern "C"
 #include "mem.h"
 }
 
+#include "espbot_http.hpp"
 #include "espbot_webclient.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
@@ -24,334 +25,87 @@ extern "C"
 #include "espbot_debug.hpp"
 
 //
-// HTTP sending data:
-// ----------------
-// to make sure espconn_send is called after espconn_sent_callback of the previous packet
-// a flag is set before calling espconn_send (will be reset by sendcb)
-//
-// befor sending a response the flag will be checked
-// when the flag is found set (espconn_send not done yet)
-// a timer will used for postponing response
+// TIMEOUT TIMERS AND TIMER FUNCTIONS
 //
 
-#define DATA_SENDING_TIMER_PERIOD 500
-static bool espclient_busy_sending_data;
-static char *send_buffer;
-static os_timer_t webclnt_wait_for_data_sent;
+static os_timer_t connect_timeout_timer;
 
-struct client_send
-{
-    struct espconn *ptr_espconn;
-    char *msg;
-};
-
-static void ICACHE_FLASH_ATTR send(struct espconn *p_espconn, char *msg);
-
-static void ICACHE_FLASH_ATTR webclient_pending_request(void *arg)
-{
-    esplog.all("webclient_pending_request\n");
-    struct client_send *request_data = (struct client_send *)arg;
-    send(request_data->ptr_espconn, request_data->msg);
-    delete request_data;
-}
-
-static void ICACHE_FLASH_ATTR webclient_sentcb(void *arg)
-{
-    esplog.all("webclient_sentcb\n");
-    struct espconn *ptr_espconn = (struct espconn *)arg;
-    espmem.stack_mon();
-    espclient_busy_sending_data = false;
-    if (send_buffer)
-    {
-        delete[] send_buffer;
-        send_buffer = NULL;
-    }
-}
-
-static void ICACHE_FLASH_ATTR send(struct espconn *p_espconn, char *msg)
-{
-    esplog.all("webclient::send\n");
-    esplog.trace("request: *p_espconn: %X\n"
-                 "                msg: %s\n",
-                 p_espconn, msg);
-    if (espclient_busy_sending_data) // previous espconn_send not completed yet
-    {
-        esplog.debug("Webclnt::send - previous espconn_send not completed yet\n");
-        struct client_send *send_data = new struct client_send;
-        espmem.stack_mon();
-        if (send_data)
-        {
-            send_data->ptr_espconn = p_espconn;
-            send_data->msg = msg;
-            os_timer_setfn(&webclnt_wait_for_data_sent, (os_timer_func_t *)webclient_pending_request, (void *)send_data);
-            os_timer_arm(&webclnt_wait_for_data_sent, DATA_SENDING_TIMER_PERIOD, 0);
-        }
-        else
-        {
-            esplog.error("Webclnt::send - not enough heap memory (%s)\n", sizeof(struct client_send));
-        }
-    }
-    else // previous espconn_send completed
-    {
-        espclient_busy_sending_data = true;
-        sint8 res = espconn_send(p_espconn, (uint8 *)msg, os_strlen(msg));
-        espmem.stack_mon();
-        send_buffer = msg;
-        if (res)
-        {
-            esplog.error("Webclnt::send - error sending response, error code %d\n", res);
-            // on error don't count on sentcb to be called
-            espclient_busy_sending_data = false;
-            delete[] msg;
-        }
-    }
-}
-
-//
-// TIMERS AND TIMER FUNCTIONS
-//
-
-os_timer_t webclnt_connect_timeout_timer;
-
-void ICACHE_FLASH_ATTR webclnt_connect_timeout(void *arg)
+void webclnt_connect_timeout(void *arg)
 {
     esplog.all("webclnt_connect_timeout\n");
     espwebclnt.update_status(WEBCLNT_CONNECT_TIMEOUT);
+    espwebclnt.call_completed_func();
 }
 
-#define WEBCLNT_SEND_REQ_TIMER 500
-os_timer_t webclnt_send_req_timer;
+static os_timer_t send_req_timeout_timer;
 
-void webclnt_send_req_timer_function(void *arg)
+void webclnt_send_req_timeout_function(void *arg)
 {
-    esplog.all("webclnt_send_req_timer_function\n");
-    Webclnt *client = (Webclnt *)arg;
-    client->send_req(NULL);
+    esplog.all("webclnt_send_req_timeout_function\n");
+    os_printf("web client: response timeout\n");
+    Webclnt *clnt = (Webclnt *)arg;
+    clnt->update_status(WEBCLNT_RESPONSE_TIMEOUT);
+    clnt->call_completed_func();
 }
 
-//
-// HTTP receive and parsing response
-//
-
-static void ICACHE_FLASH_ATTR init_html_parsed_response(Html_parsed_response *res)
-{
-    esplog.all("init_html_parsed_response\n");
-    res->http_code = 0;
-    res->content_range_start = 0;
-    res->content_range_end = 0;
-    res->content_range_size = 0;
-    res->content_len = 0;
-    res->body = NULL;
-}
-
-static void ICACHE_FLASH_ATTR parse_http_response(char *request, Html_parsed_response *parsed_response)
-{
-    esplog.all("webclnt::parse_http_response\n");
-    char *tmp_ptr = request;
-    char *end_ptr = NULL;
-    char *tmp_str = NULL;
-    int len = 0;
-    espmem.stack_mon();
-
-    if (tmp_ptr == NULL)
-    {
-        esplog.error("webclnt::parse_http_response - cannot parse empty message\n");
-        return;
-    }
-
-    // looking for HTTP CODE
-    tmp_ptr = request;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "HTTP");
-    if (tmp_ptr == NULL)
-    {
-        tmp_ptr = request;
-    }
-    else
-    {
-        tmp_ptr = (char *)os_strstr(tmp_ptr, " ");
-        do
-        {
-            tmp_ptr++;
-        } while (*tmp_ptr == ' ');
-    }
-    end_ptr = (char *)os_strstr(tmp_ptr, " ");
-    if (end_ptr == NULL)
-    {
-        esplog.error("webclnt::parse_http_response - cannot find HTTP code\n");
-        return;
-    }
-    len = end_ptr - tmp_ptr;
-    {
-        Heap_chunk tmp_str(len + 1);
-        if (tmp_str.ref == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-            return;
-        }
-        os_strncpy(tmp_str.ref, tmp_ptr, len);
-        parsed_response->http_code = atoi(tmp_str.ref);
-    }
-
-    // now the content-length
-    tmp_ptr = request;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Length: ");
-    if (tmp_ptr == NULL)
-    {
-        esplog.trace("webclnt::parse_http_response - didn't find any Content-Length\n");
-    }
-    else
-    {
-        tmp_ptr += 16;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
-        if (end_ptr == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - cannot find Content-Length value\n");
-            return;
-        }
-        len = end_ptr - tmp_ptr;
-        Heap_chunk tmp_str(len + 1);
-        if (tmp_str.ref == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-            return;
-        }
-        os_strncpy(tmp_str.ref, tmp_ptr, len);
-        parsed_response->content_len = atoi(tmp_str.ref);
-    }
-    // now Content-Range (if any)
-    tmp_ptr = request;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Range: ");
-    if (tmp_ptr == NULL)
-    {
-        esplog.trace("webclnt::parse_http_response - didn't find any Content-Range\n");
-    }
-    else
-    {
-        tmp_ptr = (char *)os_strstr(tmp_ptr, "bytes");
-        if (tmp_ptr == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - cannot find Content-Range value\n");
-            return;
-        }
-        // range start
-        tmp_ptr += os_strlen("bytes ");
-        end_ptr = (char *)os_strstr(tmp_ptr, "-");
-        if (end_ptr == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - cannot find range start\n");
-            return;
-        }
-        len = end_ptr - tmp_ptr;
-        {
-            Heap_chunk tmp_str(len + 1);
-            if (tmp_str.ref == NULL)
-            {
-                esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-                return;
-            }
-            os_strncpy(tmp_str.ref, tmp_ptr, len);
-            parsed_response->content_range_start = atoi(tmp_str.ref);
-        }
-        // range end
-        tmp_ptr++;
-        end_ptr = (char *)os_strstr(tmp_ptr, "/");
-        if (end_ptr == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - cannot find range end\n");
-            return;
-        }
-        len = end_ptr - tmp_ptr;
-        {
-            Heap_chunk tmp_str(len + 1);
-            if (tmp_str.ref == NULL)
-            {
-                esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-                return;
-            }
-            os_strncpy(tmp_str.ref, tmp_ptr, len);
-            parsed_response->content_range_start = atoi(tmp_str.ref);
-        }
-        // range size
-        tmp_ptr++;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
-        if (end_ptr == NULL)
-        {
-            esplog.error("webclnt::parse_http_response - cannot find Content-Range size\n");
-            return;
-        }
-        len = end_ptr - tmp_ptr;
-        {
-            Heap_chunk tmp_str(len + 1);
-            if (tmp_str.ref == NULL)
-            {
-                esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-                return;
-            }
-            os_strncpy(tmp_str.ref, tmp_ptr, len);
-            parsed_response->content_range_size = atoi(tmp_str.ref);
-        }
-    }
-    // finally the body
-    tmp_ptr = request;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "\r\n\r\n");
-    if (tmp_ptr == NULL)
-    {
-        esplog.error("webclnt::parse_http_response - cannot find Content start\n");
-        return;
-    }
-    tmp_ptr += 4;
-    len = os_strlen(tmp_ptr);
-    parsed_response->body = new char[len + 1];
-    if (parsed_response->body == NULL)
-    {
-        esplog.error("webclnt::parse_http_response - not enough heap memory\n");
-        return;
-    }
-    os_memcpy(parsed_response->body, tmp_ptr, len);
-}
-
-static void ICACHE_FLASH_ATTR webclient_recv(void *arg, char *precdata, unsigned short length)
+static void webclient_recv(void *arg, char *precdata, unsigned short length)
 {
     esplog.all("webclient_recv\n");
-    os_timer_disarm(&webclnt_send_req_timer);
+    os_timer_disarm(&send_req_timeout_timer);
     struct espconn *ptr_espconn = (struct espconn *)arg;
     espmem.stack_mon();
-    esplog.trace("received msg: %s\n", precdata);
-    Html_parsed_response *parsed_response = new Html_parsed_response;
-    if (parsed_response)
-    {
-        init_html_parsed_response(parsed_response);
-        parse_http_response(precdata, parsed_response);
+    esplog.trace("received msg(%d): %s\n", length, precdata);
 
-        esplog.trace("Webclnt::webclient_recv parsed response:\n"
-                     "->                            http code: %d\n"
-                     "->                  content_range_start: %d\n"
-                     "->                    content_range_end: %d\n"
-                     "->                   content_range_size: %d\n"
-                     "->                          content len: %d\n"
-                     "->                                 body: %s\n",
-                     parsed_response->http_code,
-                     parsed_response->content_range_start,
-                     parsed_response->content_range_end,
-                     parsed_response->content_range_size,
-                     parsed_response->content_len,
-                     parsed_response->body);
+    Http_parsed_response *parsed_response = new Http_parsed_response;
+    http_parse_response(precdata, parsed_response);
 
-        espwebclnt.m_response = parsed_response;
-        espwebclnt.update_status(WEBCLNT_RESPONSE_READY);
-    }
-    else
+    esplog.trace("Webclnt::webclient_recv parsed response:\n"
+                 "->                              espconn: %X\n"
+                 "->                            http code: %d\n"
+                 "->                  content_range_start: %d\n"
+                 "->                    content_range_end: %d\n"
+                 "->                   content_range_size: %d\n"
+                 "->                   header content len: %d\n"
+                 "->                          content len: %d\n"
+                 "->                                 body: %s\n",
+                 ptr_espconn,
+                 parsed_response->http_code,
+                 parsed_response->content_range_start,
+                 parsed_response->content_range_end,
+                 parsed_response->content_range_size,
+                 parsed_response->h_content_len,
+                 parsed_response->content_len,
+                 parsed_response->body);
+
+    if (!parsed_response->no_header_message && (parsed_response->h_content_len > parsed_response->content_len))
     {
-        esplog.error("Webclnt::webclient_recv - not enough heap memory (%s)\n", sizeof(Html_parsed_response));
-        espwebclnt.update_status(WEBCLNT_RESPONSE_ERROR);
+        os_timer_arm(&send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        esplog.debug("Webclnt::webclient_recv - message has been splitted waiting for completion ...\n");
+        http_save_pending_response(ptr_espconn, precdata, length, parsed_response);
+        delete parsed_response;
+        esplog.debug("Webclnt::webclient_recv - pending response saved ...\n");
+        return;
     }
+    if (parsed_response->no_header_message)
+    {
+        os_timer_arm(&send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        esplog.debug("Websvr::webclient_recv - No header message, checking pending responses ...\n");
+        http_check_pending_responses(ptr_espconn, parsed_response->body, webclient_recv);
+        delete parsed_response;
+        esplog.debug("Webclnt::webclient_recv - response checked ...\n");
+        return;
+    }
+    espwebclnt.update_status(WEBCLNT_RESPONSE_READY);
+    espwebclnt.parsed_response = parsed_response;
+    espwebclnt.call_completed_func();
+    delete parsed_response;
 }
 
 //
 // ESPCONN callbacks
 //
 
-static ICACHE_FLASH_ATTR void webclient_recon(void *arg, sint8 err)
+static void webclient_recon(void *arg, sint8 err)
 {
     esplog.all("webclient_recon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
@@ -364,7 +118,7 @@ static ICACHE_FLASH_ATTR void webclient_recon(void *arg, sint8 err)
                  err);
 }
 
-static ICACHE_FLASH_ATTR void webclient_discon(void *arg)
+static void webclient_discon(void *arg)
 {
     esplog.all("webclient_discon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
@@ -374,15 +128,17 @@ static ICACHE_FLASH_ATTR void webclient_discon(void *arg)
                  pesp_conn->proto.tcp->remote_ip[2],
                  pesp_conn->proto.tcp->remote_ip[3],
                  pesp_conn->proto.tcp->remote_port);
+    espwebclnt.update_status(WEBCLNT_DISCONNECTED);
+    espwebclnt.call_completed_func();
 }
 
-static void ICACHE_FLASH_ATTR webclient_connected(void *arg)
+static void webclient_connected(void *arg)
 {
     esplog.all("webclient_connected\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
     espconn_regist_recvcb(pesp_conn, webclient_recv);
-    espconn_regist_sentcb(pesp_conn, webclient_sentcb);
+    espconn_regist_sentcb(pesp_conn, http_sentcb);
     espconn_regist_reconcb(pesp_conn, webclient_recon);
     espconn_regist_disconcb(pesp_conn, webclient_discon);
 
@@ -398,31 +154,34 @@ static void ICACHE_FLASH_ATTR webclient_connected(void *arg)
     //        ESPCONN_CLOSE
     //    };
 
-    os_timer_disarm(&webclnt_connect_timeout_timer);
+    os_timer_disarm(&connect_timeout_timer);
     espwebclnt.update_status(WEBCLNT_CONNECTED);
+    espwebclnt.call_completed_func();
 }
 
 //
 // Webclnt class
 //
 
-void ICACHE_FLASH_ATTR Webclnt::init(void)
+void Webclnt::init(void)
 {
     esplog.all("Webclnt::init\n");
     m_status = WEBCLNT_DISCONNECTED;
-    m_response = NULL;
+    m_completed_func = NULL;
+    m_param = NULL;
+    this->parsed_response = NULL;
+    this->request = NULL;
 }
 
-void ICACHE_FLASH_ATTR Webclnt::connect(struct ip_addr t_server, uint32 t_port)
+void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_func)(void *), void *param)
 {
     esplog.all("Webclnt::connect\n");
 
-    if (m_response)
-    {
-        delete m_response;
-        m_response = NULL;
-    }
+    os_memcpy(&m_host, &t_server, sizeof(struct ip_addr));
+    m_port = t_port;
 
+    m_completed_func = completed_func;
+    m_param = param;
     m_status = WEBCLNT_CONNECTING;
     m_esp_conn.type = ESPCONN_TCP;
     m_esp_conn.state = ESPCONN_NONE;
@@ -432,12 +191,12 @@ void ICACHE_FLASH_ATTR Webclnt::connect(struct ip_addr t_server, uint32 t_port)
     m_esp_conn.proto.tcp->local_port = espconn_port();
 
     m_esp_conn.proto.tcp->remote_port = t_port;
-    os_memcpy(m_esp_conn.proto.tcp->remote_ip, &(t_server.addr), 4);
+    os_memcpy(m_esp_conn.proto.tcp->remote_ip, &(t_server.addr), sizeof(t_server.addr));
 
     espconn_regist_connectcb(&m_esp_conn, webclient_connected);
     // set timeout for connection
-    os_timer_setfn(&webclnt_connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, NULL);
-    os_timer_arm(&webclnt_connect_timeout_timer, 5000, 0);
+    os_timer_setfn(&connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, NULL);
+    os_timer_arm(&connect_timeout_timer, WEBCLNT_CONNECTION_TIMEOUT, 0);
     sint8 res = espconn_connect(&m_esp_conn);
     espmem.stack_mon();
     if (res)
@@ -445,96 +204,97 @@ void ICACHE_FLASH_ATTR Webclnt::connect(struct ip_addr t_server, uint32 t_port)
         // in this case callback will never be called
         m_status = WEBCLNT_CONNECT_FAILURE;
         esplog.error("Webclnt::connect failed to connect, error code: %d\n", res);
-        os_timer_disarm(&webclnt_connect_timeout_timer);
+        os_timer_disarm(&connect_timeout_timer);
+        call_completed_func();
     }
 }
 
-void ICACHE_FLASH_ATTR Webclnt::disconnect(void)
+void Webclnt::disconnect(void (*completed_func)(void *), void *param)
 {
     esplog.all("Webclnt::disconnect\n");
     m_status = WEBCLNT_DISCONNECTED;
+    m_completed_func = completed_func;
+    m_param = param;
+
+    // there is no need to delete this->request, http_send will do it
+    // if (this->request)
+    //     delete[] this->request;
+
     espconn_disconnect(&m_esp_conn);
-    // espconn_delete(&m_esp_conn);
     esplog.debug("web client disconnected\n");
 }
 
-void ICACHE_FLASH_ATTR Webclnt::send_req(char *t_msg)
+void Webclnt::format_request(char *t_request)
+{
+    esplog.all("Webclnt::format_request\n");
+    // there is no need to delete this->request, last http_send did it
+    // if (this->request)
+    //     delete[] this->request;
+
+    int request_len = 16 + // string format
+                      12 + // ip address
+                      5 +  // port
+                      os_strlen(t_request) +
+                      1;
+    this->request = new char[request_len];
+    if (this->request == NULL)
+    {
+        esplog.error("Webclnt::format_request - not enough heap memory %d\n", request_len);
+        return;
+    }
+    uint32 *tmp_ptr = &m_host.addr;
+    os_sprintf(this->request,
+               "%s\r\nHost: %d.%d.%d.%d:%d\r\n\r\n",
+               t_request,
+               ((char *)tmp_ptr)[0],
+               ((char *)tmp_ptr)[1],
+               ((char *)tmp_ptr)[2],
+               ((char *)tmp_ptr)[3],
+               m_port);
+    os_printf("request_len: %d, effective length: %d request: %s\n", request_len, os_strlen(this->request), this->request);
+}
+
+void Webclnt::send_req(char *t_msg, void (*completed_func)(void *), void *param)
 {
     esplog.all("Webclnt::send_req\n");
-    static int timer_cnt;
     espmem.stack_mon();
-    // first call, save the message
-    if (t_msg)
-    {
-        m_msg = t_msg;
-        timer_cnt = 0;
-    }
+    m_completed_func = completed_func;
+    format_request(t_msg);
 
     switch (m_status)
     {
-    case WEBCLNT_DISCONNECTED:
-        esplog.trace("Webclnt::send_req - disconnected, awaiting ...\n");
-        if (timer_cnt > 10)
-        {
-            esplog.error("Webclnt::send_req - timeout waiting for connection\n");
-            disconnect();
-        }
-        else
-        {
-            timer_cnt++;
-            os_timer_setfn(&webclnt_send_req_timer, (os_timer_func_t *)webclnt_send_req_timer_function, (void *)this);
-            os_timer_arm(&webclnt_send_req_timer, WEBCLNT_SEND_REQ_TIMER, 0);
-        }
-        break;
     case WEBCLNT_CONNECTED:
+    case WEBCLNT_RESPONSE_READY:
         esplog.trace("Webclnt::send_req - connected, sending ...\n");
-        send(&m_esp_conn, m_msg);
+        http_send(&m_esp_conn, this->request);
         m_status = WEBCLNT_WAITING_RESPONSE;
-        timer_cnt = 0;
-        os_timer_setfn(&webclnt_send_req_timer, (os_timer_func_t *)webclnt_send_req_timer_function, (void *)this);
-        os_timer_arm(&webclnt_send_req_timer, WEBCLNT_SEND_REQ_TIMER, 0);
-        m_status = WEBCLNT_WAITING_RESPONSE;
+        os_timer_disarm(&send_req_timeout_timer);
+        os_timer_setfn(&send_req_timeout_timer, (os_timer_func_t *)webclnt_send_req_timeout_function, (void *)this);
+        os_timer_arm(&send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
         break;
-    case WEBCLNT_WAITING_RESPONSE:
-        esplog.trace("Webclnt::send_req - awaiting for response...\n");
-        if (timer_cnt > 10)
-        {
-            esplog.error("Webclnt::send_req - timeout waiting for response\n");
-            disconnect();
-        }
-        else
-        {
-            timer_cnt++;
-            os_timer_setfn(&webclnt_send_req_timer, (os_timer_func_t *)webclnt_send_req_timer_function, (void *)this);
-            os_timer_arm(&webclnt_send_req_timer, WEBCLNT_SEND_REQ_TIMER, 0);
-        }
+    default:
+        m_status = WEBCLNT_CANNOT_SEND_REQUEST;
+        esplog.error("Webclnt::send_req - cannot send request as status is %s\n", get_status());
+        call_completed_func();
         break;
     }
 }
 
-Webclnt_status_type ICACHE_FLASH_ATTR Webclnt::get_status(void)
+Webclnt_status_type Webclnt::get_status(void)
 {
     esplog.all("Webclnt::get_status\n");
     return m_status;
 }
 
-void ICACHE_FLASH_ATTR Webclnt::update_status(Webclnt_status_type t_status)
+void Webclnt::update_status(Webclnt_status_type t_status)
 {
     esplog.all("Webclnt::update_status\n");
     m_status = t_status;
 }
 
-void ICACHE_FLASH_ATTR Webclnt::free_response(void)
+void Webclnt::call_completed_func(void)
 {
-    esplog.all("Webclnt::free_response\n");
-    if (m_response)
-    {
-        if (m_response->body)
-        {
-            delete[] m_response->body;
-            m_response->body = NULL;
-        }
-        delete m_response;
-        m_response = NULL;
-    }
+    esplog.all("Webclnt::call_completed_func\n");
+    if (m_completed_func)
+        m_completed_func(m_param);
 }

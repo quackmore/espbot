@@ -24,7 +24,7 @@ extern "C"
 #define LOG_DEBUG 5
 #define LOG_TRACE 6
 #define LOG_ALL 7
-#define LOG_BUF_SIZE 1024
+#define LOG_BUF_SIZE 512
 
 // found somewhere on www.esp8266.com
 // 3fffeb30 and 3fffffff is the designated area for the user stack
@@ -54,7 +54,8 @@ public:
   Logger(){};
   ~Logger(){};
 
-  void init();
+  void init_cfg();
+  void essential_init();
   int get_serial_level(void);
   int get_memory_level(void);
   void set_levels(char t_serial_level, char t_memory_level);

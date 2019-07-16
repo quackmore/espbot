@@ -26,7 +26,7 @@ extern "C"
 
 #define ESPBOT_INPUT_GET(input_reg, gpio_no) ((input_reg >> gpio_no) & BIT0)
 
-static int ICACHE_FLASH_ATTR gpio_getNum(int idx)
+static int gpio_getNum(int idx)
 {
     esplog.all("gpio_getNum\n");
     int num;
@@ -70,14 +70,14 @@ static int ICACHE_FLASH_ATTR gpio_getNum(int idx)
     }
 }
 
-void ICACHE_FLASH_ATTR Gpio::init(void)
+void Gpio::init(void)
 {
     esplog.all("Gpio::init\n");
     m_gpio_provisioned = 0;
     m_gpio_config = 0;
 }
 
-int ICACHE_FLASH_ATTR Gpio::config(int t_idx, int t_type)
+int Gpio::config(int t_idx, int t_type)
 {
     esplog.all("Gpio::config\n");
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
@@ -163,7 +163,7 @@ int ICACHE_FLASH_ATTR Gpio::config(int t_idx, int t_type)
     }
 }
 
-int ICACHE_FLASH_ATTR Gpio::unconfig(int t_idx)
+int Gpio::unconfig(int t_idx)
 {
     esplog.all("Gpio::unconfig\n");
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
@@ -178,7 +178,7 @@ int ICACHE_FLASH_ATTR Gpio::unconfig(int t_idx)
     }
 }
 
-int ICACHE_FLASH_ATTR Gpio::get_config(int t_idx)
+int Gpio::get_config(int t_idx)
 {
     esplog.all("Gpio::get_config\n");
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
@@ -200,7 +200,7 @@ int ICACHE_FLASH_ATTR Gpio::get_config(int t_idx)
     }
 }
 
-int ICACHE_FLASH_ATTR Gpio::read(int t_idx)
+int Gpio::read(int t_idx)
 {
     esplog.all("Gpio::read\n");
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
@@ -221,7 +221,7 @@ int ICACHE_FLASH_ATTR Gpio::read(int t_idx)
     }
 }
 
-int ICACHE_FLASH_ATTR Gpio::set(int t_idx, int t_value)
+int Gpio::set(int t_idx, int t_value)
 {
     esplog.all("Gpio::set\n");
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))

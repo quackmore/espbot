@@ -172,6 +172,13 @@ SECTIONS
 
     *libm.a:(.literal .text .literal.* .text.*)
 
+    *libapp.a:(.literal .text .literal.* .text.*)
+    *libdriver.a:(.literal .text .literal.* .text.*)
+    *libespbot.a:(.literal .text .literal.* .text.*)
+    *liblibrary.a:(.literal .text .literal.* .text.*)
+    *libspiffs.a:(.literal .text .literal.* .text.*)
+    *libuser.a:(.literal .text .literal.* .text.*)
+
     *(.irom0.literal .irom.literal .irom.text.literal .irom0.text .irom.text)
     _irom0_text_end = ABSOLUTE(.);
   } >irom0_0_seg :irom0_0_phdr
@@ -211,6 +218,9 @@ SECTIONS
     *(.fini.literal)
     *(.fini)
     *(.gnu.version)
+
+    *(.iram.text .iram.text.*)
+
     _text_end = ABSOLUTE(.);
     _etext = .;
   } >iram1_0_seg :iram1_0_phdr

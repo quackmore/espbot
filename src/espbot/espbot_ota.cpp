@@ -24,7 +24,7 @@ extern "C"
 #include "espbot_debug.hpp"
 #include "espbot_config.hpp"
 
-void ICACHE_FLASH_ATTR Ota_upgrade::init(void)
+void Ota_upgrade::init(void)
 {
     esplog.all("Ota_upgrade::init\n");
     if (restore_cfg() != CFG_OK)
@@ -41,20 +41,20 @@ void ICACHE_FLASH_ATTR Ota_upgrade::init(void)
     m_status = OTA_IDLE;
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::set_host(char *t_str)
+void Ota_upgrade::set_host(char *t_str)
 {
     esplog.all("Ota_upgrade::set_host\n");
     os_strncpy(m_host_str, t_str, 15);
     atoipaddr(&m_host, t_str);
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::set_port(char *t_str)
+void Ota_upgrade::set_port(char *t_str)
 {
     esplog.all("Ota_upgrade::set_port\n");
     m_port = atoi(t_str);
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::set_path(char *t_str)
+void Ota_upgrade::set_path(char *t_str)
 {
     esplog.all("Ota_upgrade::set_path\n");
     if (m_path)
@@ -73,7 +73,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::set_path(char *t_str)
     }
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::set_check_version(char *t_str)
+void Ota_upgrade::set_check_version(char *t_str)
 {
     esplog.all("Ota_upgrade::set_check_version\n");
     if ((os_strncmp(t_str, "true", 4) == 0) || (os_strncmp(t_str, "True", 4) == 0))
@@ -89,7 +89,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::set_check_version(char *t_str)
     esplog.error("Ota_upgrade::set_check_version: cannot assign 'm_check_version' with value (%s)\n", t_str);
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::set_reboot_on_completion(char *t_str)
+void Ota_upgrade::set_reboot_on_completion(char *t_str)
 {
     esplog.all("Ota_upgrade::set_reboot_on_completion\n");
     if ((os_strncmp(t_str, "true", 4) == 0) || (os_strncmp(t_str, "True", 4) == 0))
@@ -105,25 +105,25 @@ void ICACHE_FLASH_ATTR Ota_upgrade::set_reboot_on_completion(char *t_str)
     esplog.error("Ota_upgrade::set_check_version: cannot assign 'm_reboot_on_completion' with value (%s)\n", t_str);
 }
 
-char ICACHE_FLASH_ATTR *Ota_upgrade::get_host(void)
+char *Ota_upgrade::get_host(void)
 {
     esplog.all("Ota_upgrade::get_host\n");
     return m_host_str;
 }
 
-int ICACHE_FLASH_ATTR Ota_upgrade::get_port(void)
+int Ota_upgrade::get_port(void)
 {
     esplog.all("Ota_upgrade::get_port\n");
     return m_port;
 }
 
-char ICACHE_FLASH_ATTR *Ota_upgrade::get_path(void)
+char *Ota_upgrade::get_path(void)
 {
     esplog.all("Ota_upgrade::get_path\n");
     return m_path;
 }
 
-char ICACHE_FLASH_ATTR *Ota_upgrade::get_check_version(void)
+char *Ota_upgrade::get_check_version(void)
 {
     esplog.all("Ota_upgrade::get_check_version\n");
     if (m_check_version)
@@ -132,7 +132,7 @@ char ICACHE_FLASH_ATTR *Ota_upgrade::get_check_version(void)
         return "false";
 }
 
-char ICACHE_FLASH_ATTR *Ota_upgrade::get_reboot_on_completion(void)
+char *Ota_upgrade::get_reboot_on_completion(void)
 {
     esplog.all("Ota_upgrade::get_reboot_on_completion\n");
     if (m_reboot_on_completion)
@@ -143,7 +143,7 @@ char ICACHE_FLASH_ATTR *Ota_upgrade::get_reboot_on_completion(void)
 
 // upgrade
 
-void ICACHE_FLASH_ATTR Ota_upgrade::ota_completed_cb(void *arg)
+void Ota_upgrade::ota_completed_cb(void *arg)
 {
     esplog.all("Ota_upgrade::ota_completed_cb\n");
     uint8 u_flag = system_upgrade_flag_check();
@@ -159,7 +159,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::ota_completed_cb(void *arg)
     }
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
+void Ota_upgrade::ota_timer_function(void *arg)
 {
     esplog.all("Ota_upgrade::ota_timer_function\n");
 
@@ -288,7 +288,7 @@ void ICACHE_FLASH_ATTR Ota_upgrade::ota_timer_function(void *arg)
     }
 }
 
-void ICACHE_FLASH_ATTR Ota_upgrade::start_upgrade(void)
+void Ota_upgrade::start_upgrade(void)
 {
     esplog.all("Ota_upgrade::start_upgrade\n");
     if ((m_status == OTA_IDLE) || (m_status == OTA_SUCCESS) || (m_status == OTA_FAILED))
@@ -302,13 +302,13 @@ void ICACHE_FLASH_ATTR Ota_upgrade::start_upgrade(void)
     }
 }
 
-Ota_status_type ICACHE_FLASH_ATTR Ota_upgrade::get_status(void)
+Ota_status_type Ota_upgrade::get_status(void)
 {
     esplog.all("Ota_upgrade::get_status\n");
     return m_status;
 }
 
-int ICACHE_FLASH_ATTR Ota_upgrade::restore_cfg(void)
+int Ota_upgrade::restore_cfg(void)
 {
     esplog.all("Ota_upgrade::restore_cfg\n");
     File_to_json cfgfile("ota.cfg");
@@ -354,7 +354,7 @@ int ICACHE_FLASH_ATTR Ota_upgrade::restore_cfg(void)
     }
 }
 
-int ICACHE_FLASH_ATTR Ota_upgrade::saved_cfg_not_update(void)
+int Ota_upgrade::saved_cfg_not_update(void)
 {
     esplog.all("Ota_upgrade::saved_cfg_not_update\n");
     File_to_json cfgfile("ota.cfg");
@@ -414,7 +414,7 @@ int ICACHE_FLASH_ATTR Ota_upgrade::saved_cfg_not_update(void)
     }
 }
 
-int ICACHE_FLASH_ATTR Ota_upgrade::save_cfg(void)
+int Ota_upgrade::save_cfg(void)
 {
     esplog.all("Ota_upgrade::save_cfg\n");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)

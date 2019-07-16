@@ -36,27 +36,27 @@ static os_timer_t wait_before_reconnect;
 static int ap_count;
 static char *ap_list;
 
-static bool ICACHE_FLASH_ATTR is_timeout_timer_active(void)
+static bool is_timeout_timer_active(void)
 {
     esplog.all("Wifi::is_timeout_timer_active\n");
     return timeout_timer_active;
 }
 
-static void ICACHE_FLASH_ATTR start_connect_timeout_timer(void)
+static void start_connect_timeout_timer(void)
 {
     esplog.all("Wifi::start_connect_timeout_timer\n");
     os_timer_arm(&station_connect_timeout, WIFI_CONNECT_TIMEOUT, 0);
     timeout_timer_active = true;
 }
 
-static void ICACHE_FLASH_ATTR stop_connect_timeout_timer(void)
+static void stop_connect_timeout_timer(void)
 {
     esplog.all("Wifi::stop_connect_timeout_timer\n");
     os_timer_disarm(&station_connect_timeout);
     timeout_timer_active = false;
 }
 
-static void ICACHE_FLASH_ATTR switch_to_stationap(void)
+static void switch_to_stationap(void)
 {
     if (wifi_get_opmode() == STATIONAP_MODE)
         return;
@@ -67,7 +67,7 @@ static void ICACHE_FLASH_ATTR switch_to_stationap(void)
 // DEBUG
 // static Profiler *connect_profiler;
 
-void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
+void wifi_event_handler(System_Event_t *evt)
 {
     esplog.all("Wifi::wifi_event_handler\n");
     uint32 dummy;
@@ -165,7 +165,7 @@ void ICACHE_FLASH_ATTR wifi_event_handler(System_Event_t *evt)
     }
 }
 
-void ICACHE_FLASH_ATTR Wifi::set_stationap(void)
+void Wifi::set_stationap(void)
 {
     esplog.all("Wifi::set_stationap\n");
     struct ip_info ap_ip;
@@ -215,7 +215,7 @@ void ICACHE_FLASH_ATTR Wifi::set_stationap(void)
     espwebsvr.start(80);
 }
 
-void ICACHE_FLASH_ATTR Wifi::connect(void)
+void Wifi::connect(void)
 {
     esplog.all("Wifi::connect\n");
     struct station_config stationConf;
@@ -245,7 +245,7 @@ void ICACHE_FLASH_ATTR Wifi::connect(void)
     espmem.stack_mon();
 }
 
-static int ICACHE_FLASH_ATTR restore_cfg(void)
+static int restore_cfg(void)
 {
     esplog.all("Wifi::restore_cfg\n");
     File_to_json cfgfile("wifi.cfg");
@@ -275,7 +275,7 @@ static int ICACHE_FLASH_ATTR restore_cfg(void)
     }
 }
 
-static int ICACHE_FLASH_ATTR saved_cfg_not_update(void)
+static int saved_cfg_not_update(void)
 {
     esplog.all("Wifi::saved_cfg_not_update\n");
     File_to_json cfgfile("wifi.cfg");
@@ -308,7 +308,7 @@ static int ICACHE_FLASH_ATTR saved_cfg_not_update(void)
     }
 }
 
-void ICACHE_FLASH_ATTR Wifi::init()
+void Wifi::init()
 {
     esplog.all("Wifi::init\n");
     os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32); // uint8 ssid[32];
@@ -352,19 +352,19 @@ void ICACHE_FLASH_ATTR Wifi::init()
     Wifi::connect();
 }
 
-char ICACHE_FLASH_ATTR *Wifi::station_get_ssid(void)
+char *Wifi::station_get_ssid(void)
 {
     esplog.all("Wifi::station_get_ssid\n");
     return station_ssid;
 }
 
-char ICACHE_FLASH_ATTR *Wifi::station_get_password(void)
+char *Wifi::station_get_password(void)
 {
     esplog.all("Wifi::station_get_password\n");
     return station_pwd;
 }
 
-int ICACHE_FLASH_ATTR Wifi::save_cfg(void)
+int Wifi::save_cfg(void)
 {
     esplog.all("Wifi::save_cfg\n");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
@@ -405,7 +405,7 @@ int ICACHE_FLASH_ATTR Wifi::save_cfg(void)
     return CFG_OK;
 }
 
-void ICACHE_FLASH_ATTR Wifi::station_set_ssid(char *t_str, int t_len)
+void Wifi::station_set_ssid(char *t_str, int t_len)
 {
     esplog.all("Wifi::station_set_ssid\n");
     os_memset(station_ssid, 0, 32);
@@ -420,7 +420,7 @@ void ICACHE_FLASH_ATTR Wifi::station_set_ssid(char *t_str, int t_len)
     }
 }
 
-void ICACHE_FLASH_ATTR Wifi::station_set_pwd(char *t_str, int t_len)
+void Wifi::station_set_pwd(char *t_str, int t_len)
 {
     esplog.all("Wifi::station_set_ssid\n");
     os_memset(station_pwd, 0, 64);
@@ -441,7 +441,7 @@ static void *scan_completed_param = NULL;
 // DEBUG
 // static Profiler *scan_profiler;
 
-static void ICACHE_FLASH_ATTR fill_in_ap_list(void *arg, STATUS status)
+static void fill_in_ap_list(void *arg, STATUS status)
 {
     // delete scan_profiler;
     esplog.all("Wifi::fill_in_ap_list\n");
@@ -492,7 +492,7 @@ static void ICACHE_FLASH_ATTR fill_in_ap_list(void *arg, STATUS status)
         scan_completed_cb(scan_completed_param);
 }
 
-void ICACHE_FLASH_ATTR Wifi::scan_for_ap(struct scan_config *config, void (*callback)(void *), void *param)
+void Wifi::scan_for_ap(struct scan_config *config, void (*callback)(void *), void *param)
 {
     esplog.all("Wifi::scan_for_ap\n");
     scan_completed_cb = callback;
@@ -502,13 +502,13 @@ void ICACHE_FLASH_ATTR Wifi::scan_for_ap(struct scan_config *config, void (*call
     wifi_station_scan(config, (scan_done_cb_t)fill_in_ap_list);
 }
 
-int ICACHE_FLASH_ATTR Wifi::get_ap_count(void)
+int Wifi::get_ap_count(void)
 {
     esplog.all("Wifi::get_ap_count\n");
     return ap_count;
 }
 
-char ICACHE_FLASH_ATTR *Wifi::get_ap_name(int t_idx)
+char *Wifi::get_ap_name(int t_idx)
 {
     esplog.all("Wifi::get_ap_name\n");
     if (t_idx < ap_count)
@@ -517,7 +517,7 @@ char ICACHE_FLASH_ATTR *Wifi::get_ap_name(int t_idx)
         return "";
 }
 
-void ICACHE_FLASH_ATTR Wifi::free_ap_list(void)
+void Wifi::free_ap_list(void)
 {
     esplog.all("Wifi::free_ap_list\n");
     ap_count = 0;
@@ -533,7 +533,7 @@ void ICACHE_FLASH_ATTR Wifi::free_ap_list(void)
 static struct scan_config qs_cfg;
 static struct fast_scan qs_vars;
 
-static void ICACHE_FLASH_ATTR fast_scan_check_results(void *arg, STATUS status)
+static void fast_scan_check_results(void *arg, STATUS status)
 {
     esplog.all("Wifi::fast_scan_check_results\n");
     espmem.stack_mon();
@@ -568,7 +568,7 @@ static void ICACHE_FLASH_ATTR fast_scan_check_results(void *arg, STATUS status)
     }
 }
 
-void ICACHE_FLASH_ATTR Wifi::fast_scan_for_best_ap(char *ssid, char *ch_list, char ch_count, void (*callback)(void *), void *param)
+void Wifi::fast_scan_for_best_ap(char *ssid, char *ch_list, char ch_count, void (*callback)(void *), void *param)
 {
     esplog.all("Wifi::fast_scan_for_best_ap\n");
     espmem.stack_mon();
@@ -603,17 +603,17 @@ void ICACHE_FLASH_ATTR Wifi::fast_scan_for_best_ap(char *ssid, char *ch_list, ch
     }
 }
 
-struct fast_scan ICACHE_FLASH_ATTR *Wifi::get_fast_scan_results(void)
+struct fast_scan *Wifi::get_fast_scan_results(void)
 {
     return &qs_vars;
 }
 
-int ICACHE_FLASH_ATTR Wifi::get_op_mode(void)
+int Wifi::get_op_mode(void)
 {
     return wifi_get_opmode();
 }
 
-void ICACHE_FLASH_ATTR Wifi::get_ip_address(struct ip_info *t_ip)
+void Wifi::get_ip_address(struct ip_info *t_ip)
 {
     if (wifi_get_opmode() == STATIONAP_MODE)
     {

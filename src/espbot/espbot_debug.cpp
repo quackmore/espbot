@@ -20,7 +20,7 @@ extern "C"
  * DEBUGGER
  */
 
-void ICACHE_FLASH_ATTR Esp_mem::init(void)
+void Esp_mem::init(void)
 {
     uint32 first_stack_var;
     void *heap_var = os_zalloc(1);
@@ -47,7 +47,7 @@ void ICACHE_FLASH_ATTR Esp_mem::init(void)
     stack_mon();
 }
 
-void ICACHE_FLASH_ATTR Esp_mem::heap_mon(void)
+void Esp_mem::heap_mon(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
     //esplog.all("Esp_mem::heap_mon: %d\n", currentHeap);
@@ -55,7 +55,7 @@ void ICACHE_FLASH_ATTR Esp_mem::heap_mon(void)
         m_min_heap_size = currentHeap;
 }
 
-void ICACHE_FLASH_ATTR Esp_mem::stack_mon(void)
+void Esp_mem::stack_mon(void)
 {
     uint32 stack_var_addr = (uint32)&stack_var_addr;
     if (stack_var_addr > m_stack_max_addr)
@@ -109,37 +109,37 @@ void Esp_mem::espbot_free(void *addr)
     espmem.stack_mon();
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_min_stack_addr(void)
+uint32 Esp_mem::get_min_stack_addr(void)
 {
     esplog.all("Esp_mem::get_min_stack_addr\n");
     return m_stack_min_addr;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_stack_addr(void)
+uint32 Esp_mem::get_max_stack_addr(void)
 {
     esplog.all("Esp_mem::get_max_stack_addr\n");
     return m_stack_max_addr;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_start_heap_addr(void)
+uint32 Esp_mem::get_start_heap_addr(void)
 {
     esplog.all("Esp_mem::get_start_heap_addr\n");
     return m_heap_start_addr;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_heap_size(void)
+uint32 Esp_mem::get_max_heap_size(void)
 {
     esplog.all("Esp_mem::get_max_heap_size\n");
     return m_max_heap_size;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_mim_heap_size(void)
+uint32 Esp_mem::get_mim_heap_size(void)
 {
     esplog.all("Esp_mem::get_mim_heap_size\n");
     return m_min_heap_size;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_used_heap_size(void)
+uint32 Esp_mem::get_used_heap_size(void)
 {
     esplog.all("Esp_mem::get_used_heap_size\n");
     int idx;
@@ -153,13 +153,13 @@ uint32 ICACHE_FLASH_ATTR Esp_mem::get_used_heap_size(void)
     return used_heap;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_heap_objs(void)
+uint32 Esp_mem::get_heap_objs(void)
 {
     esplog.all("Esp_mem::get_heap_objs\n");
     return m_heap_objs;
 }
 
-uint32 ICACHE_FLASH_ATTR Esp_mem::get_max_heap_objs(void)
+uint32 Esp_mem::get_max_heap_objs(void)
 {
     esplog.all("Esp_mem::get_max_heap_objs\n");
     return m_max_heap_objs;

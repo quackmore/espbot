@@ -22,7 +22,7 @@ extern "C"
 #define FILE_TO_JSON_OK 0
 #define FILE_TO_JSON_ERROR 1
 
-ICACHE_FLASH_ATTR File_to_json::File_to_json(char *t_filename)
+File_to_json::File_to_json(char *t_filename)
 {
     esplog.all("File_to_json::File_to_json\n");
     m_filename = t_filename;
@@ -31,7 +31,7 @@ ICACHE_FLASH_ATTR File_to_json::File_to_json(char *t_filename)
     m_value_len = 0;
 }
 
-ICACHE_FLASH_ATTR File_to_json::~File_to_json()
+File_to_json::~File_to_json()
 {
     esplog.all("File_to_json::~File_to_json\n");
     if (m_cache)
@@ -40,13 +40,13 @@ ICACHE_FLASH_ATTR File_to_json::~File_to_json()
         delete [] m_value_str;
 }
 
-bool ICACHE_FLASH_ATTR File_to_json::exists(void)
+bool File_to_json::exists(void)
 {
     esplog.all("File_to_json::exists\n");
     return (Ffile::exists(&espfs, m_filename));
 }
 
-int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
+int File_to_json::find_string(char *t_string)
 {
     esplog.all("File_to_json::find_string\n");
     if (m_value_str)
@@ -121,13 +121,13 @@ int ICACHE_FLASH_ATTR File_to_json::find_string(char *t_string)
     }
 }
 
-char ICACHE_FLASH_ATTR *File_to_json::get_value(void)
+char *File_to_json::get_value(void)
 {
     esplog.all("File_to_json::get_value\n");
     return m_value_str;
 }
 
-int ICACHE_FLASH_ATTR File_to_json::get_value_len(void)
+int File_to_json::get_value_len(void)
 {
     esplog.all("File_to_json::get_value_len\n");
     return m_value_len;

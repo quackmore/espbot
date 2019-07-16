@@ -16,6 +16,7 @@ extern "C"
 #include "ip_addr.h"
 }
 
+#include "espbot_http.hpp"
 #include "espbot_webserver.hpp"
 #include "app_http_routes.hpp"
 #include "espbot.hpp"
@@ -28,7 +29,7 @@ extern "C"
 #include "app_test.hpp"
 #include "library.hpp"
 
-bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_req *parsed_req)
+bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     esplog.all("app_http_routes\n");
 
@@ -61,7 +62,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
                        system_get_chip_id(),
                        system_get_sdk_version(),
                        system_get_boot_version());
-            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
             // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
         }
         else
@@ -78,19 +79,19 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         {
             if (test_cfg.find_pair("test_number") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'test_number'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'test_number'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'test_number' does not have a INTEGER value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'test_number' does not have a INTEGER value type", false);
                 return true;
             }
             Heap_chunk tmp_test_number(test_cfg.get_cur_pair_value_len());
             if (tmp_test_number.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_test_number.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
@@ -99,14 +100,14 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         }
         else
         {
-            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
             return true;
         }
         Heap_chunk msg(36, dont_free);
         if (msg.ref)
         {
             os_sprintf(msg.ref, "{\"test_number\": %d}", test_number);
-            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
+            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
             // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
             run_test(test_number);
         }
@@ -116,9 +117,85 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         }
         return true;
     }
+    if ((0 == os_strcmp(parsed_req->url, "/api/test/webclient")) && (parsed_req->req_method == HTTP_POST))
+    {
+        Json_str test_cfg(parsed_req->req_content, parsed_req->content_len);
+        if (test_cfg.syntax_check() != JSON_SINTAX_OK)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            return true;
+        }
+        // host
+        if (test_cfg.find_pair("host") != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'host'", false);
+            return true;
+        }
+        if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'host' does not have a STRING value type", false);
+            return true;
+        }
+        Heap_chunk host(test_cfg.get_cur_pair_value_len());
+        if (host.ref == NULL)
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+            return true;
+        }
+        os_strncpy(host.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
+        struct ip_addr host_ip;
+        atoipaddr(&host_ip, host.ref);
+
+        // port
+        if (test_cfg.find_pair("port") != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'port'", false);
+            return true;
+        }
+        if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'port' does not have a INTEGER value type", false);
+            return true;
+        }
+        Heap_chunk tmp_port(test_cfg.get_cur_pair_value_len());
+        if (tmp_port.ref == NULL)
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+            return true;
+        }
+        os_strncpy(tmp_port.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
+        int port = atoi(tmp_port.ref);
+
+        // request
+        if (test_cfg.find_pair("request") != JSON_NEW_PAIR_FOUND)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'request'", false);
+            return true;
+        }
+        if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
+        {
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'request' does not have a STRING value type", false);
+            return true;
+        }
+        Heap_chunk request(test_cfg.get_cur_pair_value_len());
+        if (request.ref == NULL)
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+            return true;
+        }
+        os_strncpy(request.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
+
+        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+        init_test(host_ip, port, request.ref);
+        test_webclient();
+        return true;
+    }
     if ((0 == os_strcmp(parsed_req->url, "/api/testresponse")) && (parsed_req->req_method == HTTP_GET))
     {
-        espwebsvr.set_response_max_size(1024);
+        set_http_msg_max_size(1024);
         Heap_chunk message(512);
         if (message.ref)
         {
@@ -140,7 +217,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         header.m_content_range_start = 0;
         header.m_content_range_end = 0;
         header.m_content_range_total = 0;
-        char *header_str = format_header(&header);
+        char *header_str = http_format_header(&header);
 
         Heap_chunk msg(512 + os_strlen(header_str) + 1, dont_free);
         if (msg.ref)
@@ -153,7 +230,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
             esplog.trace("calling send_response: *p_espconn: %X\n"
                          "                              msg: %s\n",
                          ptr_espconn, msg.ref);
-            send_response(ptr_espconn, msg.ref);
+            http_send(ptr_espconn, msg.ref);
         }
         else
         {
@@ -177,133 +254,133 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
             // ssid
             if (test_cfg.find_pair("ssid") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ssid'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ssid'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ssid' does not have a STRING value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ssid' does not have a STRING value type", false);
                 return true;
             }
             Heap_chunk tmp_ssid(test_cfg.get_cur_pair_value_len());
             if (tmp_ssid.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_ssid.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
             // bssid
             if (test_cfg.find_pair("bssid") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'bssid'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'bssid'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'bssid' does not have a STRING value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'bssid' does not have a STRING value type", false);
                 return true;
             }
             Heap_chunk tmp_bssid(test_cfg.get_cur_pair_value_len());
             if (tmp_bssid.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_bssid.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
             // ch
             if (test_cfg.find_pair("ch") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ch'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ch'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ch' does not have a INTEGER value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ch' does not have a INTEGER value type", false);
                 return true;
             }
             Heap_chunk tmp_ch(test_cfg.get_cur_pair_value_len());
             if (tmp_ch.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_ch.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
             // show_hidden
             if (test_cfg.find_pair("show_hidden") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'show_hidden'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'show_hidden'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'show_hidden' does not have a INTEGER value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'show_hidden' does not have a INTEGER value type", false);
                 return true;
             }
             Heap_chunk tmp_show_hidden(test_cfg.get_cur_pair_value_len());
             if (tmp_show_hidden.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_show_hidden.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
             // show_hidden
             if (test_cfg.find_pair("scan_type") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_type'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_type'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_type' does not have a INTEGER value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_type' does not have a INTEGER value type", false);
                 return true;
             }
             Heap_chunk tmp_scan_type(test_cfg.get_cur_pair_value_len());
             if (tmp_scan_type.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_scan_type.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
             // scan_min_time
             if (test_cfg.find_pair("scan_min_time") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_min_time'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_min_time'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_min_time' does not have a INTEGER value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_min_time' does not have a INTEGER value type", false);
                 return true;
             }
             Heap_chunk tmp_scan_min_time(test_cfg.get_cur_pair_value_len());
             if (tmp_scan_min_time.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_scan_min_time.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
             // scan_max_time
             if (test_cfg.find_pair("scan_max_time") != JSON_NEW_PAIR_FOUND)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_max_time'", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_max_time'", false);
                 return true;
             }
             if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
             {
-                response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_max_time' does not have a INTEGER value type", false);
+                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_max_time' does not have a INTEGER value type", false);
                 return true;
             }
             Heap_chunk tmp_scan_max_time(test_cfg.get_cur_pair_value_len());
             if (tmp_scan_max_time.ref == NULL)
             {
                 esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", test_cfg.get_cur_pair_value_len() + 1);
-                response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
                 return true;
             }
             os_strncpy(tmp_scan_max_time.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
@@ -319,7 +396,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
         }
         else
         {
-            response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
             return true;
         }
         Heap_chunk msg(200, dont_free);
@@ -334,7 +411,7 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
                        scan_type,
                        scan_min_time,
                        scan_max_time);
-            response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
             // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
             struct scan_config cfg;
             cfg.ssid = NULL;
@@ -354,16 +431,10 @@ bool ICACHE_FLASH_ATTR app_http_routes(struct espconn *ptr_espconn, Html_parsed_
     }
     if ((0 == os_strcmp(parsed_req->url, "/api/testfastscan")) && (parsed_req->req_method == HTTP_GET))
     {
-        response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, "", false);
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, "", false);
         static char ch_list[] = {1, 6, 11};
         Wifi::fast_scan_for_best_ap("FASTWEB-13", ch_list, 3, NULL, NULL);
         return true;
     }
     return false;
 }
-
-// if ((0 == os_strcmp(parsed_req->url, "/api/wifi/scan")) && (parsed_req->req_method == HTTP_GET))
-// {
-//     Wifi::scan_for_ap(NULL, wifi_scan_completed_function, (void *)ptr_espconn);
-//     return;
-// }

@@ -13,7 +13,9 @@ extern "C"
 #include "osapi.h"
 #include "mem.h"
 #include "user_interface.h"
+#include "driver_uart.h"
 }
+
 extern "C"
 {
     int ets_vsprintf(char *str, const char *format, va_list argptr);
@@ -27,6 +29,7 @@ extern "C"
 #include "espbot_utils.hpp"
 #include "espbot_json.hpp"
 #include "espbot_config.hpp"
+#include "espbot_list.hpp"
 
 /*
  * LOGGER
@@ -34,7 +37,7 @@ extern "C"
 
 #define DEBUG_CFG_FILE_SIZE 128
 
-int ICACHE_FLASH_ATTR Logger::restore_cfg(void)
+int Logger::restore_cfg(void)
 {
     esplog.all("Logger::restore_cfg\n");
     File_to_json cfgfile("logger.cfg");
@@ -63,7 +66,7 @@ int ICACHE_FLASH_ATTR Logger::restore_cfg(void)
     }
 }
 
-int ICACHE_FLASH_ATTR Logger::saved_cfg_not_update(void)
+int Logger::saved_cfg_not_update(void)
 {
     esplog.all("Logger::saved_cfg_not_update\n");
     File_to_json cfgfile("logger.cfg");
@@ -97,7 +100,7 @@ int ICACHE_FLASH_ATTR Logger::saved_cfg_not_update(void)
     }
 }
 
-int ICACHE_FLASH_ATTR Logger::save_cfg(void)
+int Logger::save_cfg(void)
 {
     esplog.all("Logger::save_cfg\n");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
@@ -136,31 +139,39 @@ int ICACHE_FLASH_ATTR Logger::save_cfg(void)
     return CFG_OK;
 }
 
-void ICACHE_FLASH_ATTR Logger::init(void)
+void Logger::essential_init(void)
 {
-    esplog.all("Logger::init\n");
-    m_serial_level = LOG_INFO;
+    uart_init(BIT_RATE_74880, BIT_RATE_74880);
+    system_set_os_print(1); // enable log print
+    m_serial_level = LOG_ALL;
     m_memory_level = LOG_ERROR;
-    m_log = new List<char>(20, delete_content);
+    m_log = (List<char> *) new List<char>(20, delete_content);
+}
+
+void Logger::init_cfg(void)
+{
+    esplog.all("Logger::init_cfg\n");
+    uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
     if (restore_cfg())
     {
         esplog.warn("Logger::init - starting with default configuration\n");
     }
 }
 
-int ICACHE_FLASH_ATTR Logger::get_serial_level(void)
+int Logger::get_serial_level(void)
 {
     esplog.all("Logger::get_serial_level\n");
     return m_serial_level;
 }
 
-int ICACHE_FLASH_ATTR Logger::get_memory_level(void)
+int Logger::get_memory_level(void)
 {
     esplog.all("Logger::get_memory_level\n");
     return m_memory_level;
 }
 
-void ICACHE_FLASH_ATTR Logger::set_levels(char t_serial_level, char t_memory_level)
+void Logger::set_levels(char t_serial_level, char t_memory_level)
 {
     esplog.all("Logger::get_memory_level\n");
     if ((m_serial_level != t_serial_level) || (m_memory_level != t_memory_level))
@@ -171,184 +182,223 @@ void ICACHE_FLASH_ATTR Logger::set_levels(char t_serial_level, char t_memory_lev
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::fatal(const char *t_format, ...)
+void Logger::fatal(const char *t_format, ...)
 {
     if ((m_serial_level >= LOG_FATAL) || (m_memory_level >= LOG_FATAL))
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_FATAL)
-            os_printf_plus("[FATAL] %s", buffer);
+            os_printf_plus("[FATAL] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_FATAL)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
-            Heap_chunk time_str(27);
-            if (time_str.ref)
-                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
-            if (json_ptr.ref)
-            {
-                os_sprintf(json_ptr.ref,
-                           "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
-                           time_str.ref, buffer);
-                m_log->push_back(json_ptr.ref, override_when_full);
-            }
+            Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
+            if (json_ptr.ref == NULL)
+                return;
+            // eliminate final '\n' character
+            char *tmp_ptr = os_strstr(tmp_buffer.ref, "\n");
+            if (tmp_ptr)
+                *tmp_ptr = '\0';
+            os_sprintf(json_ptr.ref,
+                       "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
+                       esp_sntp.get_timestr(timestamp),
+                       tmp_buffer.ref);
+            m_log->push_back(json_ptr.ref, override_when_full);
         }
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::error(const char *t_format, ...)
+void Logger::error(const char *t_format, ...)
 {
     if ((m_serial_level >= LOG_ERROR) || (m_memory_level >= LOG_ERROR))
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_ERROR)
-            os_printf_plus("[ERROR] %s", buffer);
+            os_printf_plus("[ERROR] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_ERROR)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
-            Heap_chunk time_str(27);
-            if (time_str.ref)
-                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
-            if (json_ptr.ref)
-            {
-                os_sprintf(json_ptr.ref,
-                           "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
-                           time_str.ref, buffer);
-                m_log->push_back(json_ptr.ref, override_when_full);
-            }
+            Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
+            if (json_ptr.ref == NULL)
+                return;
+            // eliminate final '\n' character
+            char *tmp_ptr = os_strstr(tmp_buffer.ref, "\n");
+            if (tmp_ptr)
+                *tmp_ptr = '\0';
+            os_sprintf(json_ptr.ref,
+                       "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
+                       esp_sntp.get_timestr(timestamp),
+                       tmp_buffer.ref);
+            m_log->push_back(json_ptr.ref, override_when_full);
         }
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::warn(const char *t_format, ...)
+void Logger::warn(const char *t_format, ...)
 {
     if ((m_serial_level >= LOG_WARN) || (m_memory_level >= LOG_WARN))
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_WARN)
-            os_printf_plus("[WARN] %s", buffer);
+            os_printf_plus("[WARN] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_WARN)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
-            Heap_chunk time_str(27);
-            if (time_str.ref)
-                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
-            if (json_ptr.ref)
-            {
-                os_sprintf(json_ptr.ref,
-                           "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
-                           time_str.ref, buffer);
-                m_log->push_back(json_ptr.ref, override_when_full);
-            }
+            Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
+            if (json_ptr.ref == NULL)
+                return;
+            // eliminate final '\n' character
+            char *tmp_ptr = os_strstr(tmp_buffer.ref, "\n");
+            if (tmp_ptr)
+                *tmp_ptr = '\0';
+            os_sprintf(json_ptr.ref,
+                       "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
+                       esp_sntp.get_timestr(timestamp),
+                       tmp_buffer.ref);
+            m_log->push_back(json_ptr.ref, override_when_full);
         }
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::info(const char *t_format, ...)
+void Logger::info(const char *t_format, ...)
 {
     if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
         if (m_serial_level >= LOG_INFO)
-            os_printf_plus("[INFO] %s", buffer);
+            os_printf_plus("[INFO] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_INFO)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
-            Heap_chunk time_str(27);
-            if (time_str.ref)
-                os_sprintf(time_str.ref, "%s", esp_sntp.get_timestr(timestamp));
-            Heap_chunk json_ptr(29 + 24 + os_strlen(buffer), dont_free);
-            if (json_ptr.ref)
-            {
-                os_sprintf(json_ptr.ref,
-                           "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
-                           time_str.ref, buffer);
-                m_log->push_back(json_ptr.ref, override_when_full);
-            }
+            Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
+            if (json_ptr.ref == NULL)
+                return;
+            // eliminate final '\n' character
+            char *tmp_ptr = os_strstr(tmp_buffer.ref, "\n");
+            if (tmp_ptr)
+                *tmp_ptr = '\0';
+            os_sprintf(json_ptr.ref,
+                       "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
+                       esp_sntp.get_timestr(timestamp),
+                       tmp_buffer.ref);
+            m_log->push_back(json_ptr.ref, override_when_full);
         }
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::debug(const char *t_format, ...)
+void Logger::debug(const char *t_format, ...)
 {
     if (m_serial_level < LOG_DEBUG)
         return;
     else
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        os_printf_plus("[DEBUG] %s", buffer);
+        os_printf_plus("[DEBUG] %s", tmp_buffer.ref);
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::trace(const char *t_format, ...)
+void Logger::trace(const char *t_format, ...)
 {
     if (m_serial_level < LOG_TRACE)
         return;
     else
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        os_printf_plus("[TRACE] %s", buffer);
+        os_printf_plus("[TRACE] %s", tmp_buffer.ref);
     }
 }
 
-void ICACHE_FLASH_ATTR Logger::all(const char *t_format, ...)
+void Logger::all(const char *t_format, ...)
 {
     if (m_serial_level < LOG_ALL)
         return;
     else
     {
-        char buffer[LOG_BUF_SIZE];
         va_list al;
         va_start(al, t_format);
-        ets_vsnprintf(buffer, LOG_BUF_SIZE - 1, t_format, al);
+        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        if (tmp_buffer.ref == NULL)
+        {
+            va_end(al);
+            return;
+        }
+        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        os_printf_plus("[ALL] %s", buffer);
+        os_printf_plus("[ALL] %s", tmp_buffer.ref);
     }
 }
 
-char ICACHE_FLASH_ATTR *Logger::get_log_head()
+char *Logger::get_log_head()
 {
     return m_log->front();
 }
 
-char ICACHE_FLASH_ATTR *Logger::get_log_next()
+char *Logger::get_log_next()
 {
     return m_log->next();
 }
 
-int ICACHE_FLASH_ATTR Logger::get_log_size()
+int Logger::get_log_size()
 {
     return m_log->size();
 }
@@ -357,16 +407,16 @@ int ICACHE_FLASH_ATTR Logger::get_log_size()
  * PROFILER
  */
 
-ICACHE_FLASH_ATTR Profiler::Profiler(char *t_str)
+Profiler::Profiler(char *t_str)
 {
     esplog.all("Profiler::Profiler\n");
     m_msg = t_str;
     m_start_time_us = system_get_time();
 }
 
-ICACHE_FLASH_ATTR Profiler::~Profiler()
+Profiler::~Profiler()
 {
     esplog.all("Profiler::~Profiler\n");
     m_stop_time_us = system_get_time();
-    os_printf("ESPBOT PROFILER: %s: %d us\n", m_msg, (m_stop_time_us - m_start_time_us));
+    os_printf_plus("ESPBOT PROFILER: %s: %d us\n", m_msg, (m_stop_time_us - m_start_time_us));
 }

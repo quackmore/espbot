@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
 
-void ICACHE_FLASH_ATTR Mdns::start(char *app_alias)
+void Mdns::start(char *app_alias)
 {
     esplog.all("Mdns::start\n");
     struct ip_info ipconfig;
@@ -34,7 +34,7 @@ void ICACHE_FLASH_ATTR Mdns::start(char *app_alias)
     esplog.debug("mDns started\n");
 }
 
-void ICACHE_FLASH_ATTR Mdns::stop(void)
+void Mdns::stop(void)
 {
     esplog.all("Mdns::stop\n");
     espconn_mdns_close();

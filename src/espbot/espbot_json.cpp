@@ -16,7 +16,7 @@ extern "C"
 #include "espbot_json.hpp"
 #include "espbot_global.hpp"
 
-ICACHE_FLASH_ATTR Json_str::Json_str(char *t_str, int t_len)
+Json_str::Json_str(char *t_str, int t_len)
 {
     esplog.all("Json_str::Json_str\n");
     m_str = t_str;
@@ -29,7 +29,7 @@ ICACHE_FLASH_ATTR Json_str::Json_str(char *t_str, int t_len)
     m_cur_pair_value_len = 0;
 }
 
-char ICACHE_FLASH_ATTR *Json_str::find_object_end(char *t_str)
+char *Json_str::find_object_end(char *t_str)
 {
     esplog.all("Json_str::find_object_end\n");
     int paired_brackets = 0;
@@ -51,7 +51,7 @@ char ICACHE_FLASH_ATTR *Json_str::find_object_end(char *t_str)
         return NULL;
 }
 
-int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
+int Json_str::syntax_check(void)
 {
     esplog.all("Json_str::syntax_check\n");
     char *ptr = m_cursor;
@@ -224,7 +224,7 @@ int ICACHE_FLASH_ATTR Json_str::syntax_check(void)
     return -1; // the syntax is fine
 }
 
-Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
+Json_pair_type Json_str::find_next_pair(void)
 {
     esplog.all("Json_str::find_next_pair\n");
     m_cur_pair_string = NULL;
@@ -388,42 +388,42 @@ Json_pair_type ICACHE_FLASH_ATTR Json_str::find_next_pair(void)
         return JSON_NO_NEW_PAIR_FOUND;
 }
 
-char ICACHE_FLASH_ATTR *Json_str::get_cur_pair_string(void)
+char *Json_str::get_cur_pair_string(void)
 {
     esplog.all("Json_str::get_cur_pair_string\n");
     return m_cur_pair_string;
 }
 
-int ICACHE_FLASH_ATTR Json_str::get_cur_pair_string_len(void)
+int Json_str::get_cur_pair_string_len(void)
 {
     esplog.all("Json_str::get_cur_pair_string_len\n");
     return m_cur_pair_string_len;
 }
 
-Json_value_type ICACHE_FLASH_ATTR Json_str::get_cur_pair_value_type(void)
+Json_value_type Json_str::get_cur_pair_value_type(void)
 {
     esplog.all("Json_str::get_cur_pair_value_type\n");
     return m_cur_pair_value_type;
 }
 
-char ICACHE_FLASH_ATTR *Json_str::get_cur_pair_value(void)
+char *Json_str::get_cur_pair_value(void)
 {
     esplog.all("Json_str::get_cur_pair_value\n");
     return m_cur_pair_value;
 }
 
-int ICACHE_FLASH_ATTR Json_str::get_cur_pair_value_len(void)
+int Json_str::get_cur_pair_value_len(void)
 {
     esplog.all("Json_str::get_cur_pair_value_len\n");
     return m_cur_pair_value_len;
 }
 
-// char ICACHE_FLASH_ATTR *Json_str::get_cursor(void)
+// char *Json_str::get_cursor(void)
 // {
 //     return m_cursor;
 // }
 
-Json_pair_type ICACHE_FLASH_ATTR Json_str::find_pair(char *t_string)
+Json_pair_type Json_str::find_pair(char *t_string)
 {
     esplog.all("Json_str::find_pair\n");
     m_cursor = m_str;

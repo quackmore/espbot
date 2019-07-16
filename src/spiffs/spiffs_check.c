@@ -43,7 +43,7 @@
 // searches in the object indices and returns the referenced page index given
 // the object id and the data span index
 // destroys fs->lu_work
-static s32_t ICACHE_FLASH_ATTR spiffs_object_get_data_page_index_reference(
+static s32_t spiffs_object_get_data_page_index_reference(
   spiffs *fs,
   spiffs_obj_id obj_id,
   spiffs_span_ix data_spix,
@@ -74,7 +74,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_object_get_data_page_index_reference(
 }
 
 // copies page contents to a new page
-static s32_t ICACHE_FLASH_ATTR spiffs_rewrite_page(spiffs *fs, spiffs_page_ix cur_pix, spiffs_page_header *p_hdr, spiffs_page_ix *new_pix) {
+static s32_t spiffs_rewrite_page(spiffs *fs, spiffs_page_ix cur_pix, spiffs_page_header *p_hdr, spiffs_page_ix *new_pix) {
   s32_t res;
   res = spiffs_page_allocate_data(fs, p_hdr->obj_id, p_hdr, 0,0,0,0, new_pix);
   SPIFFS_CHECK_RES(res);
@@ -88,7 +88,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_rewrite_page(spiffs *fs, spiffs_page_ix cu
 
 // rewrites the object index for given object id and replaces the
 // data page index to a new page index
-static s32_t ICACHE_FLASH_ATTR spiffs_rewrite_index(spiffs *fs, spiffs_obj_id obj_id, spiffs_span_ix data_spix, spiffs_page_ix new_data_pix, spiffs_page_ix objix_pix) {
+static s32_t spiffs_rewrite_index(spiffs *fs, spiffs_obj_id obj_id, spiffs_span_ix data_spix, spiffs_page_ix new_data_pix, spiffs_page_ix objix_pix) {
   s32_t res;
   spiffs_block_ix bix;
   int entry;
@@ -153,7 +153,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_rewrite_index(spiffs *fs, spiffs_obj_id ob
 }
 
 // deletes an object just by marking object index header as deleted
-static s32_t ICACHE_FLASH_ATTR spiffs_delete_obj_lazy(spiffs *fs, spiffs_obj_id obj_id) {
+static s32_t spiffs_delete_obj_lazy(spiffs *fs, spiffs_obj_id obj_id) {
   spiffs_page_ix objix_hdr_pix;
   s32_t res;
   res = spiffs_obj_lu_find_id_and_span(fs, obj_id, 0, 0, &objix_hdr_pix);
@@ -176,7 +176,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_delete_obj_lazy(spiffs *fs, spiffs_obj_id 
 }
 
 // validates the given look up entry
-static s32_t ICACHE_FLASH_ATTR spiffs_lookup_check_validate(spiffs *fs, spiffs_obj_id lu_obj_id, spiffs_page_header *p_hdr,
+static s32_t spiffs_lookup_check_validate(spiffs *fs, spiffs_obj_id lu_obj_id, spiffs_page_header *p_hdr,
     spiffs_page_ix cur_pix, spiffs_block_ix cur_block, int cur_entry, int *reload_lu) {
   (void)cur_block;
   (void)cur_entry;
@@ -455,7 +455,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_lookup_check_validate(spiffs *fs, spiffs_o
   return res;
 }
 
-static s32_t ICACHE_FLASH_ATTR spiffs_lookup_check_v(spiffs *fs, spiffs_obj_id obj_id, spiffs_block_ix cur_block, int cur_entry,
+static s32_t spiffs_lookup_check_v(spiffs *fs, spiffs_obj_id obj_id, spiffs_block_ix cur_block, int cur_entry,
     const void *user_const_p, void *user_var_p) {
   (void)user_const_p;
   (void)user_var_p;
@@ -485,7 +485,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_lookup_check_v(spiffs *fs, spiffs_obj_id o
 
 // Scans all object look up. For each entry, corresponding page header is checked for validity.
 // If an object index header page is found, this is also checked
-s32_t ICACHE_FLASH_ATTR spiffs_lookup_consistency_check(spiffs *fs, u8_t check_all_objects) {
+s32_t spiffs_lookup_consistency_check(spiffs *fs, u8_t check_all_objects) {
   (void)check_all_objects;
   s32_t res = SPIFFS_OK;
 
@@ -519,7 +519,7 @@ s32_t ICACHE_FLASH_ATTR spiffs_lookup_consistency_check(spiffs *fs, u8_t check_a
 //  * x011 used, referenced only once, not index
 //  * x101 used, unreferenced, index
 // The working memory might not fit all pages so several scans might be needed
-static s32_t ICACHE_FLASH_ATTR spiffs_page_consistency_check_i(spiffs *fs) {
+static s32_t spiffs_page_consistency_check_i(spiffs *fs) {
   const u32_t bits = 4;
   const spiffs_page_ix pages_per_scan = SPIFFS_CFG_LOG_PAGE_SZ(fs) * 8 / bits;
 
@@ -861,7 +861,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_page_consistency_check_i(spiffs *fs) {
 }
 
 // Checks consistency amongst all pages and fixes irregularities
-s32_t ICACHE_FLASH_ATTR spiffs_page_consistency_check(spiffs *fs) {
+s32_t spiffs_page_consistency_check(spiffs *fs) {
   CHECK_CB(fs, SPIFFS_CHECK_PAGE, SPIFFS_CHECK_PROGRESS, 0, 0);
   s32_t res = spiffs_page_consistency_check_i(fs);
   if (res != SPIFFS_OK) {
@@ -876,7 +876,7 @@ s32_t ICACHE_FLASH_ATTR spiffs_page_consistency_check(spiffs *fs) {
 
 // searches for given object id in temporary object id index,
 // returns the index or -1
-static int ICACHE_FLASH_ATTR spiffs_object_index_search(spiffs *fs, spiffs_obj_id obj_id) {
+static int spiffs_object_index_search(spiffs *fs, spiffs_obj_id obj_id) {
   u32_t i;
   spiffs_obj_id *obj_table = (spiffs_obj_id *)fs->work;
   obj_id &= ~SPIFFS_OBJ_ID_IX_FLAG;
@@ -888,7 +888,7 @@ static int ICACHE_FLASH_ATTR spiffs_object_index_search(spiffs *fs, spiffs_obj_i
   return -1;
 }
 
-static s32_t ICACHE_FLASH_ATTR spiffs_object_index_consistency_check_v(spiffs *fs, spiffs_obj_id obj_id, spiffs_block_ix cur_block,
+static s32_t spiffs_object_index_consistency_check_v(spiffs *fs, spiffs_obj_id obj_id, spiffs_block_ix cur_block,
     int cur_entry, const void *user_const_p, void *user_var_p) {
   (void)user_const_p;
   s32_t res_c = SPIFFS_VIS_COUNTINUE;
@@ -983,7 +983,7 @@ static s32_t ICACHE_FLASH_ATTR spiffs_object_index_consistency_check_v(spiffs *f
 // Scans for index pages. When an index page is found, corresponding index header is searched for.
 // If no such page exists, the index page cannot be reached as no index header exists and must be
 // deleted.
-s32_t ICACHE_FLASH_ATTR spiffs_object_index_consistency_check(spiffs *fs) {
+s32_t spiffs_object_index_consistency_check(spiffs *fs) {
   s32_t res = SPIFFS_OK;
   // impl note:
   // fs->work is used for a temporary object index memory, listing found object ids and

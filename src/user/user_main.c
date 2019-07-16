@@ -40,7 +40,7 @@ uint32 priv_param_start_sec;
  * Parameters   : none
  * Returns      : rf cal sector
 *******************************************************************************/
-uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void)
+uint32 user_rf_cal_sector_set(void)
 {
     enum flash_size_map size_map = system_get_flash_size_map();
     uint32 rf_cal_sec = 0;
@@ -92,7 +92,7 @@ uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void)
     return rf_cal_sec;
 }
 
-void ICACHE_FLASH_ATTR user_rf_pre_init(void)
+void user_rf_pre_init(void)
 {
 }
 
@@ -106,7 +106,7 @@ static const partition_item_t at_partition_table[] = {
     {SYSTEM_PARTITION_CUSTOMER_PRIV_PARAM, SYSTEM_PARTITION_CUSTOMER_PRIV_PARAM_ADDR, 0x1000},
 };
 
-void ICACHE_FLASH_ATTR user_pre_init(void)
+void user_pre_init(void)
 {
     if (!system_partition_table_regist(at_partition_table, sizeof(at_partition_table) / sizeof(at_partition_table[0]), SPI_FLASH_SIZE_MAP))
     {
@@ -129,7 +129,7 @@ void espbot_init(void);
  * Returns      : none
 *******************************************************************************/
 
-void ICACHE_FLASH_ATTR user_init(void)
+void user_init(void)
 {
     system_init_done_cb(espbot_init);
 }

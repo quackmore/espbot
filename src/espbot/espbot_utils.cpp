@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_debug.hpp"
 
-int ICACHE_FLASH_ATTR atoh(char *str)
+int atoh(char *str)
 {
     esplog.all("atoh\n");
     int idx = 0;
@@ -46,7 +46,7 @@ int ICACHE_FLASH_ATTR atoh(char *str)
     return result;
 }
 
-void ICACHE_FLASH_ATTR decodeUrlStr(char *str)
+void decodeUrlStr(char *str)
 {
     esplog.all("decodeUrlStr\n");
     char *tmpptr = str;
@@ -71,7 +71,7 @@ void ICACHE_FLASH_ATTR decodeUrlStr(char *str)
     *tmpptr = '\0';
 }
 
-void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
+void atoipaddr(struct ip_addr *ip, char *str)
 {
     esplog.all("atoipaddr\n");
     char *tmp_ptr = str;
@@ -110,14 +110,14 @@ void ICACHE_FLASH_ATTR atoipaddr(struct ip_addr *ip, char *str)
     IP4_ADDR(ip, tmp_ip[0], tmp_ip[1], tmp_ip[2], tmp_ip[3]);
 }
 
-int ICACHE_FLASH_ATTR get_rand_int(int max_value)
+int get_rand_int(int max_value)
 {
     esplog.all("get_rand_int\n");
     float value = (((float)os_random()) / ((float)__UINT32_MAX__)) * ((float)max_value);
     return (int)value;
 }
 
-char ICACHE_FLASH_ATTR *f2str(char *str, float value, int decimals)
+char *f2str(char *str, float value, int decimals)
 {
     int32 value_int = (int32)value;
     float value_dec = value - value_int;
@@ -131,23 +131,20 @@ char ICACHE_FLASH_ATTR *f2str(char *str, float value, int decimals)
     return str;
 }
 
-ICACHE_FLASH_ATTR Heap_chunk::Heap_chunk(int t_len, Free_opt t_to_be_free)
+Heap_chunk::Heap_chunk(int t_len, Free_opt t_to_be_free)
 {
-    esplog.all("Heap_chunk::Heap_chunk\n");
     ref = new char[t_len + 1];
     m_to_be_free = t_to_be_free;
 }
 
-ICACHE_FLASH_ATTR Heap_chunk::~Heap_chunk()
+Heap_chunk::~Heap_chunk()
 {
-    esplog.all("Heap_chunk::~Heap_chunk\n");
     if (m_to_be_free == free)
         if (ref)
             delete [] ref;
 }
 
-int ICACHE_FLASH_ATTR Heap_chunk::len(void)
+int Heap_chunk::len(void)
 {
-    esplog.all("Heap_chunk::len\n");
     return os_strlen(ref);
 }

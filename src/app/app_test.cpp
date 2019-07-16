@@ -20,7 +20,9 @@ extern "C"
 #include "gpio.h"
 }
 
+#include "iram.h"
 #include "app.hpp"
+#include "espbot_http.hpp"
 #include "app_test.hpp"
 #include "espbot_global.hpp"
 #include "espbot_debug.hpp"
@@ -31,90 +33,87 @@ static int test_counter;
 
 static os_timer_t test_timer;
 
-static void ICACHE_FLASH_ATTR test_function(void)
+static void test_function(void)
 {
     esplog.all("test_function\n");
-    run_test();
+    // run_test();
 }
 
-static struct ip_addr ota_server_ip;
-static int ota_server_port;
-static char *ota_request;
+static struct ip_addr host_ip;
+static int host_port;
+static char *client_request;
 
-void ICACHE_FLASH_ATTR init_test(struct ip_addr ip, uint32 port, char *request)
+void init_test(struct ip_addr ip, uint32 port, char *request)
 {
     esplog.all("init_test\n");
-    os_memcpy(&ota_server_ip, &ip, sizeof(struct ip_addr));
-    ota_server_port = port;
-    ota_request = new char[48 + 12 + os_strlen(request)];
-    if (ota_request == NULL)
+    os_memcpy(&host_ip, &ip, sizeof(struct ip_addr));
+    host_port = port;
+    client_request = new char[os_strlen(request) + 1];
+    if (client_request == NULL)
     {
         os_printf("os_zalloc error\n");
-        ota_request = NULL;
+        client_request = NULL;
     }
     else
     {
-        uint32 *tmp_ptr = &ip.addr;
-        os_sprintf(ota_request,
-                   "%s\r\nHost: %d.%d.%d.%d:%d\r\n\r\n",
-                   request,
-                   ((char *)tmp_ptr)[0],
-                   ((char *)tmp_ptr)[1],
-                   ((char *)tmp_ptr)[2],
-                   ((char *)tmp_ptr)[3],
-                   port);
-        os_printf("request: %s\n", ota_request);
+        os_strcpy(client_request, request);
+        os_printf("client_request length: %d, effective length: %d , request: %s\n", (os_strlen(request) + 1), os_strlen(client_request), client_request);
     }
 }
 
-void ICACHE_FLASH_ATTR run_test(void)
+void check_version(void *param)
 {
-    esplog.all("run_test\n");
-    system_soft_wdt_feed();
+    esplog.all("check_version\n");
     switch (espwebclnt.get_status())
     {
-    case WEBCLNT_DISCONNECTED:
-        os_printf("Starting connection to server ...\n");
-        os_timer_setfn(&test_timer, (os_timer_func_t *)test_function, NULL);
-        os_timer_arm(&test_timer, 500, 0);
-        espwebclnt.connect(ota_server_ip, ota_server_port);
-        break;
-    case WEBCLNT_CONNECTING:
-        os_printf("Connecting to server ...\n");
-        os_timer_setfn(&test_timer, (os_timer_func_t *)test_function, NULL);
-        os_timer_arm(&test_timer, 500, 0);
-        break;
-    case WEBCLNT_CONNECTED:
-        os_printf("Sending request to server ...\n");
-        os_timer_setfn(&test_timer, (os_timer_func_t *)test_function, NULL);
-        os_timer_arm(&test_timer, 500, 0);
-        espwebclnt.send_req(ota_request);
-        break;
-    case WEBCLNT_WAITING_RESPONSE:
-        os_printf("Awaiting for response from server ...\n");
-        os_timer_setfn(&test_timer, (os_timer_func_t *)test_function, NULL);
-        os_timer_arm(&test_timer, 500, 0);
-        break;
     case WEBCLNT_RESPONSE_READY:
-        os_printf("Received Response: %s\n", espwebclnt.m_response->body);
-        espwebclnt.disconnect();
-        espwebclnt.free_response();
+        if (espwebclnt.parsed_response->body)
+        {
+            os_printf("Server responded: %s\n", espwebclnt.parsed_response->body);
+        }
         break;
     default:
-        os_printf("Test aborted because of an error encountered\n");
-        espwebclnt.disconnect();
+        os_printf("wc_get_version: Ops ... webclient status is %d\n", espwebclnt.get_status());
+        break;
+    }
+    os_printf("Webclient test completed\n", espwebclnt.parsed_response->body);
+    espwebclnt.disconnect(NULL, NULL);
+}
+
+void get_version(void *param)
+{
+    esplog.all("get_version\n");
+    switch (espwebclnt.get_status())
+    {
+    case WEBCLNT_CONNECTED:
+        os_printf("Sending request to server ...\n");
+        espwebclnt.send_req(client_request, check_version, NULL);
+        delete[] client_request;
+        break;
+    default:
+        os_printf("get_version: Ops ... webclient status is %d\n", espwebclnt.get_status());
+        espwebclnt.disconnect(NULL, NULL);
         break;
     }
 }
 
-static void ICACHE_FLASH_ATTR output_seq_completed(void *param)
+void test_webclient(void)
+{
+    // webclient test
+    // staus WEBCLNT_DISCONNECTED
+    // connect to OTA server and get the version
+    os_printf("Starting connection to server ...\n");
+    espwebclnt.connect(host_ip, host_port, get_version, NULL);
+}
+
+static void output_seq_completed(void *param)
 {
     struct do_seq *seq = (struct do_seq *)param;
     free_do_seq(seq);
     os_printf("Test completed\n");
 }
 
-static void ICACHE_FLASH_ATTR input_seq_completed(void *param)
+static void input_seq_completed(void *param)
 {
     struct di_seq *seq = (struct di_seq *)param;
     if (seq->ended_by_timeout)
@@ -144,7 +143,7 @@ uint32 start_time;
 uint32 end_time;
 static di_seq *dht_input;
 
-static void ICACHE_FLASH_ATTR dht_reading_completed(void *param)
+static void dht_reading_completed(void *param)
 {
     struct di_seq *seq = (struct di_seq *)param;
     os_printf("start DHT -> start reading = %d\n", (end_time - start_time));
@@ -171,7 +170,7 @@ static void ICACHE_FLASH_ATTR dht_reading_completed(void *param)
     free_di_seq(seq);
 }
 
-static void dht_start_completed(void *param)
+static void IRAM dht_start_completed(void *param)
 {
     struct do_seq *seq = (struct do_seq *)param;
     // start reading from DHT
@@ -185,7 +184,7 @@ static void dht_start_completed(void *param)
     free_do_seq(seq);
 }
 
-void ICACHE_FLASH_ATTR run_test(int idx)
+void run_test(int idx)
 {
     struct do_seq *seq;
     switch (idx)
@@ -614,53 +613,53 @@ void ICACHE_FLASH_ATTR run_test(int idx)
     case 256:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(256);
+        set_http_msg_max_size(256);
         esplog.info("response buffer size set to 256 bytes\n");
     }
     break;
     case 512:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(512);
+        set_http_msg_max_size(512);
         esplog.info("response buffer size set to 512 bytes\n");
     }
     break;
     case 768:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(768);
+        set_http_msg_max_size(768);
         esplog.info("response buffer size set to 768 bytes\n");
     }
     break;
     case 1024:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(1024);
+        set_http_msg_max_size(1024);
         esplog.info("response buffer size set to 1024 bytes\n");
     }
     break;
     case 1280:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(1280);
+        set_http_msg_max_size(1280);
         esplog.info("response buffer size set to 1280 bytes\n");
     }
     break;
     case 1536:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(1536);
+        set_http_msg_max_size(1536);
         esplog.info("response buffer size set to 1536 bytes\n");
     }
     break;
     case 1792:
     {
         // set web server response buffer size
-        espwebsvr.set_response_max_size(1792);
+        set_http_msg_max_size(1792);
         esplog.info("response buffer size set to 1792 bytes\n");
     }
     break;
     default:
         break;
     }
-    }
+}

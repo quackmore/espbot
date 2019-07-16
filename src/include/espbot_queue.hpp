@@ -62,7 +62,7 @@ private:
 };
 
 template <class T>
-Queue<T>::Queue(int max_size)
+inline Queue<T>::Queue(int max_size)
 {
   m_max_size = max_size;
   m_size = 0;
@@ -76,14 +76,14 @@ Queue<T>::Queue(int max_size)
 }
 
 template <class T>
-Queue<T>::~Queue()
+inline Queue<T>::~Queue()
 {
   if (m_content)
     delete[] m_content;
 }
 
 template <class T>
-bool Queue<T>::empty()
+bool inline Queue<T>::empty()
 {
   if (m_size == 0)
     return true;
@@ -92,7 +92,7 @@ bool Queue<T>::empty()
 }
 
 template <class T>
-bool Queue<T>::full()
+bool inline Queue<T>::full()
 {
   if (m_size == m_max_size)
     return true;
@@ -101,13 +101,13 @@ bool Queue<T>::full()
 }
 
 template <class T>
-int Queue<T>::size()
+int inline Queue<T>::size()
 {
   return m_size;
 }
 
 template <class T>
-T *Queue<T>::front()
+inline T *Queue<T>::front()
 {
   if (m_size)
     return m_content[m_front];
@@ -116,7 +116,7 @@ T *Queue<T>::front()
 }
 
 template <class T>
-T *Queue<T>::back()
+inline T *Queue<T>::back()
 {
   if (m_size)
     return m_content[m_back];
@@ -125,7 +125,7 @@ T *Queue<T>::back()
 }
 
 template <class T>
-Queue_err Queue<T>::push(T *elem)
+inline Queue_err Queue<T>::push(T *elem)
 {
   if ((m_size == m_max_size) || (m_content == NULL))
     return Queue_full;
@@ -141,7 +141,7 @@ Queue_err Queue<T>::push(T *elem)
 }
 
 template <class T>
-Queue_err Queue<T>::pop()
+inline Queue_err Queue<T>::pop()
 {
   if (m_size == 0)
     return Queue_empty;

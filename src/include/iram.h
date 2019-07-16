@@ -6,14 +6,9 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
+#ifndef __IRAM_H__
+#define __IRAM_H__
 
-#ifndef __APP_HTTP_ROUTES_HPP__
-#define __APP_HTTP_ROUTES_HPP__
-
-#include "espbot_http.hpp"
-#include "espbot_webserver.hpp"
-
-bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req);
-
+#define IRAM __attribute__((section(".iram.text")))
 
 #endif

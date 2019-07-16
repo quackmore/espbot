@@ -34,18 +34,18 @@ char *app_release = APP_RELEASE;
 
 Dht *dht22;
 
-void ICACHE_FLASH_ATTR app_init_before_wifi(void)
+void app_init_before_wifi(void)
 {
     init_dio_task();
     dht22 = new Dht(ESPBOT_D2, DHT22, 1000, 2000, 0, 10);
 }
 
-void ICACHE_FLASH_ATTR app_init_after_wifi(void)
+void app_init_after_wifi(void)
 {
     esp_mDns.start("this_is_the_app_name");
 }
 
-void ICACHE_FLASH_ATTR app_deinit_on_wifi_disconnect()
+void app_deinit_on_wifi_disconnect()
 {
     esp_mDns.stop();
 }

@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
 
-void ICACHE_FLASH_ATTR Sntp::start(void)
+void Sntp::start(void)
 {
     esplog.all("Sntp::start\n");
     sntp_setservername(0, "0.pool.ntp.org");
@@ -32,19 +32,19 @@ void ICACHE_FLASH_ATTR Sntp::start(void)
     esplog.debug("Sntp started\n");
 }
 
-void ICACHE_FLASH_ATTR Sntp::stop(void)
+void Sntp::stop(void)
 {
     esplog.all("Sntp::stop\n");
     sntp_stop();
     esplog.debug("Sntp ended\n");
 }
 
-uint32 ICACHE_FLASH_ATTR Sntp::get_timestamp()
+uint32 Sntp::get_timestamp()
 {
     return sntp_get_current_timestamp();
 }
 
-char ICACHE_FLASH_ATTR *Sntp::get_timestr(uint32 t_time)
+char *Sntp::get_timestr(uint32 t_time)
 {
     char *time_str = sntp_get_real_time(t_time);
     char *tmp_ptr = os_strstr(time_str,"\n");

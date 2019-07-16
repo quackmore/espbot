@@ -30,6 +30,7 @@
  * ----------------------------------------------------------------------------
  */
 
+#include "iram.h"
 #include "os_type.h"
 #include "osapi.h"
 #include "driver_hw_timer.h"
@@ -44,7 +45,7 @@
                         10 ~ 0x7fffff;
 * Returns      : NONE
 *******************************************************************************/
-void hw_timer_arm(uint32 val)
+void IRAM hw_timer_arm(uint32 val)
 {
     RTC_REG_WRITE(FRC1_LOAD_ADDRESS, US_TO_RTC_TIMER_TICKS(val));
 }
@@ -56,18 +57,18 @@ static void (*user_hw_timer_cb)(void) = NULL;
 * Parameters   : timer callback function,
 * Returns      : NONE
 *******************************************************************************/
-void hw_timer_set_func(void (*user_hw_timer_cb_set)(void))
+void IRAM hw_timer_set_func(void (*user_hw_timer_cb_set)(void))
 {
     user_hw_timer_cb = user_hw_timer_cb_set;
 }
 
-static void hw_timer_isr_cb(void *arg)
+static void IRAM hw_timer_isr_cb(void *arg)
 {
     if (user_hw_timer_cb != NULL)
         (*(user_hw_timer_cb))();
 }
 
-static void hw_timer_nmi_cb(void)
+static void IRAM hw_timer_nmi_cb(void)
 {
     if (user_hw_timer_cb != NULL)
         (*(user_hw_timer_cb))();
@@ -84,7 +85,7 @@ static void hw_timer_nmi_cb(void)
                         1,  autoload mode,
 * Returns      : NONE
 *******************************************************************************/
-void hw_timer_init(FRC1_TIMER_SOURCE_TYPE source_type, u8 req)
+void IRAM hw_timer_init(FRC1_TIMER_SOURCE_TYPE source_type, u8 req)
 {
     if (req == 1)
         RTC_REG_WRITE(FRC1_CTRL_ADDRESS, FRC1_AUTO_LOAD | DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
@@ -100,7 +101,7 @@ void hw_timer_init(FRC1_TIMER_SOURCE_TYPE source_type, u8 req)
     ETS_FRC1_INTR_ENABLE();
 }
 
-void hw_timer_disarm(void)
+void IRAM hw_timer_disarm(void)
 {
     RTC_REG_WRITE(FRC1_CTRL_ADDRESS, DIVDED_BY_16 | FRC1_DISABLE_TIMER | TM_EDGE_INT);
     TM1_EDGE_INT_DISABLE();
