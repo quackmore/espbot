@@ -151,6 +151,7 @@ Espot include files are:
 + espbot_debug.hpp
 + espbot_global.hpp
 + espbot_gpio.hpp
++ espbot_http.hpp
 + espbot_http_routes.hpp
 + espbot_json.hpp
 + espbot_list.hpp
@@ -164,6 +165,7 @@ Espot include files are:
 + espbot_webserver.hpp
 + espbot_wifi.hpp
 + espbot.hpp
++ iram.h
 + spiffs_config.h
 + spiffs_esp8266.hpp
 + spiffs_flash_functions.hpp
