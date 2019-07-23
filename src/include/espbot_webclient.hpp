@@ -23,18 +23,17 @@ extern "C"
 
 typedef enum
 {
-  WEBCLNT_RESPONSE_READY = 0,
-  WEBCLNT_DISCONNECTED,
-  WEBCLNT_CONNECTING,
-  WEBCLNT_CONNECTED,
-  WEBCLNT_WAITING_RESPONSE,
+  WEBCLNT_DISCONNECTED = 1,
   WEBCLNT_CONNECT_FAILURE,
   WEBCLNT_CONNECT_TIMEOUT,
-  WEBCLNT_RESPONSE_ERROR,
+  WEBCLNT_CONNECTING,
+  WEBCLNT_CONNECTED,
   WEBCLNT_CANNOT_SEND_REQUEST,
-  WEBCLNT_RESPONSE_TIMEOUT
+  WEBCLNT_WAITING_RESPONSE,
+  WEBCLNT_RESPONSE_ERROR,
+  WEBCLNT_RESPONSE_TIMEOUT,
+  WEBCLNT_RESPONSE_READY
 } Webclnt_status_type;
-
 
 class Webclnt
 {
@@ -44,25 +43,27 @@ private:
   struct ip_addr m_host;
   uint32 m_port;
   Webclnt_status_type m_status;
-  void (*m_completed_func) (void *);
+
+  void (*m_completed_func)(void *);
   void *m_param;
   void format_request(char *);
 
 public:
-  Webclnt(){};
-  ~Webclnt(){};
+  Webclnt();
+  ~Webclnt();
+
+  os_timer_t m_connect_timeout_timer;
+  os_timer_t m_send_req_timeout_timer;
 
   char *request;
   Http_parsed_response *parsed_response;
-
-  void init(void);
 
   // connect will temporary change webclient status to WEBCLNT_CONNECTING
   // and will end up into one of the following:
   // WEBCLNT_CONNECT_FAILURE: espconn_connect failed (sigh!)
   // WEBCLNT_CONNECTED
   // WEBCLNT_CONNECT_TIMEOUT
-  // WEBCLNT_DISCONNECTED (??) not sure so just in case 
+  // WEBCLNT_DISCONNECTED (??) not sure so just in case
   void connect(struct ip_addr, uint32, void (*completed_func)(void *), void *param);
 
   // disconnect will change webclient status to WEBCLNT_DISCONNECTED
@@ -76,7 +77,7 @@ public:
   // WEBCLNT_CONNECT_FAILURE: espconn_connect failed (sigh!)
   // WEBCLNT_CONNECTED
   // WEBCLNT_CONNECT_TIMEOUT
-  // WEBCLNT_DISCONNECTED (??) not sure so just in case 
+  // WEBCLNT_DISCONNECTED (??) not sure so just in case
   void send_req(char *msg, void (*completed_func)(void *), void *param);
 
   Webclnt_status_type get_status(void);
@@ -84,6 +85,11 @@ public:
   void update_status(Webclnt_status_type);
 
   void call_completed_func(void);
+
+  void print_status(void);
 };
+
+// Init the webclient <-> espconn association data strucures
+void init_webclients_data_stuctures(void);
 
 #endif

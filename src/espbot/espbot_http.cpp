@@ -836,6 +836,26 @@ void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void 
     }
 }
 
+void clean_pending_responses(struct espconn *p_espconn)
+{
+    esplog.all("clean_pending_responses\n");
+    // look for a pending request on p_espconn
+    Http_pending_req *p_p_req = pending_requests->front();
+    while (p_p_req)
+    {
+        if (p_p_req->p_espconn == p_espconn)
+        {
+            esplog.warn("Removed pending response on espconn %X\n", p_espconn);
+            pending_requests->remove();
+            // one element removed from list, better restart from front
+            p_p_req = pending_requests->front();
+        }
+        // need to check p_p_req because of pending_requests->front() maybe was called ...
+        if (p_p_req)
+            p_p_req = pending_requests->next();
+    }
+}
+
 class Http_pending_res
 {
 public:
@@ -904,9 +924,9 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
         return;
     }
     pending_res->p_espconn = p_espconn;
-    os_strncpy(pending_res->response, precdata, length);
-    pending_res->content_len = parsed_res->h_content_len;
-    pending_res->content_received = parsed_res->content_len;
+    os_memcpy(pending_res->response, precdata, length);
+    pending_res->content_len = msg_len;
+    pending_res->content_received = length;
     List_err err = pending_responses->push_back(pending_res);
     if (err != list_ok)
     {
@@ -916,7 +936,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
     }
 }
 
-void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, void (*msg_complete)(void *, char *, unsigned short))
+void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int length, void (*msg_complete)(void *, char *, unsigned short))
 {
     esplog.all("http_check_pending_responses\n");
     // look for a pending request on p_espconn
@@ -933,13 +953,13 @@ void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, void
         return;
     }
     // add the received message part
-    char *str_ptr = p_p_res->response + os_strlen(p_p_res->response);
-    os_strncpy(str_ptr, new_msg, os_strlen(new_msg));
-    p_p_res->content_received += os_strlen(new_msg);
+    char *str_ptr = p_p_res->response + p_p_res->content_received;
+    os_memcpy(str_ptr, new_msg, length);
+    p_p_res->content_received += length;
     // check if the message is completed
     if (p_p_res->content_len == p_p_res->content_received)
     {
-        msg_complete((void *)p_espconn, p_p_res->response, os_strlen(p_p_res->response));
+        msg_complete((void *)p_espconn, p_p_res->response, p_p_res->content_len);
         pending_responses->remove();
     }
 }
@@ -1001,7 +1021,7 @@ Http_parsed_response::~Http_parsed_response()
         delete[] body;
 }
 
-void http_parse_response(char *response, Http_parsed_response *parsed_response)
+void http_parse_response(char *response, int length, Http_parsed_response *parsed_response)
 {
     esplog.all("http_parse_response\n");
     char *tmp_ptr = response;
@@ -1035,14 +1055,14 @@ void http_parse_response(char *response, Http_parsed_response *parsed_response)
     }
     if (parsed_response->no_header_message)
     {
-        parsed_response->content_len = os_strlen(tmp_ptr);
+        parsed_response->content_len = length;
         parsed_response->body = new char[parsed_response->content_len + 1];
         if (parsed_response->body == NULL)
         {
             esplog.error("http_parse_response - not enough heap memory\n");
             return;
         }
-        os_strncpy(parsed_response->body, tmp_ptr, parsed_response->content_len);
+        os_memcpy(parsed_response->body, tmp_ptr, parsed_response->content_len);
         return;
     }
 
@@ -1125,7 +1145,7 @@ void http_parse_response(char *response, Http_parsed_response *parsed_response)
             parsed_response->content_range_start = atoi(tmp_str.ref);
         }
         // range end
-        tmp_ptr++;
+        tmp_ptr = end_ptr + 1;
         end_ptr = (char *)os_strstr(tmp_ptr, "/");
         if (end_ptr == NULL)
         {
@@ -1141,10 +1161,10 @@ void http_parse_response(char *response, Http_parsed_response *parsed_response)
                 return;
             }
             os_strncpy(tmp_str.ref, tmp_ptr, len);
-            parsed_response->content_range_start = atoi(tmp_str.ref);
+            parsed_response->content_range_end = atoi(tmp_str.ref);
         }
         // range size
-        tmp_ptr++;
+        tmp_ptr = end_ptr + 1;
         end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
         if (end_ptr == NULL)
         {
@@ -1172,7 +1192,7 @@ void http_parse_response(char *response, Http_parsed_response *parsed_response)
         return;
     }
     tmp_ptr += 4;
-    len = os_strlen(tmp_ptr);
+    len = length - (tmp_ptr - response);
     parsed_response->content_len = len;
     parsed_response->body = new char[len + 1];
     if (parsed_response->body == NULL)
@@ -1180,5 +1200,5 @@ void http_parse_response(char *response, Http_parsed_response *parsed_response)
         esplog.error("http_parse_response - not enough heap memory\n");
         return;
     }
-    os_strncpy(parsed_response->body, tmp_ptr, len);
+    os_memcpy(parsed_response->body, tmp_ptr, len);
 }

@@ -181,7 +181,7 @@ public:
 };
 
 // parse_response takes the incoming string response and fill in parsed_response
-void http_parse_response(char *response, Http_parsed_response *parsed_response);
+void http_parse_response(char *response, int length, Http_parsed_response *parsed_response);
 
 // http responses can come in split into different messages
 // if that is the case then the incomplete messages are queued
@@ -191,7 +191,11 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
 // will check for pending responses on p_espconn
 // will add the new message part new_msg
 // will call msg_complete function one the message is complete
-void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, void (*msg_complete)(void *, char *, unsigned short ));
+void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int length, void (*msg_complete)(void *, char *, unsigned short ));
+
+//
+//
+void clean_pending_responses(struct espconn *p_espconn);
 
 //
 // init and clear http data structures

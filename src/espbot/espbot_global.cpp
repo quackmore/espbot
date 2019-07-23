@@ -28,6 +28,5 @@ Espbot espbot;
 Mdns esp_mDns;
 Sntp esp_sntp;
 Websvr espwebsvr;
-Webclnt espwebclnt;
 Ota_upgrade esp_ota;
 Gpio esp_gpio;

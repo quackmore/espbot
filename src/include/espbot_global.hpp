@@ -18,7 +18,6 @@
 #include "espbot_mdns.hpp"
 #include "espbot_sntp.hpp"
 #include "espbot_webserver.hpp"
-#include "espbot_webclient.hpp"
 #include "espbot_ota.hpp"
 #include "espbot_gpio.hpp"
 
@@ -30,7 +29,6 @@ extern Espbot espbot;
 extern Mdns esp_mDns;
 extern Sntp esp_sntp;
 extern Websvr espwebsvr;
-extern Webclnt espwebclnt;
 extern Ota_upgrade esp_ota;
 extern Gpio esp_gpio;
 

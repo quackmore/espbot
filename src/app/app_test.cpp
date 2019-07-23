@@ -23,6 +23,7 @@ extern "C"
 #include "iram.h"
 #include "app.hpp"
 #include "espbot_http.hpp"
+#include "espbot_webclient.hpp"
 #include "app_test.hpp"
 #include "espbot_global.hpp"
 #include "espbot_debug.hpp"
@@ -42,12 +43,25 @@ static void test_function(void)
 static struct ip_addr host_ip;
 static int host_port;
 static char *client_request;
+static Webclnt *espclient;
 
 void init_test(struct ip_addr ip, uint32 port, char *request)
 {
     esplog.all("init_test\n");
     os_memcpy(&host_ip, &ip, sizeof(struct ip_addr));
     host_port = port;
+    request = "GET /user1.bin HTTP/1.1\r\nRange: bytes=0-1023";
+    // GET /user1.bin HTTP/1.1
+    // Host: 192.168.1.201
+    // Range: bytes=0-1023
+    // User-Agent: PostmanRuntime/7.15.2
+    // Accept: */*
+    // Cache-Control: no-cache
+    // Postman-Token: c677f309-b16d-4f1b-a5cd-0e2b470a9a66,b3728ec9-2966-4b08-b49a-69e88790b76b
+    // Host: 192.168.1.201
+    // Accept-Encoding: gzip, deflate
+    // Connection: keep-alive
+    // cache-control: no-cache
     client_request = new char[os_strlen(request) + 1];
     if (client_request == NULL)
     {
@@ -59,40 +73,49 @@ void init_test(struct ip_addr ip, uint32 port, char *request)
         os_strcpy(client_request, request);
         os_printf("client_request length: %d, effective length: %d , request: %s\n", (os_strlen(request) + 1), os_strlen(client_request), client_request);
     }
+    espclient = new Webclnt;
+}
+
+void free_client(void *)
+{
+    delete espclient;
 }
 
 void check_version(void *param)
 {
     esplog.all("check_version\n");
-    switch (espwebclnt.get_status())
+    switch (espclient->get_status())
     {
     case WEBCLNT_RESPONSE_READY:
-        if (espwebclnt.parsed_response->body)
+        if (espclient->parsed_response->body)
         {
-            os_printf("Server responded: %s\n", espwebclnt.parsed_response->body);
+            os_printf("Server responded: %s\n", espclient->parsed_response->body);
         }
         break;
     default:
-        os_printf("wc_get_version: Ops ... webclient status is %d\n", espwebclnt.get_status());
+        os_printf("wc_get_version: Ops ... webclient status is %d\n", espclient->get_status());
         break;
     }
-    os_printf("Webclient test completed\n", espwebclnt.parsed_response->body);
-    espwebclnt.disconnect(NULL, NULL);
+    os_printf("Webclient test completed\n");
+    espclient->disconnect(free_client, NULL);
+    // delete espclient;
 }
 
 void get_version(void *param)
 {
     esplog.all("get_version\n");
-    switch (espwebclnt.get_status())
+    switch (espclient->get_status())
     {
     case WEBCLNT_CONNECTED:
-        os_printf("Sending request to server ...\n");
-        espwebclnt.send_req(client_request, check_version, NULL);
+        os_printf("Sending request [%s]\n", client_request);
+        espclient->send_req(client_request, check_version, NULL);
         delete[] client_request;
         break;
     default:
-        os_printf("get_version: Ops ... webclient status is %d\n", espwebclnt.get_status());
-        espwebclnt.disconnect(NULL, NULL);
+        os_printf("get_version: Ops ... webclient status is %d\n", espclient->get_status());
+        os_printf("Webclient test completed\n");
+        espclient->disconnect(free_client, NULL);
+        // delete espclient;
         break;
     }
 }
@@ -103,9 +126,10 @@ void test_webclient(void)
     // staus WEBCLNT_DISCONNECTED
     // connect to OTA server and get the version
     os_printf("Starting connection to server ...\n");
-    espwebclnt.connect(host_ip, host_port, get_version, NULL);
+    espclient->connect(host_ip, host_port, get_version, NULL);
 }
 
+/*
 static void output_seq_completed(void *param)
 {
     struct do_seq *seq = (struct do_seq *)param;
@@ -141,6 +165,7 @@ static void input_seq_completed(void *param)
 
 uint32 start_time;
 uint32 end_time;
+
 static di_seq *dht_input;
 
 static void dht_reading_completed(void *param)
@@ -183,12 +208,13 @@ static void IRAM dht_start_completed(void *param)
     // free output sequence
     free_do_seq(seq);
 }
-
+*/
 void run_test(int idx)
 {
     struct do_seq *seq;
     switch (idx)
     {
+    /*
     case 1:
     {
         PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
@@ -602,6 +628,7 @@ void run_test(int idx)
         exe_do_seq_us(seq);
     }
     break;
+    */
     case 13:
     {
         // Error print
@@ -610,6 +637,7 @@ void run_test(int idx)
         esplog.error("A new error (%d) was injected.\n", counter);
     }
     break;
+    /*
     case 256:
     {
         // set web server response buffer size
@@ -659,6 +687,7 @@ void run_test(int idx)
         esplog.info("response buffer size set to 1792 bytes\n");
     }
     break;
+    */
     default:
         break;
     }

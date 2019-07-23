@@ -25,39 +25,121 @@ extern "C"
 #include "espbot_debug.hpp"
 
 //
-// TIMEOUT TIMERS AND TIMER FUNCTIONS
+// ESPCONN <==> WEBCLNT ASSOCIATION
 //
 
-static os_timer_t connect_timeout_timer;
+typedef struct _A_espconn_webclnt
+{
+    struct espconn *p_pespconn;
+    Webclnt *client;
+} A_espconn_webclnt;
+
+static List<A_espconn_webclnt> *webclnt_espconn;
+
+void init_webclients_data_stuctures(void)
+{
+    esplog.all("init_webclient\n");
+    webclnt_espconn = new List<A_espconn_webclnt>(4, delete_content);
+}
+
+static Webclnt *get_client(struct espconn *p_pespconn)
+{
+    esplog.all("get_client\n");
+    A_espconn_webclnt *ptr = webclnt_espconn->front();
+    while (ptr)
+    {
+        if (ptr->p_pespconn == p_pespconn)
+            return ptr->client;
+    }
+    return NULL;
+}
+
+static void add_client_espconn_association(Webclnt *client, struct espconn *p_pespconn)
+{
+    esplog.all("add_client_espconn_association\n");
+    A_espconn_webclnt *new_association = new A_espconn_webclnt;
+    if (new_association == NULL)
+    {
+        esplog.error("add_client_espconn_association - not enough heap memory [%d]\n", sizeof(A_espconn_webclnt));
+        return;
+    }
+    new_association->client = client;
+    new_association->p_pespconn = p_pespconn;
+    List_err err = webclnt_espconn->push_back(new_association);
+    if (err != list_ok)
+    {
+        esplog.error("add_client_espconn_association - cannot register association between webclient %X and espconn %X\n",
+                     client,
+                     p_pespconn);
+        delete new_association;
+        return;
+    }
+}
+
+static void del_client_association(Webclnt *client)
+{
+    esplog.all("del_client_association\n");
+    A_espconn_webclnt *ptr = webclnt_espconn->front();
+    while (ptr)
+    {
+        if (ptr->client == client)
+        {
+            webclnt_espconn->remove();
+            // one element removed from list, better restart from front
+            ptr = webclnt_espconn->front();
+        }
+        // need to check ptr because of webclnt_espconn->front() maybe was called ...
+        if (ptr)
+            ptr = webclnt_espconn->next();
+    }
+}
+
+//
+// TIMER FUNCTIONS
+//
 
 void webclnt_connect_timeout(void *arg)
 {
-    esplog.all("webclnt_connect_timeout\n");
-    espwebclnt.update_status(WEBCLNT_CONNECT_TIMEOUT);
-    espwebclnt.call_completed_func();
+    esplog.error("webclnt_connect_timeout\n");
+    Webclnt *clnt = (Webclnt *)arg;
+    clnt->update_status(WEBCLNT_CONNECT_TIMEOUT);
+    clnt->call_completed_func();
 }
 
-static os_timer_t send_req_timeout_timer;
-
-void webclnt_send_req_timeout_function(void *arg)
+static void webclnt_send_req_timeout_function(void *arg)
 {
-    esplog.all("webclnt_send_req_timeout_function\n");
-    os_printf("web client: response timeout\n");
+    esplog.error("webclnt_send_req_timeout_function\n");
     Webclnt *clnt = (Webclnt *)arg;
     clnt->update_status(WEBCLNT_RESPONSE_TIMEOUT);
     clnt->call_completed_func();
 }
 
+//
+// RECEIVING
+//
+
 static void webclient_recv(void *arg, char *precdata, unsigned short length)
 {
     esplog.all("webclient_recv\n");
-    os_timer_disarm(&send_req_timeout_timer);
     struct espconn *ptr_espconn = (struct espconn *)arg;
+    Webclnt *client = get_client(ptr_espconn);
+    if (client == NULL)
+    {
+        esplog.error("webclient_recv - cannot get webclient ref from espconn %X\n", ptr_espconn);
+        return;
+    }
+    os_timer_disarm(&client->m_send_req_timeout_timer);
     espmem.stack_mon();
-    esplog.trace("received msg(%d): %s\n", length, precdata);
+    esplog.trace("webclient_recv - received msg(%d): %s\n", length, precdata);
+    // in case of binary message
+    // int ii;
+    // os_printf("msg hex: ");
+    // for (ii = 0; ii < length; ii++)
+    //     os_printf("%X ", precdata[ii]);
+    // os_printf("\n");
 
     Http_parsed_response *parsed_response = new Http_parsed_response;
-    http_parse_response(precdata, parsed_response);
+    http_parse_response(precdata, length, parsed_response);
 
     esplog.trace("Webclnt::webclient_recv parsed response:\n"
                  "->                              espconn: %X\n"
@@ -79,7 +161,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
 
     if (!parsed_response->no_header_message && (parsed_response->h_content_len > parsed_response->content_len))
     {
-        os_timer_arm(&send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        os_timer_arm(&client->m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
         esplog.debug("Webclnt::webclient_recv - message has been splitted waiting for completion ...\n");
         http_save_pending_response(ptr_espconn, precdata, length, parsed_response);
         delete parsed_response;
@@ -88,16 +170,16 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
     }
     if (parsed_response->no_header_message)
     {
-        os_timer_arm(&send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        os_timer_arm(&client->m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
         esplog.debug("Websvr::webclient_recv - No header message, checking pending responses ...\n");
-        http_check_pending_responses(ptr_espconn, parsed_response->body, webclient_recv);
+        http_check_pending_responses(ptr_espconn, parsed_response->body, parsed_response->content_len, webclient_recv);
         delete parsed_response;
         esplog.debug("Webclnt::webclient_recv - response checked ...\n");
         return;
     }
-    espwebclnt.update_status(WEBCLNT_RESPONSE_READY);
-    espwebclnt.parsed_response = parsed_response;
-    espwebclnt.call_completed_func();
+    client->update_status(WEBCLNT_RESPONSE_READY);
+    client->parsed_response = parsed_response;
+    client->call_completed_func();
     delete parsed_response;
 }
 
@@ -122,20 +204,28 @@ static void webclient_discon(void *arg)
 {
     esplog.all("webclient_discon\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
+    Webclnt *client = get_client(pesp_conn);
     espmem.stack_mon();
     esplog.debug("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
                  pesp_conn->proto.tcp->remote_ip[1],
                  pesp_conn->proto.tcp->remote_ip[2],
                  pesp_conn->proto.tcp->remote_ip[3],
                  pesp_conn->proto.tcp->remote_port);
-    espwebclnt.update_status(WEBCLNT_DISCONNECTED);
-    espwebclnt.call_completed_func();
+    if (client == NULL)
+    {
+        esplog.error("webclient_discon - cannot get webclient ref from espconn %X\n", pesp_conn);
+        return;
+    }
+    client->update_status(WEBCLNT_DISCONNECTED);
+    esplog.debug("webclient disconnected\n");
+    client->call_completed_func();
 }
 
 static void webclient_connected(void *arg)
 {
     esplog.all("webclient_connected\n");
     struct espconn *pesp_conn = (struct espconn *)arg;
+    Webclnt *client = get_client(pesp_conn);
     espmem.stack_mon();
     espconn_regist_recvcb(pesp_conn, webclient_recv);
     espconn_regist_sentcb(pesp_conn, http_sentcb);
@@ -154,23 +244,43 @@ static void webclient_connected(void *arg)
     //        ESPCONN_CLOSE
     //    };
 
-    os_timer_disarm(&connect_timeout_timer);
-    espwebclnt.update_status(WEBCLNT_CONNECTED);
-    espwebclnt.call_completed_func();
+    if (client == NULL)
+    {
+        esplog.error("webclient_connected - cannot get webclient ref from espconn %X\n", pesp_conn);
+        return;
+    }
+    os_timer_disarm(&client->m_connect_timeout_timer);
+    client->update_status(WEBCLNT_CONNECTED);
+    esplog.debug("webclient connected\n");
+    client->call_completed_func();
 }
 
 //
 // Webclnt class
 //
 
-void Webclnt::init(void)
+Webclnt::Webclnt()
 {
-    esplog.all("Webclnt::init\n");
+    esplog.all("Webclnt::Webclnt\n");
     m_status = WEBCLNT_DISCONNECTED;
     m_completed_func = NULL;
     m_param = NULL;
     this->parsed_response = NULL;
     this->request = NULL;
+    add_client_espconn_association(this, &m_esp_conn);
+}
+
+Webclnt::~Webclnt()
+{
+    esplog.all("Webclnt::~Webclnt\n");
+    //if ((m_status != WEBCLNT_DISCONNECTED) && 
+    //    (m_status != WEBCLNT_CONNECT_FAILURE) && 
+    //    (m_status != WEBCLNT_CONNECT_TIMEOUT) && 
+    //    (m_status != WEBCLNT_CONNECTING))
+    //{
+    //    espconn_disconnect(&m_esp_conn);
+        del_client_association(this);
+    // }
 }
 
 void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_func)(void *), void *param)
@@ -195,8 +305,8 @@ void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_f
 
     espconn_regist_connectcb(&m_esp_conn, webclient_connected);
     // set timeout for connection
-    os_timer_setfn(&connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, NULL);
-    os_timer_arm(&connect_timeout_timer, WEBCLNT_CONNECTION_TIMEOUT, 0);
+    os_timer_setfn(&m_connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, (void *)this);
+    os_timer_arm(&m_connect_timeout_timer, WEBCLNT_CONNECTION_TIMEOUT, 0);
     sint8 res = espconn_connect(&m_esp_conn);
     espmem.stack_mon();
     if (res)
@@ -204,7 +314,7 @@ void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_f
         // in this case callback will never be called
         m_status = WEBCLNT_CONNECT_FAILURE;
         esplog.error("Webclnt::connect failed to connect, error code: %d\n", res);
-        os_timer_disarm(&connect_timeout_timer);
+        os_timer_disarm(&m_connect_timeout_timer);
         call_completed_func();
     }
 }
@@ -221,7 +331,7 @@ void Webclnt::disconnect(void (*completed_func)(void *), void *param)
     //     delete[] this->request;
 
     espconn_disconnect(&m_esp_conn);
-    esplog.debug("web client disconnected\n");
+    esplog.debug("web client disconnecting ...\n");
 }
 
 void Webclnt::format_request(char *t_request)
@@ -251,7 +361,7 @@ void Webclnt::format_request(char *t_request)
                ((char *)tmp_ptr)[2],
                ((char *)tmp_ptr)[3],
                m_port);
-    os_printf("request_len: %d, effective length: %d request: %s\n", request_len, os_strlen(this->request), this->request);
+    // os_printf("request_len: %d, effective length: %d request: %s\n", request_len, os_strlen(this->request), this->request);
 }
 
 void Webclnt::send_req(char *t_msg, void (*completed_func)(void *), void *param)
@@ -265,12 +375,12 @@ void Webclnt::send_req(char *t_msg, void (*completed_func)(void *), void *param)
     {
     case WEBCLNT_CONNECTED:
     case WEBCLNT_RESPONSE_READY:
-        esplog.trace("Webclnt::send_req - connected, sending ...\n");
+        esplog.trace("Webclnt::send_req - connected, sending: %s\n", this->request);
         http_send(&m_esp_conn, this->request);
         m_status = WEBCLNT_WAITING_RESPONSE;
-        os_timer_disarm(&send_req_timeout_timer);
-        os_timer_setfn(&send_req_timeout_timer, (os_timer_func_t *)webclnt_send_req_timeout_function, (void *)this);
-        os_timer_arm(&send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        os_timer_disarm(&m_send_req_timeout_timer);
+        os_timer_setfn(&m_send_req_timeout_timer, (os_timer_func_t *)webclnt_send_req_timeout_function, (void *)this);
+        os_timer_arm(&m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
         break;
     default:
         m_status = WEBCLNT_CANNOT_SEND_REQUEST;
@@ -290,6 +400,7 @@ void Webclnt::update_status(Webclnt_status_type t_status)
 {
     esplog.all("Webclnt::update_status\n");
     m_status = t_status;
+    print_status();
 }
 
 void Webclnt::call_completed_func(void)
@@ -297,4 +408,46 @@ void Webclnt::call_completed_func(void)
     esplog.all("Webclnt::call_completed_func\n");
     if (m_completed_func)
         m_completed_func(m_param);
+}
+
+void Webclnt::print_status(void)
+{
+    char *status;
+    switch (m_status)
+    {
+    case WEBCLNT_RESPONSE_READY:
+        status = "RESPONSE_READY";
+        break;
+    case WEBCLNT_DISCONNECTED:
+        status = "DISCONNECTED";
+        break;
+    case WEBCLNT_CONNECTING:
+        status = "CONNECTING";
+        break;
+    case WEBCLNT_CONNECTED:
+        status = "CONNECTED";
+        break;
+    case WEBCLNT_WAITING_RESPONSE:
+        status = "WAITING_RESPONSE";
+        break;
+    case WEBCLNT_CONNECT_FAILURE:
+        status = "CONNECT_FAILURE";
+        break;
+    case WEBCLNT_CONNECT_TIMEOUT:
+        status = "CONNECT_TIMEOUT";
+        break;
+    case WEBCLNT_RESPONSE_ERROR:
+        status = "RESPONSE_ERROR";
+        break;
+    case WEBCLNT_CANNOT_SEND_REQUEST:
+        status = "CANNOT_SEND_REQUEST";
+        break;
+    case WEBCLNT_RESPONSE_TIMEOUT:
+        status = "RESPONSE_TIMEOUT";
+        break;
+    default:
+        status = "UNKNOWN";
+        break;
+    }
+    esplog.trace("Webclnt status --> %s\n", status);
 }

@@ -193,6 +193,7 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         test_webclient();
         return true;
     }
+    /*
     if ((0 == os_strcmp(parsed_req->url, "/api/testresponse")) && (parsed_req->req_method == HTTP_GET))
     {
         set_http_msg_max_size(1024);
@@ -436,5 +437,6 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         Wifi::fast_scan_for_best_ap("FASTWEB-13", ch_list, 3, NULL, NULL);
         return true;
     }
+    */
     return false;
 }

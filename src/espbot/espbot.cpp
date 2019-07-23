@@ -26,6 +26,7 @@ extern "C"
 #include "espbot_gpio.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_http.hpp"
+#include "espbot_webclient.hpp"
 #include "app.hpp"
 
 static void print_greetings(void)
@@ -142,7 +143,7 @@ void espbot_init(void)
     esp_ota.init();
     http_init();
     espwebsvr.init();
-    espwebclnt.init();
+    init_webclients_data_stuctures();
     esp_gpio.init();
     app_init_before_wifi();
 
