@@ -141,9 +141,11 @@ int Logger::save_cfg(void)
 
 void Logger::essential_init(void)
 {
-    uart_init(BIT_RATE_74880, BIT_RATE_74880);
+    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
+    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_460800, BIT_RATE_460800);
     system_set_os_print(1); // enable log print
-    m_serial_level = LOG_ALL;
+    m_serial_level = LOG_INFO;
     m_memory_level = LOG_ERROR;
     m_log = (List<char> *) new List<char>(20, delete_content);
 }
@@ -151,8 +153,6 @@ void Logger::essential_init(void)
 void Logger::init_cfg(void)
 {
     esplog.all("Logger::init_cfg\n");
-    uart_init(BIT_RATE_460800, BIT_RATE_460800);
-    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
     if (restore_cfg())
     {
         esplog.warn("Logger::init - starting with default configuration\n");

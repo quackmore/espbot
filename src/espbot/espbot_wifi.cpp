@@ -102,14 +102,14 @@ void wifi_event_handler(System_Event_t *evt)
                      IP2STR(&evt->event_info.got_ip.ip),
                      IP2STR(&evt->event_info.got_ip.mask),
                      IP2STR(&evt->event_info.got_ip.gw));
-        os_printf("\n");
+        os_printf_plus("\n");
         break;
     case EVENT_STAMODE_GOT_IP:
         esplog.debug("got IP:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
                      IP2STR(&evt->event_info.got_ip.ip),
                      IP2STR(&evt->event_info.got_ip.mask),
                      IP2STR(&evt->event_info.got_ip.gw));
-        os_printf("\n");
+        os_printf_plus("\n");
         // station connected to AP and got an IP address
         // whichever was wifi mode now AP mode is no longer required
         esplog.debug("ESP8266 connected as station to %s\n", Wifi::station_get_ssid());

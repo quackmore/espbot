@@ -31,18 +31,15 @@ extern "C"
 
 static void print_greetings(void)
 {
-    P_INFO("\n");
-    P_INFO("\n");
-    P_INFO("\n"); // early os_printf always fails ...
-    P_INFO("Hello there! Espbot started\n");
-    P_INFO("Chip ID        : %d\n", system_get_chip_id());
-    P_INFO("SDK version    : %s\n", system_get_sdk_version());
-    P_INFO("Boot version   : %d\n", system_get_boot_version());
-    P_INFO("Espbot version : %s\n", espbot_release);
-    P_DEBUG("---------------------------------------------------\n");
-    P_DEBUG("Memory map\n");
+    os_printf_plus("Hello there! Espbot started\n");
+    os_printf_plus("Chip ID        : %d\n", system_get_chip_id());
+    os_printf_plus("SDK version    : %s\n", system_get_sdk_version());
+    os_printf_plus("Boot version   : %d\n", system_get_boot_version());
+    os_printf_plus("Espbot version : %s\n", espbot_release);
+    os_printf_plus("---------------------------------------------------\n");
+    os_printf_plus("Memory map\n");
     system_print_meminfo();
-    P_DEBUG("---------------------------------------------------\n");
+    os_printf_plus("---------------------------------------------------\n");
 }
 
 static void espbot_coordinator_task(os_event_t *e)
@@ -80,10 +77,10 @@ static void espbot_coordinator_task(os_event_t *e)
 static void heartbeat_cb(void)
 {
     esplog.all("heartbeat_cb\n");
-    P_DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
+    esplog.debug("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
     uint32 current_timestamp = esp_sntp.get_timestamp();
-    P_DEBUG("ESPBOT HEARTBEAT: [%d] [UTC+1] %s\n", current_timestamp, esp_sntp.get_timestr(current_timestamp));
-    P_DEBUG("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
+    esplog.debug("ESPBOT HEARTBEAT: [%d] [UTC+1] %s\n", current_timestamp, esp_sntp.get_timestr(current_timestamp));
+    esplog.debug("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
 }
 
 uint32 Espbot::get_chip_id(void)
