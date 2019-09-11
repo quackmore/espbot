@@ -542,6 +542,7 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     }
     if ((0 == os_strcmp(parsed_req->url, "/api/debug/meminfo")) && (parsed_req->req_method == HTTP_GET))
     {
+        /*
         // count the heap items
         int heap_item_count = espmem.get_heap_objs();
         struct heap_item *heap_obj_ptr;
@@ -589,6 +590,27 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
             esplog.error("Websvr::webserver_recv - not enough heap memory %d\n",
                          184 + 62 + (42 * heap_item_count));
         }
+        */
+        Heap_chunk msg(166 + // formatting string
+                       54,  // values
+                       dont_free);
+        if (msg.ref == NULL)
+        {
+            esplog.error("Websvr::webserver_recv - not enough heap memory %d\n", (166 + 54));
+            return;
+        }
+        os_sprintf(msg.ref,
+                   "{\"stack_max_addr\":\"%X\",\"stack_min_addr\":\"%X\",\"heap_start_addr\":\"%X\",\"heap_free_size\": %d,\"heap_max_size\": %d,\"heap_min_size\": %d,\"heap_objs\": %d,\"heap_max_objs\": %d}",
+                   espmem.get_max_stack_addr(),  //  8
+                   espmem.get_min_stack_addr(),  //  8
+                   espmem.get_start_heap_addr(), //  8
+                   system_get_free_heap_size(),  //  6
+                   espmem.get_max_heap_size(),   //  6
+                   espmem.get_mim_heap_size(),   //  6
+                   espmem.get_heap_objs(),       //  6
+                   espmem.get_max_heap_objs());  //  6
+        espmem.stack_mon();
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, "/api/debug/cfg")) && (parsed_req->req_method == HTTP_GET))

@@ -40,22 +40,22 @@ struct heap_item
   void *addr;
 };
 
-#define HEAP_ARRAY_SIZE 100
+// #define HEAP_ARRAY_SIZE 100
 
 class Esp_mem
 {
 private:
   // stack infos
-  uint32 m_stack_min_addr;
-  uint32 m_stack_max_addr;
+  uint32 _stack_min_addr;
+  uint32 _stack_max_addr;
   // heap infos
-  uint32 m_heap_start_addr;
-  uint32 m_max_heap_size;
-  uint32 m_min_heap_size;
-  uint32 m_heap_objs;
-  uint32 m_max_heap_objs;
+  uint32 _heap_start_addr;
+  uint32 _max_heap_size;
+  uint32 _min_heap_size;
+  uint32 _heap_objs;
+  uint32 _max_heap_objs;
 
-  struct heap_item m_heap_array[HEAP_ARRAY_SIZE];
+  // struct heap_item m_heap_array[HEAP_ARRAY_SIZE];
 
   void heap_mon(void);
 
@@ -76,10 +76,10 @@ public:
   uint32 get_start_heap_addr(void);
   uint32 get_max_heap_size(void);
   uint32 get_mim_heap_size(void);
-  uint32 get_used_heap_size(void);
+  // uint32 get_used_heap_size(void);
   uint32 get_heap_objs(void);
   uint32 get_max_heap_objs(void);
-  struct heap_item *get_heap_item(List_item item = first); // return NULL if no item is found
+  // struct heap_item *get_heap_item(List_item item = first); // return NULL if no item is found
 };
 
 #endif
