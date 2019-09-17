@@ -50,19 +50,11 @@ void init_test(struct ip_addr ip, uint32 port, char *request)
     esplog.all("init_test\n");
     os_memcpy(&host_ip, &ip, sizeof(struct ip_addr));
     host_port = port;
-    request = "GET /user1.bin HTTP/1.1\r\nRange: bytes=0-1023";
-    // GET /user1.bin HTTP/1.1
-    // Host: 192.168.1.201
-    // Range: bytes=0-1023
-    // User-Agent: PostmanRuntime/7.15.2
-    // Accept: */*
-    // Cache-Control: no-cache
-    // Postman-Token: c677f309-b16d-4f1b-a5cd-0e2b470a9a66,b3728ec9-2966-4b08-b49a-69e88790b76b
-    // Host: 192.168.1.201
-    // Accept-Encoding: gzip, deflate
-    // Connection: keep-alive
-    // cache-control: no-cache
-    client_request = new char[os_strlen(request) + 1];
+    char ip_str[16];
+    os_memset(ip_str, 0, 16);
+    os_sprintf(ip_str, IPSTR, IP2STR(&ip));
+    os_printf("------> ip: %s\n", ip_str);
+    client_request = new char[38 + os_strlen(ip_str) + os_strlen(request) + 1];
     if (client_request == NULL)
     {
         os_printf("os_zalloc error\n");
@@ -70,8 +62,14 @@ void init_test(struct ip_addr ip, uint32 port, char *request)
     }
     else
     {
-        os_strcpy(client_request, request);
-        os_printf("client_request length: %d, effective length: %d , request: %s\n", (os_strlen(request) + 1), os_strlen(client_request), client_request);
+        // GET /user1.bin HTTP/1.1
+        // Host: 192.168.1.201
+        // Range: bytes=0-1023
+        os_sprintf(client_request, "%s\r\nHost: %s\r\nRange: bytes=0-1023\r\n\r\n", request, ip_str);
+        // os_printf("client_request length: %d, effective length: %d , request: %s\n",
+        //          (os_strlen(request) + 1),
+        //          os_strlen(client_request),
+        //          client_request);
     }
     espclient = new Webclnt;
 }

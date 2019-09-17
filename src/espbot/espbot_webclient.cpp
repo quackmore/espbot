@@ -273,14 +273,14 @@ Webclnt::Webclnt()
 Webclnt::~Webclnt()
 {
     esplog.all("Webclnt::~Webclnt\n");
-    //if ((m_status != WEBCLNT_DISCONNECTED) && 
-    //    (m_status != WEBCLNT_CONNECT_FAILURE) && 
-    //    (m_status != WEBCLNT_CONNECT_TIMEOUT) && 
-    //    (m_status != WEBCLNT_CONNECTING))
-    //{
-    //    espconn_disconnect(&m_esp_conn);
-        del_client_association(this);
-    // }
+    del_client_association(this);
+    if ((m_status != WEBCLNT_DISCONNECTED) && 
+        (m_status != WEBCLNT_CONNECT_FAILURE) && 
+        (m_status != WEBCLNT_CONNECT_TIMEOUT) && 
+        (m_status != WEBCLNT_CONNECTING))
+    {
+        espconn_disconnect(&m_esp_conn);
+    }
 }
 
 void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_func)(void *), void *param)
@@ -334,42 +334,48 @@ void Webclnt::disconnect(void (*completed_func)(void *), void *param)
     esplog.debug("web client disconnecting ...\n");
 }
 
-void Webclnt::format_request(char *t_request)
-{
-    esplog.all("Webclnt::format_request\n");
-    // there is no need to delete this->request, last http_send did it
-    // if (this->request)
-    //     delete[] this->request;
-
-    int request_len = 16 + // string format
-                      12 + // ip address
-                      5 +  // port
-                      os_strlen(t_request) +
-                      1;
-    this->request = new char[request_len];
-    if (this->request == NULL)
-    {
-        esplog.error("Webclnt::format_request - not enough heap memory %d\n", request_len);
-        return;
-    }
-    uint32 *tmp_ptr = &m_host.addr;
-    os_sprintf(this->request,
-               "%s\r\nHost: %d.%d.%d.%d:%d\r\n\r\n",
-               t_request,
-               ((char *)tmp_ptr)[0],
-               ((char *)tmp_ptr)[1],
-               ((char *)tmp_ptr)[2],
-               ((char *)tmp_ptr)[3],
-               m_port);
-    // os_printf("request_len: %d, effective length: %d request: %s\n", request_len, os_strlen(this->request), this->request);
-}
+// void Webclnt::format_request(char *t_request)
+// {
+//     esplog.all("Webclnt::format_request\n");
+//     // there is no need to delete this->request, last http_send did it
+//     // if (this->request)
+//     //     delete[] this->request;
+// 
+//     int request_len = 16 + // string format
+//                       12 + // ip address
+//                       5 +  // port
+//                       os_strlen(t_request) +
+//                       1;
+//     this->request = new char[request_len];
+//     if (this->request == NULL)
+//     {
+//         esplog.error("Webclnt::format_request - not enough heap memory %d\n", request_len);
+//         return;
+//     }
+//     uint32 *tmp_ptr = &m_host.addr;
+//     os_sprintf(this->request,
+//                "%s\r\nHost: %d.%d.%d.%d:%d\r\n\r\n",
+//                t_request,
+//                ((char *)tmp_ptr)[0],
+//                ((char *)tmp_ptr)[1],
+//                ((char *)tmp_ptr)[2],
+//                ((char *)tmp_ptr)[3],
+//                m_port);
+//     // os_printf("request_len: %d, effective length: %d request: %s\n", request_len, os_strlen(this->request), this->request);
+// }
 
 void Webclnt::send_req(char *t_msg, void (*completed_func)(void *), void *param)
 {
     esplog.all("Webclnt::send_req\n");
     espmem.stack_mon();
     m_completed_func = completed_func;
-    format_request(t_msg);
+    this->request = new char[os_strlen(t_msg) + 1];
+    if (this->request == NULL)
+    {
+        esplog.error("Webclnt::format_request - not enough heap memory %d\n", os_strlen(t_msg));
+        return;
+    }
+    os_memcpy(this->request, t_msg, os_strlen(t_msg) + 1);
 
     switch (m_status)
     {
