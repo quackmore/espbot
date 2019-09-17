@@ -283,7 +283,11 @@ Webclnt::~Webclnt()
     }
 }
 
-void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_func)(void *), void *param)
+void Webclnt::connect(struct ip_addr t_server,
+                      uint32 t_port,
+                      void (*completed_func)(void *),
+                      void *param,
+                      int comm_tout)
 {
     esplog.all("Webclnt::connect\n");
 
@@ -296,6 +300,7 @@ void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_f
     m_esp_conn.type = ESPCONN_TCP;
     m_esp_conn.state = ESPCONN_NONE;
     m_esp_conn.proto.tcp = &m_esptcp;
+    m_comm_timeout = comm_tout;
 
     system_soft_wdt_feed();
     m_esp_conn.proto.tcp->local_port = espconn_port();
@@ -306,7 +311,7 @@ void Webclnt::connect(struct ip_addr t_server, uint32 t_port, void (*completed_f
     espconn_regist_connectcb(&m_esp_conn, webclient_connected);
     // set timeout for connection
     os_timer_setfn(&m_connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, (void *)this);
-    os_timer_arm(&m_connect_timeout_timer, WEBCLNT_CONNECTION_TIMEOUT, 0);
+    os_timer_arm(&m_connect_timeout_timer, m_comm_timeout, 0);
     sint8 res = espconn_connect(&m_esp_conn);
     espmem.stack_mon();
     if (res)

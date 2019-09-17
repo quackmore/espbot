@@ -22,8 +22,8 @@ extern "C"
 // Init the webclient <-> espconn association data strucures
 void init_webclients_data_stuctures(void);
 
-#define WEBCLNT_CONNECTION_TIMEOUT 10000
-#define WEBCLNT_SEND_REQ_TIMEOUT 2000
+#define WEBCLNT_COMM_TIMEOUT 10000
+#define WEBCLNT_SEND_REQ_TIMEOUT 10000
 
 typedef enum
 {
@@ -43,6 +43,7 @@ class Webclnt
 {
 private:
   struct espconn m_esp_conn;
+  int m_comm_timeout;
   esp_tcp m_esptcp;
   struct ip_addr m_host;
   uint32 m_port;
@@ -68,7 +69,7 @@ public:
   // WEBCLNT_CONNECTED
   // WEBCLNT_CONNECT_TIMEOUT
   // WEBCLNT_DISCONNECTED (??) not sure so just in case
-  void connect(struct ip_addr, uint32, void (*completed_func)(void *), void *param);
+  void connect(struct ip_addr, uint32, void (*completed_func)(void *), void *param, int comm_tout = 10000);
 
   // disconnect will change webclient status to WEBCLNT_DISCONNECTED
   void disconnect(void (*completed_func)(void *), void *param);
