@@ -26,7 +26,7 @@ extern "C"
 #define HTTP_UNAUTHORIZED 401
 #define HTTP_FORBIDDEN 403
 #define HTTP_NOT_FOUND 404
-#define HTTP_CONFLICT 404
+#define HTTP_CONFLICT 409
 #define HTTP_SERVER_ERROR 500
 
 #define HTTP_CONTENT_TEXT "text/html"
