@@ -141,7 +141,7 @@ int Json_str::syntax_check(void)
             ptr++;
             while ((ptr - m_str) < m_str_len) // looking for number end
             {
-                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == 'n'))
+                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == '\n'))
                     break;
                 if ((*ptr >= '0') && (*ptr <= '9'))
                 {
@@ -322,7 +322,7 @@ Json_pair_type Json_str::find_next_pair(void)
         m_cursor++;
         while ((m_cursor - m_str) < m_str_len) // looking for number end
         {
-            if ((*m_cursor == ',') || (*m_cursor == '}') || (*m_cursor == ' ') || (*m_cursor == '\r') || (*m_cursor == 'n'))
+            if ((*m_cursor == ',') || (*m_cursor == '}') || (*m_cursor == ' ') || (*m_cursor == '\r') || (*m_cursor == '\n'))
             {
                 m_cur_pair_value_len = (m_cursor - m_cur_pair_value);
                 break;

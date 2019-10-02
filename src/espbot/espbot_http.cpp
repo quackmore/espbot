@@ -46,6 +46,10 @@ char *code_msg(int code)
     {
     case HTTP_OK:
         return "OK";
+    case HTTP_CREATED:
+        return "Created";
+    case HTTP_ACCEPTED:
+        return "Accepted";
     case HTTP_BAD_REQUEST:
         return "Bad Request";
     case HTTP_UNAUTHORIZED:
@@ -54,6 +58,8 @@ char *code_msg(int code)
         return "Forbidden";
     case HTTP_NOT_FOUND:
         return "Not Found";
+    case HTTP_CONFLICT:
+        return "Conflict";
     case HTTP_SERVER_ERROR:
         return "Internal Server Error";
     default:
