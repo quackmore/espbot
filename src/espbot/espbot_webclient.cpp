@@ -50,6 +50,7 @@ static Webclnt *get_client(struct espconn *p_pespconn)
     {
         if (ptr->p_pespconn == p_pespconn)
             return ptr->client;
+        ptr = webclnt_espconn->next();
     }
     return NULL;
 }
@@ -274,9 +275,9 @@ Webclnt::~Webclnt()
 {
     esplog.all("Webclnt::~Webclnt\n");
     del_client_association(this);
-    if ((m_status != WEBCLNT_DISCONNECTED) && 
-        (m_status != WEBCLNT_CONNECT_FAILURE) && 
-        (m_status != WEBCLNT_CONNECT_TIMEOUT) && 
+    if ((m_status != WEBCLNT_DISCONNECTED) &&
+        (m_status != WEBCLNT_CONNECT_FAILURE) &&
+        (m_status != WEBCLNT_CONNECT_TIMEOUT) &&
         (m_status != WEBCLNT_CONNECTING))
     {
         espconn_disconnect(&m_esp_conn);
@@ -345,7 +346,7 @@ void Webclnt::disconnect(void (*completed_func)(void *), void *param)
 //     // there is no need to delete this->request, last http_send did it
 //     // if (this->request)
 //     //     delete[] this->request;
-// 
+//
 //     int request_len = 16 + // string format
 //                       12 + // ip address
 //                       5 +  // port
