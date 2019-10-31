@@ -100,56 +100,56 @@ int Gpio::config(int t_idx, int t_type)
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D1_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D1_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D1_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D2:
             PIN_FUNC_SELECT(ESPBOT_D2_MUX, ESPBOT_D2_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D2_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D2_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D2_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D3:
             PIN_FUNC_SELECT(ESPBOT_D3_MUX, ESPBOT_D3_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D3_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D3_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D3_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D4:
             PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D4_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D4_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D4_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D5:
             PIN_FUNC_SELECT(ESPBOT_D5_MUX, ESPBOT_D5_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D5_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D5_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D5_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D6:
             PIN_FUNC_SELECT(ESPBOT_D6_MUX, ESPBOT_D6_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D6_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D6_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D6_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D7:
             PIN_FUNC_SELECT(ESPBOT_D7_MUX, ESPBOT_D7_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D7_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D7_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D7_NUM, ESPBOT_HIGH);
             break;
         case ESPBOT_D8:
             PIN_FUNC_SELECT(ESPBOT_D8_MUX, ESPBOT_D8_FUNC);
             if (t_type == ESPBOT_GPIO_INPUT)
                 GPIO_DIS_OUTPUT(ESPBOT_D8_NUM);
             else
-                GPIO_OUTPUT_SET(ESPBOT_D8_NUM, ESPBOT_LOW);
+                GPIO_OUTPUT_SET(ESPBOT_D8_NUM, ESPBOT_HIGH);
             break;
         default:
             break;
