@@ -375,6 +375,7 @@ void Webclnt::send_req(char *t_msg, void (*completed_func)(void *), void *param)
     esplog.all("Webclnt::send_req\n");
     espmem.stack_mon();
     m_completed_func = completed_func;
+    m_param = param;
     this->request = new char[os_strlen(t_msg) + 1];
     if (this->request == NULL)
     {
