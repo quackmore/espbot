@@ -120,7 +120,7 @@ int Json_str::syntax_check(void)
                 m_cur_pair_value_type = JSON_STRING;
                 break;
             }
-            if ((*ptr >= '0') && (*ptr <= '9')) // found a number
+            if (((*ptr >= '0') && (*ptr <= '9')) || (*ptr == '-')) // found a number
             {
                 m_cur_pair_value_type = JSON_INTEGER;
                 break;
@@ -143,7 +143,7 @@ int Json_str::syntax_check(void)
             {
                 if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == '\n'))
                     break;
-                if ((*ptr >= '0') && (*ptr <= '9'))
+                if (((*ptr >= '0') && (*ptr <= '9')) || (*ptr == '.'))
                 {
                     ptr++;
                     continue;
@@ -299,7 +299,7 @@ Json_pair_type Json_str::find_next_pair(void)
             m_cur_pair_value_type = JSON_STRING;
             break;
         }
-        if ((*m_cursor >= '0') && (*m_cursor <= '9')) // found a number
+        if (((*m_cursor >= '0') && (*m_cursor <= '9')) || (*m_cursor == '-')) // found a number
         {
             m_cur_pair_value_type = JSON_INTEGER;
             m_cur_pair_value = m_cursor;
@@ -327,7 +327,7 @@ Json_pair_type Json_str::find_next_pair(void)
                 m_cur_pair_value_len = (m_cursor - m_cur_pair_value);
                 break;
             }
-            if ((*m_cursor >= '0') && (*m_cursor <= '9'))
+            if (((*m_cursor >= '0') && (*m_cursor <= '9')) || (*m_cursor == '.'))
             {
                 m_cursor++;
                 continue;

@@ -21,12 +21,14 @@ extern "C"
 }
 
 #include "iram.h"
-#include "app.hpp"
-#include "espbot_http.hpp"
-#include "espbot_webclient.hpp"
-#include "app_test.hpp"
-#include "espbot_global.hpp"
 #include "espbot_debug.hpp"
+#include "espbot_global.hpp"
+#include "espbot_http.hpp"
+#include "espbot_json.hpp"
+#include "espbot_utils.hpp"
+#include "espbot_webclient.hpp"
+#include "app.hpp"
+#include "app_test.hpp"
 
 // function for testing purpose
 
@@ -633,6 +635,60 @@ void run_test(int idx)
         static int counter = 0;
         counter++;
         esplog.error("A new error (%d) was injected.\n", counter);
+    }
+    break;
+    case 101:
+    {
+        // check json numbers
+        char *sample_str = "{\"first\":1,\"second\":-1,\"third\":0.5,\"fourth\":-0.5}";
+        char tmp_str[10];
+        char tmp_value[10];
+        Json_str json_obj(sample_str, os_strlen(sample_str));
+        os_printf("JSON syntax: found and error at position %d\n", json_obj.syntax_check());
+        json_obj.find_pair("first");
+        os_memset(tmp_str, 0, 10);
+        os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
+        os_memset(tmp_value, 0, 10);
+        os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+                  tmp_str,
+                  json_obj.get_cur_pair_value_type(),
+                  tmp_value,
+                  json_obj.get_cur_pair_value_len());
+        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        json_obj.find_pair("second");
+        os_memset(tmp_str, 0, 10);
+        os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
+        os_memset(tmp_value, 0, 10);
+        os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+                  tmp_str,
+                  json_obj.get_cur_pair_value_type(),
+                  tmp_value,
+                  json_obj.get_cur_pair_value_len());
+        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        json_obj.find_pair("third");
+        os_memset(tmp_str, 0, 10);
+        os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
+        os_memset(tmp_value, 0, 10);
+        os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+                  tmp_str,
+                  json_obj.get_cur_pair_value_type(),
+                  tmp_value,
+                  json_obj.get_cur_pair_value_len());
+        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        json_obj.find_pair("fourth");
+        os_memset(tmp_str, 0, 10);
+        os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
+        os_memset(tmp_value, 0, 10);
+        os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+                  tmp_str,
+                  json_obj.get_cur_pair_value_type(),
+                  tmp_value,
+                  json_obj.get_cur_pair_value_len());
+        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
     }
     break;
     /*
