@@ -25,8 +25,6 @@
 #ifndef __USER_CONFIG_H__
 #define __USER_CONFIG_H__
 
-#define USE_OPTIMIZE_PRINTF
-
 #ifndef SPI_FLASH_SIZE_MAP
 #define SPI_FLASH_SIZE_MAP 4
 #endif

@@ -198,12 +198,12 @@ GIT_VERSION := $(shell git --no-pager describe --tags --always --dirty)
 # they will override "-Os" defined above.
 # "-Os" should be used to reduce code size
 #
-CCFLAGS += 			                         \
-	-g			                               \
-	-Wpointer-arith		                     \
-	-Wundef			                           \
-	-Werror			                           \
-	-Wl,-EL			                           \
+CCFLAGS += 			                       \
+	-g			                           \
+	-Wpointer-arith		                   \
+	-Wundef			                       \
+	-Werror			                       \
+	-Wl,-EL			                       \
 	-nostdlib                              \
 	-mlongcalls	                           \
 	-mtext-section-literals                \
@@ -211,19 +211,20 @@ CCFLAGS += 			                         \
 	-fdata-sections	                       \
 	-fno-builtin-printf                    \
 	-fno-exceptions                        \
-  -Wno-write-strings                     \
-  -DESPBOT=1                             \
-  -DAPP_RELEASE=\"$(GIT_VERSION)\"    \
+	-Wno-write-strings                     \
+	-DESPBOT=1                             \
+	-DUSE_OPTIMIZE_PRINTF=1                \
+	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 #	-fno-inline-functions	                 \
 
-CCPPFLAGS += 			                         \
-	-g			                               \
-	-Wpointer-arith		                     \
-	-Wundef			                           \
-	-Werror			                           \
-	-Wl,-EL			                           \
+CCPPFLAGS += 			                   \
+	-g			                           \
+	-Wpointer-arith		                   \
+	-Wundef			                       \
+	-Werror			                       \
+	-Wl,-EL			                       \
 	-nostdlib                              \
 	-mlongcalls	                           \
 	-mtext-section-literals                \
@@ -232,9 +233,10 @@ CCPPFLAGS += 			                         \
 	-fno-builtin-printf                    \
 	-fno-exceptions                        \
 	-fno-rtti                              \
-  -Wno-write-strings                     \
-  -DESPBOT=1                             \
-  -DAPP_RELEASE=\"$(GIT_VERSION)\"    \
+	-Wno-write-strings                     \
+	-DESPBOT=1                             \
+	-DUSE_OPTIMIZE_PRINTF=1                \
+	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
 #	-fno-inline-functions	                 \

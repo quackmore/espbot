@@ -31,15 +31,15 @@ extern "C"
 
 static void print_greetings(void)
 {
-    os_printf_plus("Hello there! Espbot started\n");
-    os_printf_plus("Chip ID        : %d\n", system_get_chip_id());
-    os_printf_plus("SDK version    : %s\n", system_get_sdk_version());
-    os_printf_plus("Boot version   : %d\n", system_get_boot_version());
-    os_printf_plus("Espbot version : %s\n", espbot_release);
-    os_printf_plus("---------------------------------------------------\n");
-    os_printf_plus("Memory map\n");
+    os_printf("Hello there! Espbot started\n");
+    os_printf("Chip ID        : %d\n", system_get_chip_id());
+    os_printf("SDK version    : %s\n", system_get_sdk_version());
+    os_printf("Boot version   : %d\n", system_get_boot_version());
+    os_printf("Espbot version : %s\n", espbot_release);
+    os_printf("---------------------------------------------------\n");
+    os_printf("Memory map\n");
     system_print_meminfo();
-    os_printf_plus("---------------------------------------------------\n");
+    os_printf("---------------------------------------------------\n");
 }
 
 static void espbot_coordinator_task(os_event_t *e)
