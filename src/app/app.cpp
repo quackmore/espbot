@@ -34,15 +34,46 @@ char *app_release = APP_RELEASE;
 
 // Dht *dht22;
 
+uint32 lastRebootTime;
+
 void app_init_before_wifi(void)
 {
+    lastRebootTime = 0;
     init_dio_task();
     // dht22 = new Dht(ESPBOT_D2, DHT22, 1000, 2000, 0, 10);
 }
 
+os_timer_t delay_after_wifi;
+
+// give some time to sntp to setup everything ...
+void app_init_after_wifi_delayed(void)
+{
+    static bool first_time = true;
+    if (first_time)
+    {
+        lastRebootTime = esp_sntp.get_timestamp();
+
+        first_time = false;
+    }
+}
+
 void app_init_after_wifi(void)
 {
-    esp_mDns.start("this_is_the_app_name");
+    esp_mDns.start(espbot.get_name());
+    os_timer_disarm(&delay_after_wifi);
+    os_timer_setfn(&delay_after_wifi, (os_timer_func_t *)app_init_after_wifi_delayed, NULL);
+    os_timer_arm(&delay_after_wifi, 5000, 0);
+
+    static bool first_time = true;
+    if (first_time)
+    {
+        first_time = false;
+    }
+}
+
+uint32 get_last_reboot_date(void)
+{
+    return lastRebootTime;
 }
 
 void app_deinit_on_wifi_disconnect()

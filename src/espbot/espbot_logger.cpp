@@ -22,9 +22,10 @@ extern "C"
     int ets_vsnprintf(char *buffer, unsigned int sizeOfBuffer, const char *format, va_list argptr);
 }
 
-#include "espbot_logger.hpp"
-#include "espbot_global.hpp"
 #include "espbot_debug.hpp"
+#include "espbot_global.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_mem_sections.h"
 #include "spiffs_esp8266.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_json.hpp"
@@ -35,7 +36,24 @@ extern "C"
  * LOGGER
  */
 
-#define DEBUG_CFG_FILE_SIZE 128
+// global vars for espbot_logger_macros.h
+char logger_buffer[LOGGER_BUF_SIZE];
+
+char logger_msg_fmt[] IROM_TEXT ALIGNED_4 = "%s %s%s";
+char logger_newline[] IROM_TEXT ALIGNED_4 = "\n";
+char logger_fatal_str[] IROM_TEXT ALIGNED_4 = "[FATAL]";
+char logger_fatal_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}";
+char logger_heap_exhausted[] IROM_TEXT ALIGNED_4 = "[FATAL] heap memory exhausted!";
+char logger_error_str[] IROM_TEXT ALIGNED_4 = "[ERROR]";
+char logger_error_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}";
+char logger_warn_str[] IROM_TEXT ALIGNED_4 = "[WARNING]";
+char logger_warn_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[WARNING] %s\"}";
+char logger_info_str[] IROM_TEXT ALIGNED_4 = "[INFO]";
+char logger_info_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}";
+char logger_debug_str[] IROM_TEXT ALIGNED_4 = "[DEBUG]";
+char logger_trace_str[] IROM_TEXT ALIGNED_4 = "[TRACE]";
+char logger_all_str[] IROM_TEXT ALIGNED_4 = "[ALL]";
+// end of global vars for espbot_logger_macros.h
 
 int Logger::restore_cfg(void)
 {
@@ -145,9 +163,9 @@ void Logger::essential_init(void)
     // uart_init(BIT_RATE_115200, BIT_RATE_115200);
     uart_init(BIT_RATE_460800, BIT_RATE_460800);
     system_set_os_print(1); // enable log print
-    m_serial_level = LOG_INFO;
-    m_memory_level = LOG_ERROR;
-    m_log = (List<char> *) new List<char>(20, delete_content);
+    m_serial_level = LOG_LEV_INFO;
+    m_memory_level = LOG_LEV_ERROR;
+    m_log = (List<char> *)new List<char>(20, delete_content);
 }
 
 void Logger::init_cfg(void)
@@ -182,24 +200,29 @@ void Logger::set_levels(char t_serial_level, char t_memory_level)
     }
 }
 
+void Logger::add_log(const char *msg)
+{
+    m_log->push_back((char *)msg, override_when_full);
+}
+
 void Logger::fatal(const char *t_format, ...)
 {
-    if ((m_serial_level >= LOG_FATAL) || (m_memory_level >= LOG_FATAL))
+    if ((m_serial_level >= LOG_LEV_FATAL) || (m_memory_level >= LOG_LEV_FATAL))
     {
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        if (m_serial_level >= LOG_FATAL)
+        if (m_serial_level >= LOG_LEV_FATAL)
             os_printf_plus("[FATAL] %s", tmp_buffer.ref);
-        if (m_memory_level >= LOG_FATAL)
+        if (m_memory_level >= LOG_LEV_FATAL)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
@@ -220,22 +243,22 @@ void Logger::fatal(const char *t_format, ...)
 
 void Logger::error(const char *t_format, ...)
 {
-    if ((m_serial_level >= LOG_ERROR) || (m_memory_level >= LOG_ERROR))
+    if ((m_serial_level >= LOG_LEV_ERROR) || (m_memory_level >= LOG_LEV_ERROR))
     {
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        if (m_serial_level >= LOG_ERROR)
+        if (m_serial_level >= LOG_LEV_ERROR)
             os_printf_plus("[ERROR] %s", tmp_buffer.ref);
-        if (m_memory_level >= LOG_ERROR)
+        if (m_memory_level >= LOG_LEV_ERROR)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
@@ -256,22 +279,22 @@ void Logger::error(const char *t_format, ...)
 
 void Logger::warn(const char *t_format, ...)
 {
-    if ((m_serial_level >= LOG_WARN) || (m_memory_level >= LOG_WARN))
+    if ((m_serial_level >= LOG_LEV_WARN) || (m_memory_level >= LOG_LEV_WARN))
     {
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        if (m_serial_level >= LOG_WARN)
+        if (m_serial_level >= LOG_LEV_WARN)
             os_printf_plus("[WARN] %s", tmp_buffer.ref);
-        if (m_memory_level >= LOG_WARN)
+        if (m_memory_level >= LOG_LEV_WARN)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
@@ -292,22 +315,22 @@ void Logger::warn(const char *t_format, ...)
 
 void Logger::info(const char *t_format, ...)
 {
-    if ((m_serial_level >= LOG_INFO) || (m_memory_level >= LOG_INFO))
+    if ((m_serial_level >= LOG_LEV_INFO) || (m_memory_level >= LOG_LEV_INFO))
     {
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
-        if (m_serial_level >= LOG_INFO)
+        if (m_serial_level >= LOG_LEV_INFO)
             os_printf_plus("[INFO] %s", tmp_buffer.ref);
-        if (m_memory_level >= LOG_INFO)
+        if (m_memory_level >= LOG_LEV_INFO)
         {
             uint32 timestamp = esp_sntp.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
@@ -328,20 +351,20 @@ void Logger::info(const char *t_format, ...)
 
 void Logger::debug(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_DEBUG)
+    if (m_serial_level < LOG_LEV_DEBUG)
         return;
     else
     {
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
         os_printf_plus("[DEBUG] %s", tmp_buffer.ref);
     }
@@ -349,20 +372,20 @@ void Logger::debug(const char *t_format, ...)
 
 void Logger::trace(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_TRACE)
+    if (m_serial_level < LOG_LEV_TRACE)
         return;
     else
     {
         va_list al;
         espmem.stack_mon();
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
         os_printf_plus("[TRACE] %s", tmp_buffer.ref);
     }
@@ -370,19 +393,19 @@ void Logger::trace(const char *t_format, ...)
 
 void Logger::all(const char *t_format, ...)
 {
-    if (m_serial_level < LOG_ALL)
+    if (m_serial_level < LOG_LEV_ALL)
         return;
     else
     {
         va_list al;
         va_start(al, t_format);
-        Heap_chunk tmp_buffer(LOG_BUF_SIZE);
+        Heap_chunk tmp_buffer(LOGGER_BUF_SIZE);
         if (tmp_buffer.ref == NULL)
         {
             va_end(al);
             return;
         }
-        ets_vsnprintf(tmp_buffer.ref, (LOG_BUF_SIZE - 1), t_format, al);
+        ets_vsnprintf(tmp_buffer.ref, (LOGGER_BUF_SIZE - 1), t_format, al);
         va_end(al);
         os_printf_plus("[ALL] %s", tmp_buffer.ref);
     }

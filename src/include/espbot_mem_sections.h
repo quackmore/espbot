@@ -6,9 +6,11 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __IRAM_H__
-#define __IRAM_H__
+#ifndef __MEM_SECTIONS_H__
+#define __MEM_SECTIONS_H__
 
 #define IRAM __attribute__((section(".iram.text")))
+#define IROM_TEXT __attribute__((section(".irom.text")))
+#define ALIGNED_4 __attribute__((aligned(4)))
 
 #endif

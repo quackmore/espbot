@@ -14,6 +14,7 @@
 void app_init_before_wifi(void);
 void app_init_after_wifi(void);
 void app_deinit_on_wifi_disconnect(void);
+uint32 get_last_reboot_date(void);
 
 extern char *app_name;
 extern char *app_release;

@@ -16,15 +16,15 @@ extern "C"
 
 #include "espbot_list.hpp"
 
-#define LOG_OFF 0
-#define LOG_FATAL 1
-#define LOG_ERROR 2
-#define LOG_WARN 3
-#define LOG_INFO 4
-#define LOG_DEBUG 5
-#define LOG_TRACE 6
-#define LOG_ALL 7
-#define LOG_BUF_SIZE 512
+#define LOG_LEV_OFF 0
+#define LOG_LEV_FATAL 1
+#define LOG_LEV_ERROR 2
+#define LOG_LEV_WARN 3
+#define LOG_LEV_INFO 4
+#define LOG_LEV_DEBUG 5
+#define LOG_LEV_TRACE 6
+#define LOG_LEV_ALL 7
+#define LOGGER_BUF_SIZE 256
 
 // found somewhere on www.esp8266.com
 // 3fffeb30 and 3fffffff is the designated area for the user stack
@@ -70,6 +70,7 @@ public:
 
   char *get_log_head();
   char *get_log_next();
+  void add_log(const char *);
   int get_log_size();
 };
 

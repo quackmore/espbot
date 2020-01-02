@@ -209,15 +209,15 @@ CCFLAGS += 			                       \
 	-mtext-section-literals                \
 	-ffunction-sections                    \
 	-fdata-sections	                       \
+	-fno-inline-functions	               \
 	-fno-builtin-printf                    \
 	-fno-exceptions                        \
 	-Wno-write-strings                     \
 	-DESPBOT=1                             \
-	-DUSE_OPTIMIZE_PRINTF=1                \
 	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
-#	-fno-inline-functions	                 \
+#	-DUSE_OPTIMIZE_PRINTF=1                \
 
 CCPPFLAGS += 			                   \
 	-g			                           \
@@ -230,16 +230,16 @@ CCPPFLAGS += 			                   \
 	-mtext-section-literals                \
 	-ffunction-sections                    \
 	-fdata-sections	                       \
+	-fno-inline-functions	               \
 	-fno-builtin-printf                    \
 	-fno-exceptions                        \
 	-fno-rtti                              \
 	-Wno-write-strings                     \
 	-DESPBOT=1                             \
-	-DUSE_OPTIMIZE_PRINTF=1                \
 	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
-#	-fno-inline-functions	                 \
+#	-DUSE_OPTIMIZE_PRINTF=1                \
 
 
 

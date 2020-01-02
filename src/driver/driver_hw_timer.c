@@ -30,7 +30,7 @@
  * ----------------------------------------------------------------------------
  */
 
-#include "iram.h"
+#include "espbot_mem_sections.h"
 #include "os_type.h"
 #include "osapi.h"
 #include "driver_hw_timer.h"
