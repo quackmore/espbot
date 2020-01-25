@@ -10,24 +10,24 @@
 extern "C"
 {
 #include "ets_sys.h"
-#include "osapi.h"
 #include "mem.h"
+#include "osapi.h"
 #include "user_interface.h"
 }
 // local includes
 
-#include "espbot_debug.hpp"
-#include "espbot_global.hpp"
-#include "espbot.hpp"
-#include "spiffs_esp8266.hpp"
-#include "espbot_logger.hpp"
-#include "espbot_json.hpp"
-#include "espbot_config.hpp"
-#include "espbot_gpio.hpp"
-#include "espbot_utils.hpp"
-#include "espbot_http.hpp"
-#include "espbot_webclient.hpp"
 #include "app.hpp"
+#include "espbot.hpp"
+#include "espbot_config.hpp"
+#include "espbot_global.hpp"
+#include "espbot_gpio.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_http.hpp"
+#include "espbot_json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_utils.hpp"
+#include "espbot_webclient.hpp"
+#include "spiffs_esp8266.hpp"
 
 static void print_greetings(void)
 {
@@ -135,6 +135,7 @@ void espbot_init(void)
     print_greetings();
 
     espfs.init();
+    esp_diag.init();
     esplog.init_cfg();
     espbot.init();
     esp_ota.init();

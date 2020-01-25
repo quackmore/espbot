@@ -10,22 +10,22 @@
 // SDK includes
 extern "C"
 {
+#include "ip_addr.h"
+#include "mem.h"
 #include "osapi.h"
 #include "user_interface.h"
-#include "mem.h"
-#include "ip_addr.h"
 }
 
-#include "espbot_queue.hpp"
-#include "espbot_http.hpp"
-#include "espbot_webserver.hpp"
-#include "espbot_http_routes.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "espbot_logger.hpp"
+#include "espbot_http.hpp"
+#include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_queue.hpp"
+#include "espbot_webserver.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_debug.hpp"
 
 static void webserver_recv(void *arg, char *precdata, unsigned short length)
 {

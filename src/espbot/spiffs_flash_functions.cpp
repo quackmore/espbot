@@ -10,13 +10,13 @@
 extern "C"
 {
 #include "c_types.h"
-#include "osapi.h"
-#include "user_interface.h"
 #include "mem.h"
+#include "osapi.h"
 #include "spi_flash.h"
+#include "user_interface.h"
 }
 
-#include "espbot_debug.hpp"
+#include "espbot_mem_mon.hpp"
 #include "spiffs_flash_functions.hpp"
 
 // flash read function (checkout SPIFFS documentation)

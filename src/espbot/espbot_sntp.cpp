@@ -22,7 +22,6 @@ extern "C"
 
 void Sntp::start(void)
 {
-    esplog.all("Sntp::start\n");
     sntp_setservername(0, "0.pool.ntp.org");
     sntp_setservername(1, "1.pool.ntp.org");
     sntp_setservername(2, "2.pool.ntp.org");
@@ -34,21 +33,44 @@ void Sntp::start(void)
 
 void Sntp::stop(void)
 {
-    esplog.all("Sntp::stop\n");
     sntp_stop();
     esplog.debug("Sntp ended\n");
 }
 
+struct espbot_time
+{
+    uint32 sntp_time;
+    uint32 rtc_time;
+};
+
 uint32 Sntp::get_timestamp()
 {
-    return sntp_get_current_timestamp();
+    uint32 timestamp = sntp_get_current_timestamp();
+    if (timestamp > 0)
+    {
+        // save timestamp and corresponding RTC time into RTC memory
+        struct espbot_time time_pair;
+        time_pair.rtc_time = system_get_rtc_time();
+        time_pair.sntp_time = timestamp;
+        system_rtc_mem_write(64, &time_pair, sizeof(struct espbot_time));
+    }
+    else
+    {
+        // get last timestamp and corresponding RTC time from RTC memory
+        // and calculate current timestamp
+        struct espbot_time old_time;
+        system_rtc_mem_read(64, &old_time, sizeof(struct espbot_time));
+        uint32 rtc_diff_us = ((system_get_rtc_time() - old_time.rtc_time) * system_rtc_clock_cali_proc()) >> 12;
+        timestamp = old_time.sntp_time + rtc_diff_us / 1000000;
+    }
+    return timestamp;
 }
 
 char *Sntp::get_timestr(uint32 t_time)
 {
     char *time_str = sntp_get_real_time(t_time);
-    char *tmp_ptr = os_strstr(time_str,"\n");
-    if(tmp_ptr)
+    char *tmp_ptr = os_strstr(time_str, "\n");
+    if (tmp_ptr)
         *tmp_ptr = '\0';
     return time_str;
 }

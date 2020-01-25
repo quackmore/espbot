@@ -10,23 +10,23 @@
 // SDK includes
 extern "C"
 {
+#include "ip_addr.h"
+#include "mem.h"
 #include "osapi.h"
 #include "user_interface.h"
-#include "mem.h"
-#include "ip_addr.h"
 }
 
-#include "espbot_http.hpp"
-#include "espbot_webserver.hpp"
+#include "app.hpp"
+#include "app_test.hpp"
 #include "app_http_routes.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "espbot_logger.hpp"
+#include "espbot_http.hpp"
 #include "espbot_json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_debug.hpp"
-#include "app.hpp"
-#include "app_test.hpp"
+#include "espbot_webserver.hpp"
 #include "library.hpp"
 
 bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)

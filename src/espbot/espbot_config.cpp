@@ -13,10 +13,10 @@ extern "C"
 #include "mem.h"
 }
 
-#include "espbot_debug.hpp"
-#include "espbot_global.hpp"
 #include "espbot_config.hpp"
+#include "espbot_global.hpp"
 #include "espbot_json.hpp"
+#include "espbot_mem_mon.hpp"
 #include "spiffs_esp8266.hpp"
 
 #define FILE_TO_JSON_OK 0

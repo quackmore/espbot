@@ -10,19 +10,19 @@
 // SDK includes
 extern "C"
 {
-#include "osapi.h"
-#include "user_interface.h"
-#include "mem.h"
 #include "ip_addr.h"
+#include "mem.h"
+#include "osapi.h"
 #include "upgrade.h"
+#include "user_interface.h"
 }
 
+#include "espbot_config.hpp"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_ota.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_debug.hpp"
-#include "espbot_config.hpp"
 
 void Ota_upgrade::init(void)
 {

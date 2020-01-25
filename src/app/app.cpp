@@ -69,6 +69,9 @@ void app_init_after_wifi(void)
     {
         first_time = false;
     }
+    // test if sntp get_timestamp works fine
+    uint32 timestamp = esp_sntp.get_timestamp();
+    os_printf("=======> current timestamp %s\n", esp_sntp.get_timestr(timestamp));
 }
 
 uint32 get_last_reboot_date(void)

@@ -9,11 +9,11 @@
 // SDK includes
 extern "C"
 {
-#include <stdarg.h>
-#include "osapi.h"
-#include "mem.h"
-#include "user_interface.h"
 #include "driver_uart.h"
+#include "mem.h"
+#include "osapi.h"
+#include <stdarg.h>
+#include "user_interface.h"
 }
 
 extern "C"
@@ -22,15 +22,15 @@ extern "C"
     int ets_vsnprintf(char *buffer, unsigned int sizeOfBuffer, const char *format, va_list argptr);
 }
 
-#include "espbot_debug.hpp"
-#include "espbot_global.hpp"
-#include "espbot_logger.hpp"
-#include "espbot_mem_sections.h"
-#include "spiffs_esp8266.hpp"
-#include "espbot_utils.hpp"
-#include "espbot_json.hpp"
 #include "espbot_config.hpp"
+#include "espbot_global.hpp"
+#include "espbot_json.hpp"
 #include "espbot_list.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_mem_sections.h"
+#include "espbot_utils.hpp"
+#include "spiffs_esp8266.hpp"
 
 /*
  * LOGGER
@@ -424,22 +424,4 @@ char *Logger::get_log_next()
 int Logger::get_log_size()
 {
     return m_log->size();
-}
-
-/*
- * PROFILER
- */
-
-Profiler::Profiler(char *t_str)
-{
-    esplog.all("Profiler::Profiler\n");
-    m_msg = t_str;
-    m_start_time_us = system_get_time();
-}
-
-Profiler::~Profiler()
-{
-    esplog.all("Profiler::~Profiler\n");
-    m_stop_time_us = system_get_time();
-    os_printf_plus("ESPBOT PROFILER: %s: %d us\n", m_msg, (m_stop_time_us - m_start_time_us));
 }

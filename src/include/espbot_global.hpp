@@ -9,20 +9,26 @@
 #ifndef __ESPBOT_GLOBAL_HPP__
 #define __ESPBOT_GLOBAL_HPP__
 
+extern "C"
+{
+#include "ip_addr.h"
+}
 
-#include "espbot_logger.hpp"
-#include "espbot_debug.hpp"
 #include "espbot.hpp"
-#include "spiffs_esp8266.hpp"
-#include "espbot_wifi.hpp"
+#include "espbot_diagnostic.hpp"
+#include "espbot_gpio.hpp"
+#include "espbot_logger.hpp"
 #include "espbot_mdns.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_ota.hpp"
 #include "espbot_sntp.hpp"
 #include "espbot_webserver.hpp"
-#include "espbot_ota.hpp"
-#include "espbot_gpio.hpp"
+#include "espbot_wifi.hpp"
+#include "spiffs_esp8266.hpp"
 
 extern char *espbot_release;
 extern Flashfs espfs;
+extern Espbot_diag esp_diag;
 extern Esp_mem espmem;
 extern Logger esplog;
 extern Espbot espbot;

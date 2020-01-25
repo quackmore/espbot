@@ -29,7 +29,7 @@ extern "C"
 // found somewhere on www.esp8266.com
 // 3fffeb30 and 3fffffff is the designated area for the user stack
 
-#define DEBUG_MAX_SAVED_ERRORS 20
+#define DEBUG_MAX_SAVED_ERRORS 10
 #define DEBUG_MAX_FILE_SAVED_ERRORS 20
 
 #define CFG_OK 0
@@ -72,28 +72,6 @@ public:
   char *get_log_next();
   void add_log(const char *);
   int get_log_size();
-};
-
-class Profiler
-{
-private:
-  char *m_msg;
-  uint32_t m_start_time_us;
-  uint32_t m_stop_time_us;
-
-public:
-  Profiler(char *); // pass the message to be printed
-                    // constructor will start the timer
-  ~Profiler();      // destructor will stop the timer and print elapsed msg to serial
-  // EXAMPLE
-  // {
-  //    Profiler esp_profiler;
-  //    ...
-  //    this is the code you want to profile
-  //    place it into a block
-  //    and declare a Profiler object at the beginning
-  //    ...
-  // }
 };
 
 #endif

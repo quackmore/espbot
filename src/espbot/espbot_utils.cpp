@@ -10,15 +10,15 @@
 // SDK includes
 extern "C"
 {
-#include "osapi.h"
-#include "mem.h"
-#include "user_interface.h"
 #include "ip_addr.h"
+#include "mem.h"
+#include "osapi.h"
+#include "user_interface.h"
 }
 
-#include "espbot_utils.hpp"
 #include "espbot_global.hpp"
-#include "espbot_debug.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_utils.hpp"
 
 int atoh(char *str)
 {

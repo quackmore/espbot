@@ -10,19 +10,19 @@
 // SDK includes
 extern "C"
 {
+#include "mem.h"
 #include "osapi.h"
 #include "user_interface.h"
-#include "mem.h"
 }
 
-#include "espbot_wifi.hpp"
 #include "espbot.hpp"
-#include "espbot_global.hpp"
-#include "espbot_logger.hpp"
-#include "espbot_json.hpp"
-#include "espbot_utils.hpp"
-#include "espbot_debug.hpp"
 #include "espbot_config.hpp"
+#include "espbot_global.hpp"
+#include "espbot_json.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_utils.hpp"
+#include "espbot_wifi.hpp"
 
 // connection management vars
 static struct softap_config ap_config;

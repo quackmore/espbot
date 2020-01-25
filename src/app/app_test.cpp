@@ -10,25 +10,27 @@
 // SDK includes
 extern "C"
 {
-#include "osapi.h"
-#include "mem.h"
-#include "user_interface.h"
-#include "ip_addr.h"
-#include "library_di_sequence.h"
-#include "library_do_sequence.h"
+#include "c_types.h"
 #include "esp8266_io.h"
 #include "gpio.h"
+#include "ip_addr.h"
+#include "osapi.h"
+#include "library_di_sequence.h"
+#include "library_do_sequence.h"
+#include "mem.h"
+#include "user_interface.h"
 }
 
-#include "iram.h"
-#include "espbot_debug.hpp"
+#include "app.hpp"
+#include "app_test.hpp"
+#include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_mem_sections.h"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
-#include "app.hpp"
-#include "app_test.hpp"
 
 // function for testing purpose
 
@@ -212,6 +214,7 @@ static void IRAM dht_start_completed(void *param)
 void run_test(int idx)
 {
     struct do_seq *seq;
+    static int event_counter = 0;
     switch (idx)
     {
     /*
@@ -629,12 +632,95 @@ void run_test(int idx)
     }
     break;
     */
-    case 13:
+    case 14:
+    {
+        // Error diagnostic log
+        int idx = 0;
+        os_printf("###### start of diagnostic events\n");
+        while (esp_diag.get_event(idx))
+        {
+            struct dia_event *event_ptr = esp_diag.get_event(idx);
+            os_printf("event %d - %s %d %d %d %d\n",
+                      idx,
+                      esp_sntp.get_timestr(event_ptr->timestamp),
+                      event_ptr->ack,
+                      event_ptr->type,
+                      event_ptr->code,
+                      event_ptr->value);
+            idx++;
+            if (idx >= esp_diag.get_max_events_count())
+                break;
+        }
+        os_printf("###### end of diagnostic events\n");
+    }
+    break;
+    case 15:
+    {
+        // Acknowledge events
+        esp_diag.ack_events();
+    }
+    break;
+    case 16:
+    {
+        // get unacknowledged events
+        int value = esp_diag.get_unack_events();
+        os_printf("unacknoledged events: %d\n", value);
+    }
+    break;
+    case 17:
     {
         // Error print
-        static int counter = 0;
-        counter++;
-        esplog.error("A new error (%d) was injected.\n", counter);
+        event_counter++;
+        os_printf("A new fatal event (%d) was injected.\n", event_counter);
+        esp_diag.fatal(event_counter, 100 + event_counter);
+    }
+    break;
+    case 18:
+    {
+        // Error print
+        event_counter++;
+        os_printf("A new error event (%d) was injected.\n", event_counter);
+        esp_diag.error(event_counter, 100 + event_counter);
+    }
+    break;
+    case 19:
+    {
+        // Error print
+        event_counter++;
+        os_printf("A new warning event (%d) was injected.\n", event_counter);
+        esp_diag.warn(event_counter, 100 + event_counter);
+    }
+    break;
+    case 20:
+    {
+        // Error print
+        event_counter++;
+        os_printf("A new info event (%d) was injected.\n", event_counter);
+        esp_diag.info(event_counter, 100 + event_counter);
+    }
+    break;
+    case 21:
+    {
+        // Error print
+        event_counter++;
+        os_printf("A new debug event (%d) was injected.\n", event_counter);
+        esp_diag.debug(event_counter, 100 + event_counter);
+    }
+    break;
+    case 22:
+    {
+        // Error print
+        event_counter++;
+        os_printf("A new trace event (%d) was injected.\n", event_counter);
+        esp_diag.trace(event_counter, 100 + event_counter);
+    }
+    break;
+    case 23:
+    {
+        // Error print
+        event_counter++;
+        os_printf("A new fatal all (%d) was injected.\n", event_counter);
+        esp_diag.all(event_counter, 100 + event_counter);
     }
     break;
     case 101:
@@ -650,7 +736,7 @@ void run_test(int idx)
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
@@ -661,7 +747,7 @@ void run_test(int idx)
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
@@ -672,7 +758,7 @@ void run_test(int idx)
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
@@ -683,7 +769,7 @@ void run_test(int idx)
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n", 
+        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,

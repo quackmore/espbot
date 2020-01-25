@@ -10,22 +10,22 @@
 // SDK includes
 extern "C"
 {
+#include "ip_addr.h"
+#include "mem.h"
 #include "osapi.h"
 #include "user_interface.h"
-#include "mem.h"
-#include "ip_addr.h"
 }
 
-#include "espbot_queue.hpp"
-#include "espbot_list.hpp"
-#include "espbot_http.hpp"
-#include "espbot_http_routes.hpp"
 #include "espbot.hpp"
 #include "espbot_global.hpp"
-#include "espbot_logger.hpp"
+#include "espbot_http.hpp"
+#include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
+#include "espbot_list.hpp"
+#include "espbot_logger.hpp"
+#include "espbot_mem_mon.hpp"
+#include "espbot_queue.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_debug.hpp"
 
 static int http_msg_max_size;
 
@@ -974,7 +974,7 @@ void http_init(void)
 {
     esplog.all("http_init\n");
 
-    http_msg_max_size = 256;
+    http_msg_max_size = 1024;
 
     pending_send = new Queue<struct http_send>(8);
     pending_split_send = new Queue<struct http_split_send>(4);
