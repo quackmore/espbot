@@ -7,18 +7,18 @@
  * ----------------------------------------------------------------------------
  */
 
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "spiffs_flash_functions.hpp"
 #include "spiffs_esp8266.hpp"
 
 Flashfs::Flashfs()
 {
-    esplog.all("Flashfs::Flashfs\n");
     status = FFS_NOT_INIT;
 }
 
 void Flashfs::init(void)
 {
-    esplog.all("Flashfs::init\n");
     // SPIFFS_USE_MAGIC is enabled so following documentation:
     // 1) Call SPIFFS_mount
     // 2) If SPIFFS_mount fails with SPIFFS_ERR_NOT_A_FS, keep going.
@@ -47,30 +47,39 @@ void Flashfs::init(void)
     {
         if (res == SPIFFS_ERR_MAGIC_NOT_POSSIBLE)
         {
-            esplog.fatal("Error mounting the file system, error code %d\n", res);
-            esplog.fatal("Try another page size or block size.\n");
+            esp_diag.fatal(SPIFFS_INIT_CANNOT_MOUNT, res);
+            // esplog.fatal("Error mounting the file system, error code %d\n", res);
+            // esplog.fatal("Try another page size or block size.\n");
             status = FFS_UNAVAILABLE;
             return;
         }
         if (res == SPIFFS_ERR_NOT_A_FS)
         {
+#ifdef DEBUG_TRACE
             esplog.trace("Error mounting the file system, error code %d\n", res);
             esplog.trace("Will try to format the file system.\n");
+#endif
         }
         if (res != SPIFFS_ERR_NOT_A_FS)
         {
+#ifdef DEBUG_TRACE
             esplog.trace("Unmounting the file system.\n");
+#endif
             SPIFFS_unmount(&m_fs);
         }
+#ifdef DEBUG_TRACE
         esplog.trace("Formatting the file system.\n");
+#endif
         res = SPIFFS_format(&m_fs);
         if (res == SPIFFS_OK)
         {
-            esplog.trace("File system formatted.\n");
+            esp_diag.info(SPIFFS_INIT_FS_FORMATTED);
+            // esplog.info("File system formatted.\n");
         }
         else
         {
-            esplog.fatal("Cannot format file system, error code %d\n", res);
+            esp_diag.fatal(SPIFFS_INIT_CANNOT_FORMAT);
+            // esplog.fatal("Cannot format file system, error code %d\n", res);
             status = FFS_UNAVAILABLE;
             return;
         }
@@ -84,41 +93,51 @@ void Flashfs::init(void)
                            0);
         if (res != SPIFFS_OK)
         {
-            esplog.fatal("Cannot mount file system, error code %d\n", res);
+            esp_diag.fatal(SPIFFS_INIT_CANNOT_MOUNT, res);
+            // esplog.fatal("Cannot mount file system, error code %d\n", res);
             status = FFS_UNAVAILABLE;
             return;
         }
     }
-    esplog.info("File system mounted.\n");
+    esp_diag.info(SPIFFS_INIT_FS_MOUNTED);
+    // esplog.info("File system mounted.\n");
     status = FFS_AVAILABLE;
     u32_t total = 0;
     u32_t used = 0;
     res = SPIFFS_info(&m_fs, &total, &used);
-    esplog.info("File system size [bytes]: %d, used [bytes]:%d.\n", total, used);
+    esp_diag.info(SPIFFS_INIT_FS_SIZE, total);
+    esp_diag.info(SPIFFS_INIT_FS_USED, used);
+    // esplog.info("File system size [bytes]: %d, used [bytes]:%d.\n", total, used);
     espmem.stack_mon();
 }
 
 void Flashfs::format(void)
 {
-    esplog.all("Flashfs::format\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Formatting a not initialized file system\n");
+        esp_diag.error(SPIFFS_FORMAT_FS_NOT_INIT);
+        // esplog.error("Formatting a not initialized file system\n");
         return;
     }
     s32_t res;
+#ifdef DEBUG_TRACE
     esplog.trace("Unmounting the file system.\n");
+#endif
     SPIFFS_unmount(&m_fs);
+#ifdef DEBUG_TRACE
     esplog.trace("Formatting the file system.\n");
+#endif
     res = SPIFFS_format(&m_fs);
     if (res == SPIFFS_OK)
     {
-        esplog.trace("File system formatted.\n");
+        esp_diag.info(SPIFFS_FORMAT_FS_FORMATTED);
+        // esplog.info("File system formatted.\n");
         status = FFS_UNMOUNTED;
     }
     else
     {
-        esplog.fatal("Cannot format file system, error code %d\n", res);
+        esp_diag.fatal(SPIFFS_FORMAT_CANNOT_FORMAT, res);
+        // esplog.fatal("Cannot format file system, error code %d\n", res);
         status = FFS_UNAVAILABLE;
     }
     espmem.stack_mon();
@@ -126,26 +145,25 @@ void Flashfs::format(void)
 
 void Flashfs::unmount(void)
 {
-    esplog.all("Flashfs::unmount\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Unmounting a not initialized file system\n");
+        esp_diag.error(SPIFFS_UNMOUNT_FS_NOT_INIT);
+        // esplog.error("Unmounting a not initialized file system\n");
         return;
     }
     SPIFFS_unmount(&m_fs);
-    esplog.trace("File system unmounted.\n");
+    esp_diag.info(SPIFFS_UNMOUNT_FS_UNMOUNTED);
+    // esplog.info("File system unmounted.\n");
     status = FFS_UNMOUNTED;
 }
 
 flashfs_status Flashfs::get_status()
 {
-    esplog.all("Flashfs::get_status\n");
     return status;
 }
 
 bool Flashfs::is_available()
 {
-    esplog.all("Flashfs::is_available\n");
     if ((status == FFS_AVAILABLE) || (status == FFS_ERRORS))
         return true;
     else
@@ -154,10 +172,10 @@ bool Flashfs::is_available()
 
 s32_t Flashfs::last_error()
 {
-    esplog.all("Flashfs::last_error\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Looking for last error of a not initialized file system\n");
+        esp_diag.error(SPIFFS_LAST_ERROR_FS_NOT_INIT);
+        // esplog.error("Looking for last error of a not initialized file system\n");
         return 0;
     }
     return SPIFFS_errno(&m_fs);
@@ -165,10 +183,10 @@ s32_t Flashfs::last_error()
 
 u32_t Flashfs::get_total_size()
 {
-    esplog.all("Flashfs::get_total_size\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Looking for total size of a not initialized file system\n");
+        esp_diag.error(SPIFFS_GET_TOTAL_SIZE_FS_NOT_INIT);
+        // esplog.error("Looking for total size of a not initialized file system\n");
         return 0;
     }
     s32_t res;
@@ -180,10 +198,10 @@ u32_t Flashfs::get_total_size()
 }
 u32_t Flashfs::get_used_size()
 {
-    esplog.all("Flashfs::get_used_size\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Looking for used size of a not initialized file system\n");
+        esp_diag.error(SPIFFS_GET_USED_SIZE_FS_NOT_INIT);
+        // esplog.error("Looking for used size of a not initialized file system\n");
         return 0;
     }
     s32_t res;
@@ -196,21 +214,23 @@ u32_t Flashfs::get_used_size()
 
 s32_t Flashfs::check()
 {
-    esplog.all("Flashfs::check\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Checking a not initialized file system\n");
+        esp_diag.error(SPIFFS_CHECK_FS_NOT_INIT);
+        // esplog.error("Checking a not initialized file system\n");
         return 0;
     }
     s32_t res = SPIFFS_check(&m_fs);
     if (res == SPIFFS_OK)
     {
-        esplog.trace("Successfully checked the file system.\n");
+        esp_diag.info(SPIFFS_CHECK_SUCCESSFULLY);
+        // esplog.info("Successfully checked the file system.\n");
         status = FFS_AVAILABLE;
     }
     else
     {
-        esplog.error("File system check found errors, error code %d\n", res);
+        esp_diag.info(SPIFFS_CHECK_ERRORS, res);
+        // esplog.error("File system check found errors, error code %d\n", res);
         status = FFS_ERRORS;
     }
     espmem.stack_mon();
@@ -219,10 +239,10 @@ s32_t Flashfs::check()
 
 struct spiffs_dirent *Flashfs::list(int t_file)
 {
-    esplog.all("Flashfs::list\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Listing a not initialized file system\n");
+        esp_diag.error(SPIFFS_CHECK_FS_NOT_INIT);
+        // esplog.error("Listing a not initialized file system\n");
         return NULL;
     }
     static spiffs_DIR dd;
@@ -240,10 +260,10 @@ struct spiffs_dirent *Flashfs::list(int t_file)
 
 spiffs *Flashfs::get_handler()
 {
-    esplog.all("Flashfs::get_handler\n");
     if (status == FFS_NOT_INIT)
     {
-        esplog.error("Looking for handler of a not initialized file system\n");
+        esp_diag.error(SPIFFS_GET_HANDLER_NOT_INIT);
+        // esplog.error("Looking for handler of a not initialized file system\n");
         return NULL;
     }
     return &m_fs;
@@ -253,7 +273,6 @@ spiffs *Flashfs::get_handler()
 // the file status is set to FFS_F_UNAVAILABLE
 Ffile::Ffile(Flashfs *t_fs)
 {
-    esplog.all("Ffile::Ffile()\n");
     status = FFS_F_UNAVAILABLE;
     m_name[0] = '\0';
     if (t_fs->is_available())
@@ -263,7 +282,8 @@ Ffile::Ffile(Flashfs *t_fs)
     else
     {
         m_fs = NULL;
-        esplog.error("Cannot create files cause the file system is not available\n");
+        esp_diag.error(SPIFFS_FFILE_FS_NOT_AVAILABLE);
+        // esplog.error("Cannot create files cause the file system is not available\n");
     }
 }
 
@@ -272,12 +292,12 @@ Ffile::Ffile(Flashfs *t_fs)
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
 Ffile::Ffile(Flashfs *t_fs, char *t_filename)
 {
-    esplog.all("Ffile::Ffile(,)\n");
     status = FFS_F_UNAVAILABLE;
     os_strncpy(m_name, t_filename, 30);
     if (os_strlen(t_filename) > 30)
     {
-        esplog.warn("Filename will be truncated to 30 characters\n");
+        esp_diag.warn(SPIFFS_FFILE_NAME_TRUNCATED);
+        // esplog.warn("Filename will be truncated to 30 characters\n");
         m_name[30] = '\0';
     }
     if (t_fs->is_available())
@@ -286,7 +306,8 @@ Ffile::Ffile(Flashfs *t_fs, char *t_filename)
         m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
         if (m_fd < 0)
         {
-            esplog.error("SPIFFS error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            esp_diag.error(SPIFFS_FFILE_FILE_OPEN_ERROR, SPIFFS_errno(m_fs->get_handler()));
+            // esplog.error("SPIFFS error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
         }
         else
             status = FFS_F_OPEN;
@@ -294,7 +315,8 @@ Ffile::Ffile(Flashfs *t_fs, char *t_filename)
     else
     {
         m_fs = NULL;
-        esplog.error("Cannot create files cause the file system is not available.\n");
+        esp_diag.error(SPIFFS_FFILE_FS_NOT_AVAILABLE);
+        // esplog.error("Cannot create files cause the file system is not available.\n");
     }
 }
 
@@ -302,14 +324,16 @@ Ffile::Ffile(Flashfs *t_fs, char *t_filename)
 // and eventually flush chache to flash memory
 Ffile::~Ffile()
 {
-    esplog.all("Ffile::~Ffile\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
             s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
             if (res != SPIFFS_OK)
-                esplog.error("SPIFFS error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            {
+                esp_diag.error(SPIFFS_FFILE_DES_FILE_CLOSE_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
         }
     }
 }
@@ -317,10 +341,10 @@ Ffile::~Ffile()
 // return the file name
 char *Ffile::get_name()
 {
-    esplog.all("Ffile::get_name\n");
     if (os_strlen(m_name) == 0)
     {
-        esplog.error("The file has no name\n");
+        esp_diag.error(SPIFFS_GET_NAME_NO_NAME);
+        // esplog.error("The file has no name\n");
         status = FFS_F_UNAVAILABLE;
     }
     return m_name;
@@ -333,26 +357,30 @@ char *Ffile::get_name()
 // in case of errors the file status is set to FFS_F_UNAVAILABLE
 void Ffile::open(char *t_filename)
 {
-    esplog.all("Ffile::open\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
             s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
             if (res != SPIFFS_OK)
-                esplog.error("SPIFF error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            {
+                esp_diag.error(SPIFFS_OPEN_FILE_CLOSE_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFF error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
             espmem.stack_mon();
         }
         os_strncpy(m_name, t_filename, 30);
         if (os_strlen(t_filename) > 30)
         {
-            esplog.warn("Filename will be truncated to 30 characters\n");
+            esp_diag.warn(SPIFFS_OPEN_NAME_TRUNCATED);
+            // esplog.warn("Filename will be truncated to 30 characters\n");
             m_name[30] = '\0';
         }
         m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
         if (m_fd < 0)
         {
-            esplog.error("SPIFFS error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            esp_diag.error(SPIFFS_OPEN_FILE_OPEN_ERROR, SPIFFS_errno(m_fs->get_handler()));
+            // esplog.error("SPIFFS error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
             status = FFS_F_UNAVAILABLE;
         }
         else
@@ -361,21 +389,20 @@ void Ffile::open(char *t_filename)
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("opening file on a not available file system\n");
+        esp_diag.error(SPIFFS_OPEN_FS_NOT_AVAILABLE);
+        // esplog.error("opening file on a not available file system\n");
     }
 }
 
 // return the file status
 flashfs_file_status Ffile::get_status()
 {
-    esplog.all("Ffile::get_status\n");
     return status;
 }
 
 // return the file status
 bool Ffile::is_available()
 {
-    esplog.all("Ffile::is_available\n");
     if ((status == FFS_F_OPEN) || (FFS_F_MODIFIED_UNSAVED))
         return true;
     else
@@ -385,7 +412,6 @@ bool Ffile::is_available()
 // read t_len bytes from the file to the t_buffer
 int Ffile::n_read(char *t_buffer, int t_len)
 {
-    esplog.all("Ffile::n_read\n");
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
     {
@@ -394,18 +420,21 @@ int Ffile::n_read(char *t_buffer, int t_len)
             res = SPIFFS_read(m_fs->get_handler(), m_fd, (u8_t *)t_buffer, t_len);
             if (res < SPIFFS_OK)
             {
-                esplog.error("SPIFFS error %d while reading from file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                esp_diag.error(SPIFFS_N_READ_FILE_READ_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while reading from file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
             }
         }
         else
         {
-            esplog.error("Cannot read from file %s, file status is %d\n", m_name, status);
+            esp_diag.error(SPIFFS_N_READ_CANNOT_READ, status);
+            // esplog.error("Cannot read from file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("reading file on a not available file system\n");
+        esp_diag.error(SPIFFS_N_READ_FS_NOT_AVAILABLE);
+        // esplog.error("reading file on a not available file system\n");
         res = -1;
     }
     espmem.stack_mon();
@@ -415,7 +444,6 @@ int Ffile::n_read(char *t_buffer, int t_len)
 // read t_len bytes from the file + offset to the t_buffer
 int Ffile::n_read(char *t_buffer, int offset, int t_len)
 {
-    esplog.all("Ffile::n_read(offset)\n");
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
     {
@@ -424,25 +452,29 @@ int Ffile::n_read(char *t_buffer, int offset, int t_len)
             res = SPIFFS_lseek(m_fs->get_handler(), m_fd, offset, SPIFFS_SEEK_SET);
             if (res < SPIFFS_OK)
             {
-                esplog.error("SPIFFS error %d while seeking into file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                esp_diag.error(SPIFFS_N_READ_FILE_SEEK_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while seeking into file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
                 return (int)res;
             }
             res = SPIFFS_read(m_fs->get_handler(), m_fd, (u8_t *)t_buffer, t_len);
             if (res < SPIFFS_OK)
             {
-                esplog.error("SPIFFS error %d while reading from file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                esp_diag.error(SPIFFS_N_READ_FILE_READ_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while reading from file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
                 return (int)res;
             }
         }
         else
         {
-            esplog.error("Cannot read from file %s, file status is %d\n", m_name, status);
+            esp_diag.error(SPIFFS_N_READ_CANNOT_READ, status);
+            // esplog.error("Cannot read from file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("reading file on a not available file system\n");
+        esp_diag.error(SPIFFS_N_READ_FS_NOT_AVAILABLE);
+        // esplog.error("reading file on a not available file system\n");
         res = -1;
     }
     espmem.stack_mon();
@@ -452,7 +484,6 @@ int Ffile::n_read(char *t_buffer, int offset, int t_len)
 // write (append) t_len bytes from the t_buffer to the file
 int Ffile::n_append(char *t_buffer, int t_len)
 {
-    esplog.all("Ffile::n_append\n");
     s32_t res = 0;
     if (m_fs && (m_fs->is_available()))
     {
@@ -461,20 +492,23 @@ int Ffile::n_append(char *t_buffer, int t_len)
             res = SPIFFS_write(m_fs->get_handler(), m_fd, (u8_t *)t_buffer, t_len);
             if (res < SPIFFS_OK)
             {
-                esplog.error("SPIFFS error %d while writing to file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                esp_diag.error(SPIFFS_N_APPEND_FILE_WRITE_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while writing to file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
             }
             else
                 status = FFS_F_MODIFIED_UNSAVED;
         }
         else
         {
-            esplog.error("Cannot write to file %s, file status is %d\n", m_name, status);
+            esp_diag.error(SPIFFS_N_APPEND_CANNOT_WRITE, status);
+            // esplog.error("Cannot write to file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("writing file on a not available file system\n");
+        esp_diag.error(SPIFFS_N_APPEND_FS_NOT_AVAILABLE);
+        // esplog.error("writing file on a not available file system\n");
         res = -1;
     }
     espmem.stack_mon();
@@ -484,18 +518,21 @@ int Ffile::n_append(char *t_buffer, int t_len)
 // clear the file content
 void Ffile::clear()
 {
-    esplog.all("Ffile::clear\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
             s32_t res = SPIFFS_close(m_fs->get_handler(), m_fd);
             if (res != SPIFFS_OK)
-                esplog.error("SPIFFS error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            {
+                esp_diag.error(SPIFFS_CLEAR_FILE_CLOSE_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while closing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
             m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR | SPIFFS_APPEND, 0);
             if (m_fd < 0)
             {
-                esplog.error("SPIFFS error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+                esp_diag.error(SPIFFS_CLEAR_FILE_OPEN_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while opening file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
                 status = FFS_F_UNAVAILABLE;
             }
             else
@@ -504,71 +541,80 @@ void Ffile::clear()
         }
         else
         {
-            esplog.error("Cannot clear file %s, file status is %d\n", m_name, status);
+            esp_diag.error(SPIFFS_CLEAR_CANNOT_CLEAR, status);
+            // esplog.error("Cannot clear file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("clearing file on a not available file system\n");
+        esp_diag.error(SPIFFS_CLEAR_FS_NOT_AVAILABLE);
+        // esplog.error("clearing file on a not available file system\n");
     }
 }
 
 // remove the file
 void Ffile::remove()
 {
-    esplog.all("Ffile::remove\n");
     if (m_fs && (m_fs->is_available()))
     {
         if ((status == FFS_F_OPEN) || (status == FFS_F_MODIFIED_UNSAVED))
         {
             s32_t res = SPIFFS_fremove(m_fs->get_handler(), m_fd);
             if (res != SPIFFS_OK)
-                esplog.error("SPIFFS error %d while removing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            {
+                esp_diag.error(SPIFFS_REMOVE_FILE_REMOVE_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while removing file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
             else
                 status = FFS_F_REMOVED;
             espmem.stack_mon();
         }
         else
         {
-            esplog.error("Cannot remove file %s, file status is %d\n", m_name, status);
+            esp_diag.error(SPIFFS_REMOVE_CANNOT_REMOVE, status);
+            // esplog.error("Cannot remove file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("Removing file on a not available file system\n");
+        esp_diag.error(SPIFFS_REMOVE_FS_NOT_AVAILABLE);
+        // esplog.error("Removing file on a not available file system\n");
     }
 }
 
 // flush chached changes to the flash memory
 void Ffile::flush_cache()
 {
-    esplog.all("Ffile::flush_cache\n");
     if (m_fs && (m_fs->is_available()))
     {
         if (status == FFS_F_MODIFIED_UNSAVED)
         {
             s32_t res = SPIFFS_fflush(m_fs->get_handler(), m_fd);
             if (res < SPIFFS_OK)
-                esplog.error("SPIFFS error %d while flushing cache for file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            {
+                esp_diag.error(SPIFFS_FLUSH_FILE_FLUSH_ERROR, SPIFFS_errno(m_fs->get_handler()));
+                // esplog.error("SPIFFS error %d while flushing cache for file %s\n", SPIFFS_errno(m_fs->get_handler()), m_name);
+            }
             espmem.stack_mon();
         }
         else
         {
-            esplog.error("Cannot flush cache for file %s, file status is %d\n", m_name, status);
+            esp_diag.error(SPIFFS_FLUSH_CANNOT_FLUSH, status);
+            // esplog.error("Cannot flush cache for file %s, file status is %d\n", m_name, status);
         }
     }
     else
     {
         status = FFS_F_UNAVAILABLE;
-        esplog.error("Flushing cache on a not available file system\n");
+        esp_diag.error(SPIFFS_FLUSH_FS_NOT_AVAILABLE);
+        // esplog.error("Flushing cache on a not available file system\n");
     }
 }
 
 bool Ffile::exists(Flashfs *t_fs, char *t_name)
 {
-    esplog.all("Ffile::exists\n");
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
@@ -587,7 +633,8 @@ bool Ffile::exists(Flashfs *t_fs, char *t_name)
     }
     else
     {
-        esplog.error("Checking if file exists on not available file system\n");
+        esp_diag.error(SPIFFS_EXISTS_FS_NOT_AVAILABLE);
+        // esplog.error("Checking if file exists on not available file system\n");
     }
     espmem.stack_mon();
     return false;
@@ -595,7 +642,6 @@ bool Ffile::exists(Flashfs *t_fs, char *t_name)
 
 int Ffile::size(Flashfs *t_fs, char *t_name)
 {
-    esplog.all("Ffile::size\n");
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
@@ -615,7 +661,8 @@ int Ffile::size(Flashfs *t_fs, char *t_name)
     }
     else
     {
-        esplog.error("Checking file size on not available file system\n");
+        esp_diag.error(SPIFFS_SIZE_FS_NOT_AVAILABLE);
+        // esplog.error("Checking file size on not available file system\n");
     }
     return -1;
 }

@@ -9,7 +9,6 @@
 // SDK includes
 extern "C"
 {
-#include "driver_uart.h"
 #include "mem.h"
 #include "osapi.h"
 #include <stdarg.h>
@@ -23,6 +22,8 @@ extern "C"
 }
 
 #include "espbot_config.hpp"
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_json.hpp"
 #include "espbot_list.hpp"
@@ -57,7 +58,6 @@ char logger_all_str[] IROM_TEXT ALIGNED_4 = "[ALL]";
 
 int Logger::restore_cfg(void)
 {
-    esplog.all("Logger::restore_cfg\n");
     File_to_json cfgfile("logger.cfg");
     espmem.stack_mon();
 
@@ -65,13 +65,15 @@ int Logger::restore_cfg(void)
     {
         if (cfgfile.find_string("logger_serial_level"))
         {
-            esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
+            esp_diag.error(LOGGER_RESTORE_CFG_INCOMPLETE);
+            // esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         m_serial_level = atoi(cfgfile.get_value());
         if (cfgfile.find_string("logger_memory_level"))
         {
-            esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
+            esp_diag.error(LOGGER_RESTORE_CFG_INCOMPLETE);
+            // esplog.error("Logger::restore_cfg - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         m_memory_level = atoi(cfgfile.get_value());
@@ -79,14 +81,14 @@ int Logger::restore_cfg(void)
     }
     else
     {
-        esplog.warn("Logger::restore_cfg - cfg file not found\n");
+        esp_diag.warn(LOGGER_RESTORE_CFG_FILE_NOT_FOUND);
+        // esplog.warn("Logger::restore_cfg - cfg file not found\n");
         return CFG_ERROR;
     }
 }
 
 int Logger::saved_cfg_not_update(void)
 {
-    esplog.all("Logger::saved_cfg_not_update\n");
     File_to_json cfgfile("logger.cfg");
     espmem.stack_mon();
 
@@ -94,7 +96,8 @@ int Logger::saved_cfg_not_update(void)
     {
         if (cfgfile.find_string("logger_serial_level"))
         {
-            esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
+            esp_diag.error(LOGGER_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
+            // esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         if (m_serial_level != atoi(cfgfile.get_value()))
@@ -103,7 +106,8 @@ int Logger::saved_cfg_not_update(void)
         }
         if (cfgfile.find_string("logger_memory_level"))
         {
-            esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
+            esp_diag.error(LOGGER_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
+            // esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         if (m_memory_level != atoi(cfgfile.get_value()))
@@ -120,7 +124,6 @@ int Logger::saved_cfg_not_update(void)
 
 int Logger::save_cfg(void)
 {
-    esplog.all("Logger::save_cfg\n");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
@@ -139,19 +142,22 @@ int Logger::save_cfg(void)
             }
             else
             {
-                esplog.error("Logger::save_cfg - not enough heap memory available (%d)\n", 64);
+                esp_diag.error(LOGGER_SAVE_CFG_HEAP_EXHAUSTED);
+                // esplog.error("Logger::save_cfg - not enough heap memory available (%d)\n", 64);
                 return CFG_ERROR;
             }
         }
         else
         {
-            esplog.error("Logger::save_cfg - cannot open logger.cfg\n");
+            esp_diag.error(LOGGER_SAVE_CFG_CANNOT_OPEN_FILE);
+            // esplog.error("Logger::save_cfg - cannot open logger.cfg\n");
             return CFG_ERROR;
         }
     }
     else
     {
-        esplog.error("Logger::save_cfg - file system not available\n");
+        esp_diag.error(LOGGER_SAVE_CFG_FS_NOT_AVAILABLE);
+        // esplog.error("Logger::save_cfg - file system not available\n");
         return CFG_ERROR;
     }
     return CFG_OK;
@@ -159,10 +165,6 @@ int Logger::save_cfg(void)
 
 void Logger::essential_init(void)
 {
-    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
-    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
-    uart_init(BIT_RATE_460800, BIT_RATE_460800);
-    system_set_os_print(1); // enable log print
     m_serial_level = LOG_LEV_INFO;
     m_memory_level = LOG_LEV_ERROR;
     m_log = (List<char> *)new List<char>(20, delete_content);
@@ -170,28 +172,25 @@ void Logger::essential_init(void)
 
 void Logger::init_cfg(void)
 {
-    esplog.all("Logger::init_cfg\n");
     if (restore_cfg())
     {
-        esplog.warn("Logger::init - starting with default configuration\n");
+        esp_diag.warn(LOGGER_INIT_CFG_DEFAULT_CFG);
+        // esplog.warn("Logger::init - starting with default configuration\n");
     }
 }
 
 int Logger::get_serial_level(void)
 {
-    esplog.all("Logger::get_serial_level\n");
     return m_serial_level;
 }
 
 int Logger::get_memory_level(void)
 {
-    esplog.all("Logger::get_memory_level\n");
     return m_memory_level;
 }
 
 void Logger::set_levels(char t_serial_level, char t_memory_level)
 {
-    esplog.all("Logger::get_memory_level\n");
     if ((m_serial_level != t_serial_level) || (m_memory_level != t_memory_level))
     {
         m_serial_level = t_serial_level;

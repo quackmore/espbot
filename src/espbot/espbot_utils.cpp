@@ -16,13 +16,14 @@ extern "C"
 #include "user_interface.h"
 }
 
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
 
 int atoh(char *str)
 {
-    esplog.all("atoh\n");
     int idx = 0;
     int power = 16;
     int tmpvalue;
@@ -48,7 +49,6 @@ int atoh(char *str)
 
 void decodeUrlStr(char *str)
 {
-    esplog.all("decodeUrlStr\n");
     char *tmpptr = str;
     char hexchar[3];
     int idx = 0;
@@ -73,12 +73,12 @@ void decodeUrlStr(char *str)
 
 void atoipaddr(struct ip_addr *ip, char *str)
 {
-    esplog.all("atoipaddr\n");
     char *tmp_ptr = str;
-    char *tmp_str, *end_ptr;
+    char *end_ptr;
     int len;
     int cnt = 0;
     int tmp_ip[4];
+    char tmp_str[4];
     espmem.stack_mon();
     while (*tmp_ptr == ' ')
         *tmp_ptr++;
@@ -90,20 +90,22 @@ void atoipaddr(struct ip_addr *ip, char *str)
             end_ptr = str + os_strlen(str);
         if (end_ptr == NULL)
         {
-            esplog.trace("str_to_ipaddr - cannot find separator dot\n");
+            esp_diag.error(UTILS_CANNOT_PARSE_IP);
+            // esplog.trace("str_to_ipaddr - cannot parse IP\n");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;
         }
         len = end_ptr - tmp_ptr;
-        Heap_chunk tmp_str(len + 1);
-        if (tmp_str.ref == NULL)
+        if(len > 3)
         {
-            esplog.error("str_to_ipaddr - not enough heap memory\n");
+            esp_diag.error(UTILS_CANNOT_PARSE_IP);
+            // esplog.trace("str_to_ipaddr - cannot parse IP\n");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;
         }
-        os_strncpy(tmp_str.ref, tmp_ptr, len);
-        tmp_ip[cnt] = atoi(tmp_str.ref);
+        os_memset(tmp_str, 0, 4);
+        os_strncpy(tmp_str, tmp_ptr, 3);
+        tmp_ip[cnt] = atoi(tmp_str);
         tmp_ptr = end_ptr + 1;
         cnt++;
     } while (cnt <= 3);
@@ -112,7 +114,6 @@ void atoipaddr(struct ip_addr *ip, char *str)
 
 int get_rand_int(int max_value)
 {
-    esplog.all("get_rand_int\n");
     float value = (((float)os_random()) / ((float)__UINT32_MAX__)) * ((float)max_value);
     return (int)value;
 }
@@ -141,7 +142,7 @@ Heap_chunk::~Heap_chunk()
 {
     if (m_to_be_free == free)
         if (ref)
-            delete [] ref;
+            delete[] ref;
 }
 
 int Heap_chunk::len(void)

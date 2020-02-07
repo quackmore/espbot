@@ -15,10 +15,12 @@ extern "C"
 #include "sntp.h"
 }
 
-#include "espbot_sntp.hpp"
 #include "espbot.hpp"
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
+#include "espbot_sntp.hpp"
 
 void Sntp::start(void)
 {
@@ -26,15 +28,20 @@ void Sntp::start(void)
     sntp_setservername(1, "1.pool.ntp.org");
     sntp_setservername(2, "2.pool.ntp.org");
     if (sntp_set_timezone(1) == false)
-        esplog.error("Sntp::start - cannot set timezone\n");
+    {
+        esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
+        // esplog.error("Sntp::start - cannot set timezone\n");
+    }
     sntp_init();
-    esplog.debug("Sntp started\n");
+    esp_diag.info(SNTP_START);
+    // esplog.debug("Sntp started\n");
 }
 
 void Sntp::stop(void)
 {
     sntp_stop();
-    esplog.debug("Sntp ended\n");
+    esp_diag.info(SNTP_STOP);
+    // esplog.debug("Sntp ended\n");
 }
 
 struct espbot_time

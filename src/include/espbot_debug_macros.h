@@ -157,7 +157,7 @@ extern char logger_all_str[];
     os_snprintf_plus(buf, logger_str, ##__VA_ARGS__);         \
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_TRACE
 #define debug(fmt, ...)                 \
   {                                     \
     os_printf_plus(fmt, ##__VA_ARGS__); \
@@ -166,7 +166,7 @@ extern char logger_all_str[];
 #define debug(fmt, ...)
 #endif
 
-#ifdef DEBUG
+#ifdef DEBUG_TRACE
 #define e_log(EVENT, evnt_code, param) \
   {                                    \
     event_log(ERROR, err_code, param); \

@@ -29,6 +29,7 @@ extern "C"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_mem_sections.h"
+#include "espbot_profiler.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
 
@@ -40,7 +41,7 @@ static os_timer_t test_timer;
 
 static void test_function(void)
 {
-    esplog.all("test_function\n");
+    // esplog.all("test_function\n");
     // run_test();
 }
 
@@ -51,7 +52,7 @@ static Webclnt *espclient;
 
 void init_test(struct ip_addr ip, uint32 port, char *request)
 {
-    esplog.all("init_test\n");
+    // esplog.all("init_test\n");
     os_memcpy(&host_ip, &ip, sizeof(struct ip_addr));
     host_port = port;
     char ip_str[16];
@@ -85,7 +86,7 @@ void free_client(void *)
 
 void check_version(void *param)
 {
-    esplog.all("check_version\n");
+    // esplog.all("check_version\n");
     switch (espclient->get_status())
     {
     case WEBCLNT_RESPONSE_READY:
@@ -105,7 +106,7 @@ void check_version(void *param)
 
 void get_version(void *param)
 {
-    esplog.all("get_version\n");
+    // esplog.all("get_version\n");
     switch (espclient->get_status())
     {
     case WEBCLNT_CONNECTED:
@@ -640,7 +641,7 @@ void run_test(int idx)
         while (esp_diag.get_event(idx))
         {
             struct dia_event *event_ptr = esp_diag.get_event(idx);
-            os_printf("event %d - %s %d %d %d %d\n",
+            os_printf("event %d - %s %d %X %X %d\n",
                       idx,
                       esp_sntp.get_timestr(event_ptr->timestamp),
                       event_ptr->ack,
@@ -715,12 +716,113 @@ void run_test(int idx)
         esp_diag.trace(event_counter, 100 + event_counter);
     }
     break;
-    case 23:
+    case 30:
     {
-        // Error print
-        event_counter++;
-        os_printf("A new fatal all (%d) was injected.\n", event_counter);
-        esp_diag.all(event_counter, 100 + event_counter);
+        char str[80];
+        {
+            Profiler ram_string("ram string sprintf");
+            os_sprintf(str, "this string is mapped into RAM\n");
+        }
+        os_printf(str);
+        {
+            Profiler flash_string("flash string sprintf");
+            fs_sprintf(str, "this string is mapped into FLASH\n");
+        }
+        os_printf(str);
+    }
+    case 31:
+    {
+        // char str[256];
+        // os_printf("41 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40");
+        // os_printf("%s\n", str);
+        // os_printf("51 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50");
+        // os_printf("%s\n", str);
+        // os_printf("61 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60");
+        // os_printf("%s\n", str);
+        // os_printf("71 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70");
+        // os_printf("%s\n", str);
+        // os_printf("72 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70_");
+        // os_printf("%s\n", str);
+        // os_printf("73 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70_2");
+        // os_printf("%s\n", str);
+        // os_printf("74 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70__3");
+        // os_printf("%s\n", str);
+        // os_printf("75 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70___4");
+        // os_printf("%s\n", str);
+    }
+    break;
+    case 32:
+    {
+        // char str[256];
+        // os_printf("41 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40");
+        // os_printf("%s\n", str);
+        // os_printf("51 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50");
+        // os_printf("%s\n", str);
+        // os_printf("61 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60");
+        // os_printf("%s\n", str);
+        // os_printf("71 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70");
+        // os_printf("%s\n", str);
+        // os_printf("72 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70_");
+        // os_printf("%s\n", str);
+        // os_printf("73 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70_2");
+        // os_printf("%s\n", str);
+        // os_printf("74 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70__3");
+        // os_printf("%s\n", str);
+    }
+    break;
+    case 33:
+    {
+        // char str[256];
+        // os_printf("41 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40");
+        // os_printf("%s\n", str);
+        // os_printf("51 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50");
+        // os_printf("%s\n", str);
+        // os_printf("61 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60");
+        // os_printf("%s\n", str);
+        // os_printf("71 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70");
+        // os_printf("%s\n", str);
+        // os_printf("72 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70_");
+        // os_printf("%s\n", str);
+        // os_printf("73 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70_2");
+        // os_printf("%s\n", str);
+    }
+    break;
+    case 34:
+    {
+        // char str[256];
+        // os_printf("41 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40");
+        // os_printf("%s\n", str);
+        // os_printf("51 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50");
+        // os_printf("%s\n", str);
+        // os_printf("61 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60");
+        // os_printf("%s\n", str);
+        // os_printf("71 char string\n");
+        // fs_sprintf(str, "1_______10________20________30________40________50________60________70");
+        // os_printf("%s\n", str);
     }
     break;
     case 101:

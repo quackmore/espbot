@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Title</title>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <style>
+    .table-responsive {
+      height: 350px;
+      overflow: scroll-y;
+    }
+  </style>
+</head>
+
+<body class="bg-secondary">
+  <div class="container col-sm-6" style="display: flex;">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="text-primary" id="esp_name"></h4>
+        <!-- Nav tabs -->
+        <ul class="nav nav-tabs card-header-tabs">
+          <li class="nav-item">
+            <a class="nav-link active" data-toggle="tab" href="#home">Home</a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+              aria-haspopup="true" aria-expanded="false">
+              Config
+            </a>
+            <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+              <a class="dropdown-item" data-toggle="tab" href="#WiFi">WiFi</a>
+              <a class="dropdown-item" data-toggle="tab" href="#OTA">OTA</a>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item" data-toggle="tab" href="#debug_lev">Debug log levels</a>
+              <a class="dropdown-item" data-toggle="tab" href="#debug_log">Debug log</a>
+              <a class="dropdown-item" data-toggle="tab" href="#debug_mem">Debug memory</a>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-toggle="tab" href="#dataLog">Data Log</a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tab panes -->
+      <div class="card-block">
+        <div class="tab-content">
+          <div class="tab-pane container active" id="home">
+            <div>
+              <p></p>
+            </div>
+            <div class="form-group row">
+              <label for="app_name" class="col-sm-4 col-form-label">App name</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="app_name" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="app_version" class="col-sm-4 col-form-label">App version</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="app_version" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="dev_name" class="col-sm-4 col-form-label">Device name</label>
+              <div class="input-group col-sm-8">
+                <input type="text" class="form-control" id="dev_name">
+                <div class="input-group-append">
+                  <button class="btn btn-outline-secondary" type="button" id="change_name">Change</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="espbot_version" class="col-sm-4 col-form-label">Espbot version</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="espbot_version" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="library_version" class="col-sm-4 col-form-label">Library version</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="library_version" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="chip_id" class="col-sm-4 col-form-label">Chip ID</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="chip_id" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="sdk_version" class="col-sm-4 col-form-label">SDK version</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="sdk_version" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="boot_version" class="col-sm-4 col-form-label">Boot version</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="boot_version" readonly>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane container fade" id="WiFi">
+            <p></p>
+            <div>
+              <h5 class="text-primary">WiFi</h5>
+            </div>
+            <div class="form-group row">
+              <label for="wifi_working_as" class="col-sm-4 col-form-label">Working as</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="wifi_working_as" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="wifi_ssid" class="col-sm-4 col-form-label" id="wifi_ssid_label">Connected to</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="wifi_ssid" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="wifi_ip" class="col-sm-4 col-form-label">IP</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="wifi_IP" readonly>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="wifi_aps" class="col-sm-4 col-form-label">Networks</label>
+              <div class="input-group col-sm-8">
+                <select id="wifi_aps" class="form-control">
+                  <option selected><span class="sr-only">Loading...</span></option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="wifi_pwd" class="col-sm-4 col-form-label">Password</label>
+              <div class="col-sm-8">
+                <input type="password" class="form-control" id="wifi_pwd" placeholder="Password">
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" id="wifi_refresh">Refresh</button>
+            <button type="button" class="btn btn-primary" id="wifi_connect">Connect</button>
+            <p></p>
+          </div>
+          <div class="tab-pane container fade" id="OTA">
+            <p></p>
+            <div>
+              <h5 class="text-primary">OTA</h5>
+            </div>
+            <div class="form-group row">
+              <label for="ota_host" class="col-sm-4 col-form-label">Host IP</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="ota_host">
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="ota_port" class="col-sm-4 col-form-label">Host port</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="ota_port">
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="ota_path" class="col-sm-4 col-form-label">Host path</label>
+              <div class="col-sm-8">
+                <input type="text" class="form-control" id="ota_path">
+              </div>
+            </div>
+            <div class="form-group row">
+              <div class="col-sm-4">Options</div>
+              <div class="col-sm-8">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="ota_cv">
+                  <label class="form-check-label" for="ota_cv">
+                    Check binary version
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="form-group row">
+              <div class="col-sm-4"></div>
+              <div class="col-sm-8">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="ota_rac">
+                  <label class="form-check-label" for="ota_rac">
+                    Reboot after completion
+                  </label>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" id="ota_refresh">Refresh</button>
+            <button type="button" class="btn btn-primary" id="ota_save">Save</button>
+            <button type="button" class="btn btn-primary" id="ota_upgrade">Upgrade</button>
+            <p></p>
+          </div>
+          <div class="tab-pane container fade" id="debug_lev">
+            <p></p>
+            <div>
+              <h5 class="text-primary">DEBUG LOG LEVELS</h5>
+            </div>
+            <div class="form-group row">
+              <label for="debug_serial" class="col-sm-6 col-form-label">Serial log level</label>
+              <div class="input-group col-sm-6">
+                <select id="debug_serial" class="form-control">
+                  <option value="0">Off</option>
+                  <option value="1">Fatal</option>
+                  <option value="2">Error</option>
+                  <option value="3">Warning</option>
+                  <option value="4">Info</option>
+                  <option value="5">Debug</option>
+                  <option value="6">Trace</option>
+                  <option value="7">All</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label for="debug_mem" class="col-sm-6 col-form-label">RAM log level</label>
+              <div class="input-group col-sm-6">
+                <select id="debug_mem" class="form-control">
+                  <option value="0">Off</option>
+                  <option value="1">Fatal</option>
+                  <option value="2">Error</option>
+                  <option value="3">Warning</option>
+                  <option value="4">Info</option>
+                </select>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" id="debug_refresh">Refresh</button>
+            <button type="button" class="btn btn-primary" id="debug_save">Save</button>
+            <p></p>
+          </div>
+          <div class="tab-pane container fade" id="debug_log">
+            <p></p>
+            <div>
+              <h5 class="text-primary">DEBUG LOG</h5>
+            </div>
+            <button type="button" class="btn btn-primary" id="debug_log_refresh">Refresh</button>
+            <p></p>
+          </div>
+          <div class="tab-pane container fade" id="debug_mem">
+            <p></p>
+            <div>
+              <h5 class="text-primary">DEBUG MEMORY</h5>
+            </div>
+            <button type="button" class="btn btn-primary" id="debug_mem_refresh">Refresh</button>
+            <p></p>
+          </div>
+          <div class="tab-pane container fade" id="dataLog">
+            <p></p>
+            <div class="table-responsive text-nowrap table-sm small">
+              <table class="table table-striped" id="diag_event_table">
+                <thead>
+                  <tr>
+                    <th scope="col">Timestamp</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Code</th>
+                    <th scope="col">Desc</th>
+                    <th scope="col">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="text-success">
+                    <th scope="row">Wed Feb 05 09:41:09 2020</th>
+                    <td>ERROR</td>
+                    <td>0054</td>
+                    <td>Example (Acknowledged)</td>
+                    <td>00000000</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Wed Feb 05 09:41:09 2020</th>
+                    <td>ERROR</td>
+                    <td>0054</td>
+                    <td>Example</td>
+                    <td>00000000</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p></p>
+            <div>
+              <button type="button" class="btn btn-primary" id="diag_evnt_log_refresh">Refresh</button>
+              <button type="button" class="btn btn-primary" id="diag_evnt_acknowledge">Acknowledge</button>
+            </div>
+            <p></p>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer text-muted">By <a href="mailto:quackmore-ff@yahoo.com">Quackmore</a>
+      </div>
+    </div>
+  </div>
+  <!-- JavaScript -->
+  <!-- jQuery first, then Popper.js, then Bootstrap JS, then custom script -->
+  <!-- don't use slim if you need ajax -->
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"
+    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+    crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+    crossorigin="anonymous"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>

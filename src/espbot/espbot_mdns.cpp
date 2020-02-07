@@ -15,28 +15,33 @@ extern "C"
 #include "espconn.h"
 }
 
-#include "espbot_mdns.hpp"
 #include "espbot.hpp"
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
+#include "espbot_mdns.hpp"
 
 void Mdns::start(char *app_alias)
 {
-    esplog.all("Mdns::start\n");
-    struct ip_info ipconfig;
-    wifi_get_ip_info(STATION_IF, &ipconfig);
-    m_info.host_name = espbot.get_name();
-    m_info.ipAddr = ipconfig.ip.addr;
-    m_info.server_name = espbot.get_name();
-    m_info.server_port = SERVER_PORT;
-    m_info.txt_data[0] = app_alias;
-    espconn_mdns_init(&m_info);
-    esplog.debug("mDns started\n");
+    if (espbot.mdns_enabled())
+    {
+        struct ip_info ipconfig;
+        wifi_get_ip_info(STATION_IF, &ipconfig);
+        m_info.host_name = espbot.get_name();
+        m_info.ipAddr = ipconfig.ip.addr;
+        m_info.server_name = espbot.get_name();
+        m_info.server_port = SERVER_PORT;
+        m_info.txt_data[0] = app_alias;
+        espconn_mdns_init(&m_info);
+        esp_diag.info(MDNS_START);
+        // esplog.debug("mDns started\n");
+    }
 }
 
 void Mdns::stop(void)
 {
-    esplog.all("Mdns::stop\n");
     espconn_mdns_close();
-    esplog.debug("mDns ended\n");
+    esp_diag.info(MDNS_STOP);
+    // esplog.debug("mDns ended\n");
 }

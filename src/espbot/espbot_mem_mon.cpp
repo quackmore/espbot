@@ -13,6 +13,8 @@ extern "C"
 #include "user_interface.h"
 }
 
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
 
@@ -50,7 +52,6 @@ void Esp_mem::init(void)
 void Esp_mem::heap_mon(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
-    //esplog.all("Esp_mem::heap_mon: %d\n", currentHeap);
     if (_min_heap_size > currentHeap)
         _min_heap_size = currentHeap;
 }
@@ -86,7 +87,8 @@ void *Esp_mem::espbot_zalloc(size_t size)
     }
     else
     {
-        esplog.fatal("Esp_mem::espbot_zalloc heap exhausted\n");
+        esp_diag.fatal(MEM_MON_HEAP_EXHAUSTED);
+        // esplog.fatal("Esp_mem::espbot_zalloc heap exhausted\n");
     }
     espmem.heap_mon();
     return addr;
@@ -111,37 +113,31 @@ void Esp_mem::espbot_free(void *addr)
 
 uint32 Esp_mem::get_min_stack_addr(void)
 {
-    esplog.all("Esp_mem::get_min_stack_addr\n");
     return _stack_min_addr;
 }
 
 uint32 Esp_mem::get_max_stack_addr(void)
 {
-    esplog.all("Esp_mem::get_max_stack_addr\n");
     return _stack_max_addr;
 }
 
 uint32 Esp_mem::get_start_heap_addr(void)
 {
-    esplog.all("Esp_mem::get_start_heap_addr\n");
     return _heap_start_addr;
 }
 
 uint32 Esp_mem::get_max_heap_size(void)
 {
-    esplog.all("Esp_mem::get_max_heap_size\n");
     return _max_heap_size;
 }
 
 uint32 Esp_mem::get_mim_heap_size(void)
 {
-    esplog.all("Esp_mem::get_mim_heap_size\n");
     return _min_heap_size;
 }
 
 // uint32 Esp_mem::get_used_heap_size(void)
 // {
-//     esplog.all("Esp_mem::get_used_heap_size\n");
 //     // int idx;
 //     // int used_heap = 0;
 //     // stack_mon();
@@ -156,19 +152,16 @@ uint32 Esp_mem::get_mim_heap_size(void)
 
 uint32 Esp_mem::get_heap_objs(void)
 {
-    esplog.all("Esp_mem::get_heap_objs\n");
     return _heap_objs;
 }
 
 uint32 Esp_mem::get_max_heap_objs(void)
 {
-    esplog.all("Esp_mem::get_max_heap_objs\n");
     return _max_heap_objs;
 }
 
 // struct heap_item *Esp_mem::get_heap_item(List_item item)
 // {
-//     esplog.all("get_heap_item\n");
 //     static int idx = 0;
 //     stack_mon();
 //     if (item == first)

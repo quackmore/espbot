@@ -9,6 +9,7 @@
 // SDK includes
 extern "C"
 {
+#include "driver_uart.h"
 #include "ets_sys.h"
 #include "mem.h"
 #include "osapi.h"
@@ -19,6 +20,8 @@ extern "C"
 #include "app.hpp"
 #include "espbot.hpp"
 #include "espbot_config.hpp"
+#include "espbot_diagnostic.hpp"
+#include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_mem_mon.hpp"
@@ -31,20 +34,19 @@ extern "C"
 
 static void print_greetings(void)
 {
-    os_printf("Hello there! Espbot started\n");
-    os_printf("Chip ID        : %d\n", system_get_chip_id());
-    os_printf("SDK version    : %s\n", system_get_sdk_version());
-    os_printf("Boot version   : %d\n", system_get_boot_version());
-    os_printf("Espbot version : %s\n", espbot_release);
-    os_printf("---------------------------------------------------\n");
-    os_printf("Memory map\n");
+    fs_printf("Hello there! Espbot started\n");
+    fs_printf("Chip ID        : %d\n", system_get_chip_id());
+    fs_printf("SDK version    : %s\n", system_get_sdk_version());
+    fs_printf("Boot version   : %d\n", system_get_boot_version());
+    fs_printf("Espbot version : %s\n", espbot_release);
+    fs_printf("---------------------------------------------------\n");
+    fs_printf("Memory map\n");
     system_print_meminfo();
-    os_printf("---------------------------------------------------\n");
+    fs_printf("---------------------------------------------------\n");
 }
 
 static void espbot_coordinator_task(os_event_t *e)
 {
-    esplog.all("espbot_coordinator_task\n");
     switch (e->sig)
     {
     case SIG_STAMODE_GOT_IP:
@@ -76,52 +78,65 @@ static void espbot_coordinator_task(os_event_t *e)
 
 static void heartbeat_cb(void)
 {
-    esplog.all("heartbeat_cb\n");
+#ifdef DEBUG_TRACE
     esplog.debug("ESPBOT HEARTBEAT: ---------------------------------------------------\n");
     uint32 current_timestamp = esp_sntp.get_timestamp();
     esplog.debug("ESPBOT HEARTBEAT: [%d] [UTC+1] %s\n", current_timestamp, esp_sntp.get_timestr(current_timestamp));
     esplog.debug("ESPBOT HEARTBEAT: Available heap size: %d\n", system_get_free_heap_size());
+#endif
 }
 
 uint32 Espbot::get_chip_id(void)
 {
-    esplog.all("Espbot::get_chip_id\n");
     return system_get_chip_id();
 }
 
 uint8 Espbot::get_boot_version(void)
 {
-    esplog.all("Espbot::get_boot_version\n");
     return system_get_boot_version();
 }
 
 const char *Espbot::get_sdk_version(void)
 {
-    esplog.all("Espbot::get_sdk_version\n");
     return system_get_sdk_version();
 }
 
 char *Espbot::get_version(void)
 {
-    esplog.all("Espbot::get_version\n");
     return (char *)espbot_release;
 }
 
 char *Espbot::get_name(void)
 {
-    esplog.all("Espbot::get_name\n");
-    return m_name;
+    return _name;
 }
 
 void Espbot::set_name(char *t_name)
 {
-    esplog.all("Espbot::set_name\n");
-    os_memset(m_name, 0, 32);
+    os_memset(_name, 0, 32);
     if (os_strlen(t_name) > 31)
     {
-        esplog.warn("Espbot::set_name: truncating name to 31 characters\n");
+        esp_diag.warn(ESPOT_SET_NAME_TRUNCATED);
+        // esplog.warn("Espbot::set_name: truncating name to 31 characters\n");
     }
-    os_strncpy(m_name, t_name, 31);
+    os_strncpy(_name, t_name, 31);
+    save_cfg();
+}
+
+bool Espbot::mdns_enabled(void)
+{
+    return _mdns_enabled;
+}
+
+void Espbot::enable_mdns(void)
+{
+    _mdns_enabled = true;
+    save_cfg();
+}
+
+void Espbot::disable_mdns(void)
+{
+    _mdns_enabled = false;
     save_cfg();
 }
 
@@ -130,13 +145,21 @@ extern "C" void espbot_init(void);
 
 void espbot_init(void)
 {
+    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
+    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
+    uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    system_set_os_print(1); // enable log print
     espmem.init();
+#ifdef DEBUG_TRACE
     esplog.essential_init();
+#endif
     print_greetings();
 
     espfs.init();
     esp_diag.init();
+#ifdef DEBUG_TRACE
     esplog.init_cfg();
+#endif
     espbot.init();
     esp_ota.init();
     http_init();
@@ -150,14 +173,14 @@ void espbot_init(void)
 
 int Espbot::restore_cfg(void)
 {
-    esplog.all("Espbot::restore_cfg\n");
     File_to_json cfgfile("espbot.cfg");
     espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string("espbot_name"))
         {
-            esplog.error("Espbot::restore_cfg - available configuration is incomplete\n");
+            esp_diag.error(ESPBOT_RESTORE_CFG_INCOMPLETE);
+            // esplog.error("Espbot::restore_cfg - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         set_name(cfgfile.get_value());
@@ -165,24 +188,24 @@ int Espbot::restore_cfg(void)
     }
     else
     {
-        esplog.warn("Espbot::restore_cfg - cfg file not found\n");
+        // esplog.warn("Espbot::restore_cfg - cfg file not found\n");
         return CFG_ERROR;
     }
 }
 
 int Espbot::saved_cfg_not_update(void)
 {
-    esplog.all("Espbot::saved_cfg_not_update\n");
     File_to_json cfgfile("espbot.cfg");
     espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string("espbot_name"))
         {
-            esplog.error("Espbot::saved_cfg_not_update - available configuration is incomplete\n");
+            esp_diag.error(ESPBOT_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
+            // esplog.error("Espbot::saved_cfg_not_update - available configuration is incomplete\n");
             return CFG_ERROR;
         }
-        if (os_strcmp(m_name, cfgfile.get_value()))
+        if (os_strcmp(_name, cfgfile.get_value()))
         {
             return CFG_REQUIRES_UPDATE;
         }
@@ -196,7 +219,6 @@ int Espbot::saved_cfg_not_update(void)
 
 int Espbot::save_cfg(void)
 {
-    esplog.all("Espbot::save_cfg\n");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
@@ -209,24 +231,27 @@ int Espbot::save_cfg(void)
             espmem.stack_mon();
             if (buffer.ref)
             {
-                os_sprintf(buffer.ref, "{\"espbot_name\": \"%s\"}", m_name);
+                fs_sprintf(buffer.ref, "{\"espbot_name\": \"%s\"}", _name);
                 cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
             }
             else
             {
-                esplog.error("Espbot::save_cfg - not enough heap memory available\n");
+                esp_diag.error(ESPBOT_SAVE_CFG_HEAP_EXHAUSTED, 64);
+                // esplog.error("Espbot::save_cfg - not enough heap memory available\n");
                 return CFG_ERROR;
             }
         }
         else
         {
-            esplog.error("Espbot::save_cfg - cannot open espbot.cfg\n");
+            esp_diag.error(ESPBOT_SAVE_CFG_CANNOT_OPEN_FILE);
+            // esplog.error("Espbot::save_cfg - cannot open espbot.cfg\n");
             return CFG_ERROR;
         }
     }
     else
     {
-        esplog.error("Espbot::save_cfg - file system not available\n");
+        esp_diag.error(ESPBOT_SAVE_CFG_FS_NOT_AVAILABLE);
+        // esplog.error("Espbot::save_cfg - file system not available\n");
         return CFG_ERROR;
     }
     return 0;
@@ -245,14 +270,12 @@ static os_timer_t graceful_rst_timer;
 
 static void graceful_reset(void *t_reset)
 {
-    esplog.all("graceful_reset\n");
     graceful_rst_counter++;
     espbot.reset((int)t_reset);
 }
 
 void Espbot::reset(int t_reset)
 {
-    esplog.all("Espbot::reset\n");
     switch (graceful_rst_counter)
     {
     case 0:
@@ -284,22 +307,27 @@ void Espbot::reset(int t_reset)
 
 void Espbot::init(void)
 {
-    esplog.all("Espbot::init\n");
     // set default name
-    os_sprintf(m_name, "ESPBOT-%d", system_get_chip_id());
-    if (restore_cfg())
-        esplog.warn("no cfg available, espbot name set to %s\n", get_name());
+    fs_sprintf(_name, "ESPBOT-%d", system_get_chip_id());
+    _mdns_enabled = false;
 
+    if (restore_cfg())
+    {
+        esp_diag.warn(ESPBOT_INIT_DEFAULT_CFG);
+        // esplog.warn("no cfg available, espbot name set to %s\n", get_name());
+    }
     os_timer_disarm(&graceful_rst_timer);
 
     // start an heartbeat timer
-    os_timer_disarm(&m_heartbeat);
-    os_timer_setfn(&m_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
-    os_timer_arm(&m_heartbeat, HEARTBEAT_PERIOD, 1);
+    os_timer_disarm(&_heartbeat);
+    os_timer_setfn(&_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
+    os_timer_arm(&_heartbeat, HEARTBEAT_PERIOD, 1);
 
     // setup the task
-    m_queue = new os_event_t[QUEUE_LEN];
-    system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, m_queue, QUEUE_LEN);
+    _queue = new os_event_t[QUEUE_LEN];
+    system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, _queue, QUEUE_LEN);
 
+#ifdef DEBUG_TRACE
     esplog.debug("Espbot::init complete\n");
+#endif
 }

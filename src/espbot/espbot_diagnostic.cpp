@@ -16,6 +16,7 @@ extern "C"
 
 #include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
+#include "espbot_profiler.hpp"
 
 void Espbot_diag::init(void)
 {
@@ -29,14 +30,18 @@ void Espbot_diag::init(void)
         _evnt_queue[idx].value = 0;
     }
     _last_event = EVNT_QUEUE_SIZE - 1;
-    _diag_led_enabled = true;
+    _diag_led_mask = 0x00 | EVNT_FATAL | EVNT_ERROR | EVNT_WARN;
     // switch off the diag led
-    PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
-    GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+    if (_diag_led_mask)
+    {
+        PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
+        GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+    }
 }
 
-inline void Espbot_diag::add_event(char type, char code, uint32 value)
+inline void Espbot_diag::add_event(char type, int code, uint32 value)
 {
+    // Profiler("DIA: add-event"); => 4-5 us
     int idx = _last_event + 1;
     if (idx >= EVNT_QUEUE_SIZE)
         idx = 0;
@@ -47,43 +52,38 @@ inline void Espbot_diag::add_event(char type, char code, uint32 value)
     _evnt_queue[idx].value = value;
     _last_event = idx;
     // switch on the diag led
-    if (_diag_led_enabled)
+    if (_diag_led_mask & type)
         GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_LOW);
 }
 
-void Espbot_diag::fatal(char code, uint32 value)
+void Espbot_diag::fatal(int code, uint32 value)
 {
     add_event(EVNT_FATAL, code, value);
 }
 
-void Espbot_diag::error(char code, uint32 value)
+void Espbot_diag::error(int code, uint32 value)
 {
     add_event(EVNT_ERROR, code, value);
 }
 
-void Espbot_diag::warn(char code, uint32 value)
+void Espbot_diag::warn(int code, uint32 value)
 {
     add_event(EVNT_WARN, code, value);
 }
 
-void Espbot_diag::info(char code, uint32 value)
+void Espbot_diag::info(int code, uint32 value)
 {
     add_event(EVNT_INFO, code, value);
 }
 
-void Espbot_diag::debug(char code, uint32 value)
+void Espbot_diag::debug(int code, uint32 value)
 {
     add_event(EVNT_DEBUG, code, value);
 }
 
-void Espbot_diag::trace(char code, uint32 value)
+void Espbot_diag::trace(int code, uint32 value)
 {
     add_event(EVNT_TRACE, code, value);
-}
-
-void Espbot_diag::all(char code, uint32 value)
-{
-    add_event(EVNT_ALL, code, value);
 }
 
 int Espbot_diag::get_max_events_count(void)
@@ -127,6 +127,16 @@ void Espbot_diag::ack_events(void)
                 _evnt_queue[idx].ack = 1;
     }
     // switch off the diag led
-    if (_diag_led_enabled)
+    if (_diag_led_mask)
         GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+}
+
+char Espbot_diag::get_led_mask(void)
+{
+    return _diag_led_mask;
+}
+
+void Espbot_diag::set_led_mask(char mask)
+{
+    _diag_led_mask = mask;
 }

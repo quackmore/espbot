@@ -24,7 +24,9 @@ char *espbot_release = APP_RELEASE;
 Flashfs espfs;
 Espbot_diag esp_diag;
 Esp_mem espmem;
+#ifdef DEBUG_TRACE
 Logger esplog;
+#endif
 Espbot espbot;
 Mdns esp_mDns;
 Sntp esp_sntp;
