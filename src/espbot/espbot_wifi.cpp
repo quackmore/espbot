@@ -251,11 +251,11 @@ void Wifi::connect(void)
 static int restore_cfg(void)
 {
     ALL("Wifi::restore_cfg");
-    File_to_json cfgfile("wifi.cfg");
+    File_to_json cfgfile(f_str("wifi.cfg"));
     espmem.stack_mon();
     if (cfgfile.exists())
     {
-        if (cfgfile.find_string("station_ssid"))
+        if (cfgfile.find_string(f_str("station_ssid")))
         {
             esp_diag.error(WIFI_RESTORE_CFG_INCOMPLETE);
             ERROR("Wifi::restore_cfg incomplete cfg");
@@ -263,7 +263,7 @@ static int restore_cfg(void)
         }
         os_memset(station_ssid, 0, 32);
         os_strncpy(station_ssid, cfgfile.get_value(), 31);
-        if (cfgfile.find_string("station_pwd"))
+        if (cfgfile.find_string(f_str("station_pwd")))
         {
             esp_diag.error(WIFI_RESTORE_CFG_INCOMPLETE);
             ERROR("Wifi::restore_cfg incomplete cfg");
@@ -284,11 +284,11 @@ static int restore_cfg(void)
 static int saved_cfg_not_update(void)
 {
     ALL("Wifi::saved_cfg_not_update");
-    File_to_json cfgfile("wifi.cfg");
+    File_to_json cfgfile(f_str("wifi.cfg"));
     espmem.stack_mon();
     if (cfgfile.exists())
     {
-        if (cfgfile.find_string("station_ssid"))
+        if (cfgfile.find_string(f_str("station_ssid")))
         {
             esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
             ERROR("Wifi::saved_cfg_not_update incomplete cfg");
@@ -298,7 +298,7 @@ static int saved_cfg_not_update(void)
         {
             return CFG_REQUIRES_UPDATE;
         }
-        if (cfgfile.find_string("station_pwd"))
+        if (cfgfile.find_string(f_str("station_pwd")))
         {
             esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
             ERROR("Wifi::saved_cfg_not_update incomplete cfg");

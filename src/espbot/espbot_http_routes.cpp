@@ -52,7 +52,7 @@ static void wifi_scan_completed_function(void *param)
     {
         char *tmp_ptr;
         espmem.stack_mon();
-        os_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDs\":[", Wifi::get_ap_count());
+        fs_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDs\":[", Wifi::get_ap_count());
         for (int idx = 0; idx < Wifi::get_ap_count(); idx++)
         {
             tmp_ptr = scan_list + os_strlen(scan_list);
@@ -61,7 +61,7 @@ static void wifi_scan_completed_function(void *param)
             os_sprintf(tmp_ptr, "\"%s\"", Wifi::get_ap_name(idx));
         }
         tmp_ptr = scan_list + os_strlen(scan_list);
-        os_sprintf(tmp_ptr, "]}");
+        fs_sprintf(tmp_ptr, "]}");
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, scan_list, true);
         Wifi::free_ap_list();
     }
@@ -934,7 +934,7 @@ static void post_api_gpio_uncfg(struct espconn *ptr_espconn, Http_parsed_req *pa
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+    if (gpio_cfg.find_pair(f_str("gpio_pin")) != JSON_NEW_PAIR_FOUND)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_pin'"), false);
         return;
@@ -1521,7 +1521,7 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/"))) && (parsed_req->req_method == HTTP_GET))
     {
-        return_file(ptr_espconn, "index.html");
+        return_file(ptr_espconn, (char *) f_str("index.html"));
         return;
     }
     if ((os_strncmp(parsed_req->url, f_str("/api/"), 5)) && (parsed_req->req_method == HTTP_GET))

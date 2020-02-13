@@ -402,7 +402,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
         {
             os_strncpy(buffer.ref, p_sr->content + p_sr->content_transferred, buffer_size);
             TRACE("send_remaining_msg *p_espconn %X, msg (last piece) len: %d",
-                  p_sr->p_espconn, 
+                  p_sr->p_espconn,
                   os_strlen(buffer.ref));
             http_send_buffer(p_sr->p_espconn, buffer.ref);
         }
