@@ -279,7 +279,7 @@ void Ota_upgrade::ota_timer_function(void *arg)
         //     esp_free(pespconn);
         //     pespconn = NULL;
         // }
-        // esplog.error("OTA failed\n");
+        // ERROR("OTA failed\n");
         esp_ota.m_status = OTA_IDLE;
         break;
     }

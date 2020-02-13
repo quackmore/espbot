@@ -148,12 +148,10 @@ void espbot_init(void)
     uart_init(BIT_RATE_460800, BIT_RATE_460800);
     system_set_os_print(1); // enable log print
     espmem.init();
-    // esplog.essential_init();
     print_greetings();
 
     espfs.init();
     esp_diag.init();
-    // esplog.init_cfg();
     espbot.init();
     esp_ota.init();
     http_init();

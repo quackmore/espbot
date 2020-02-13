@@ -23,13 +23,13 @@ extern "C"
 }
 
 #include "espbot_global.hpp"
-#define PRINT_FATAL(...) esplog.fatal(__VA_ARGS__)
-#define PRINT_ERROR(...) esplog.error(__VA_ARGS__)
-#define PRINT_WARN(...) esplog.warn(__VA_ARGS__)
-#define PRINT_INFO(...) esplog.info(__VA_ARGS__)
-#define PRINT_DEBUG(...) esplog.debug(__VA_ARGS__)
-#define PRINT_TRACE(...) esplog.trace(__VA_ARGS__)
-#define PRINT_ALL(...) esplog.all(__VA_ARGS__)
+#define PRINT_FATAL(...) FATAL(__VA_ARGS__)
+#define PRINT_ERROR(...) ERROR(__VA_ARGS__)
+#define PRINT_WARN(...) WARN(__VA_ARGS__)
+#define PRINT_INFO(...) INFO(__VA_ARGS__)
+#define PRINT_DEBUG(...) DEBUG(__VA_ARGS__)
+#define PRINT_TRACE(...) TRACE(__VA_ARGS__)
+#define PRINT_ALL(...) ALL(__VA_ARGS__)
 #define getTimestamp() esp_sntp.get_timestamp();
 
 #else

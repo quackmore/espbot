@@ -98,11 +98,10 @@ void wifi_event_handler(System_Event_t *evt)
     case EVENT_STAMODE_DHCP_TIMEOUT:
         esp_diag.warn(WIFI_DHCP_TIMEOUT);
         WARN("dhcp timeout");
-        // esplog.debug("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
-        //              IP2STR(&evt->event_info.got_ip.ip),
-        //              IP2STR(&evt->event_info.got_ip.mask),
-        //              IP2STR(&evt->event_info.got_ip.gw));
-        // os_printf_plus("\n");
+        // DEBUG("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
+        //       IP2STR(&evt->event_info.got_ip.ip),
+        //       IP2STR(&evt->event_info.got_ip.mask),
+        //       IP2STR(&evt->event_info.got_ip.gw));
         break;
     case EVENT_STAMODE_GOT_IP:
         esp_diag.info(WIFI_GOT_IP);

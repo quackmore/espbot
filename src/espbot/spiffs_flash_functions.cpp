@@ -18,6 +18,7 @@ extern "C"
 
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
+#include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
 #include "spiffs_flash_functions.hpp"
 

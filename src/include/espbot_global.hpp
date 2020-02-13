@@ -30,7 +30,6 @@ extern char *espbot_release;
 extern Flashfs espfs;
 extern Espbot_diag esp_diag;
 extern Esp_mem espmem;
-extern Logger esplog;
 extern Espbot espbot;
 extern Mdns esp_mDns;
 extern Sntp esp_sntp;

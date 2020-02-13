@@ -41,7 +41,7 @@ static os_timer_t test_timer;
 
 static void test_function(void)
 {
-    // esplog.all("test_function\n");
+    // ALL("test_function");
     // run_test();
 }
 
@@ -52,7 +52,7 @@ static Webclnt *espclient;
 
 void init_test(struct ip_addr ip, uint32 port, char *request)
 {
-    // esplog.all("init_test\n");
+    // ALL("init_test");
     os_memcpy(&host_ip, &ip, sizeof(struct ip_addr));
     host_port = port;
     char ip_str[16];
@@ -86,7 +86,7 @@ void free_client(void *)
 
 void check_version(void *param)
 {
-    // esplog.all("check_version\n");
+    // ALL("check_version");
     switch (espclient->get_status())
     {
     case WEBCLNT_RESPONSE_READY:
@@ -106,7 +106,7 @@ void check_version(void *param)
 
 void get_version(void *param)
 {
-    // esplog.all("get_version\n");
+    // ALL("get_version");
     switch (espclient->get_status())
     {
     case WEBCLNT_CONNECTED:
@@ -911,49 +911,49 @@ void run_test(int idx)
     {
         // set web server response buffer size
         set_http_msg_max_size(256);
-        esplog.info("response buffer size set to 256 bytes\n");
+        INFO("response buffer size set to 256 bytes");
     }
     break;
     case 512:
     {
         // set web server response buffer size
         set_http_msg_max_size(512);
-        esplog.info("response buffer size set to 512 bytes\n");
+        INFO("response buffer size set to 512 bytes");
     }
     break;
     case 768:
     {
         // set web server response buffer size
         set_http_msg_max_size(768);
-        esplog.info("response buffer size set to 768 bytes\n");
+        INFO("response buffer size set to 768 bytes");
     }
     break;
     case 1024:
     {
         // set web server response buffer size
         set_http_msg_max_size(1024);
-        esplog.info("response buffer size set to 1024 bytes\n");
+        INFO("response buffer size set to 1024 bytes");
     }
     break;
     case 1280:
     {
         // set web server response buffer size
         set_http_msg_max_size(1280);
-        esplog.info("response buffer size set to 1280 bytes\n");
+        INFO("response buffer size set to 1280 bytes");
     }
     break;
     case 1536:
     {
         // set web server response buffer size
         set_http_msg_max_size(1536);
-        esplog.info("response buffer size set to 1536 bytes\n");
+        INFO("response buffer size set to 1536 bytes");
     }
     break;
     case 1792:
     {
         // set web server response buffer size
         set_http_msg_max_size(1792);
-        esplog.info("response buffer size set to 1792 bytes\n");
+        INFO("response buffer size set to 1792 bytes");
     }
     break;
     */

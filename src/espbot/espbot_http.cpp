@@ -170,7 +170,7 @@ void http_check_pending_send(void)
               p_pending_send->p_espconn, p_pending_send->msg);
         http_send_buffer(p_pending_send->p_espconn, p_pending_send->msg);
         // the send procedure will clear the buffer so just delete the http_send
-        // esplog.trace("http_check_pending_send: deleting p_pending_send\n");
+        // TRACE("http_check_pending_send: deleting p_pending_send\n");
         delete p_pending_send;
         pending_send->pop();
         // a pending response was found
@@ -189,7 +189,7 @@ void http_check_pending_send(void)
               p_pending_response->action_function);
         p_pending_response->action_function(p_pending_response);
         // don't free the content yet
-        // esplog.trace("http_check_pending_send: deleting p_pending_response\n");
+        // TRACE("http_check_pending_send: deleting p_pending_response\n");
         delete p_pending_response;
         pending_split_send->pop();
         // serving just one pending_split_send, so that just one espconn_send is engaged
@@ -371,7 +371,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
                 if (result == Queue_full)
                 {
                     esp_diag.error(HTTP_SEND_REMAINING_MSG_RES_QUEUE_FULL);
-                    // esplog.error("send_remaining_msg: pending response queue is full\n");
+                    ERROR("send_remaining_msg full pending response queue");
                 }
                 TRACE("send_remaining_msg *p_espconn %X, msg (splitted) len %d",
                       p_sr->p_espconn,

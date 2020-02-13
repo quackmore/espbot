@@ -10,6 +10,7 @@
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "spiffs_flash_functions.hpp"
+#include "espbot_global.hpp"
 #include "spiffs_esp8266.hpp"
 
 Flashfs::Flashfs()
