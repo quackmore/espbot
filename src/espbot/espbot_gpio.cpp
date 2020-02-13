@@ -66,7 +66,7 @@ static int gpio_getNum(int idx)
     else
     {
         esp_diag.warn(GPIO_GETNUM_WRONG_INDEX);
-        // esplog.error("Gpio::set_as_input: wrong gpio index.\n");
+        ERROR("Gpio::set_as_input wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
@@ -89,7 +89,7 @@ int Gpio::config(int t_idx, int t_type)
         else
         {
             esp_diag.warn(GPIO_CONFIG_WRONG_TYPE);
-            // esplog.error("Gpio::config: wrong gpio type\n");
+            ERROR("Gpio::config wrong type");
             return ESPBOT_GPIO_WRONG_TYPE;
         }
 
@@ -159,7 +159,7 @@ int Gpio::config(int t_idx, int t_type)
     else
     {
         esp_diag.warn(GPIO_CONFIG_WRONG_INDEX);
-        // esplog.error("Gpio::config: wrong gpio index\n");
+        ERROR("Gpio::config wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
@@ -174,7 +174,7 @@ int Gpio::unconfig(int t_idx)
     else
     {
         esp_diag.warn(GPIO_UNCONFIG_WRONG_INDEX);
-        // esplog.error("Gpio::unconfig: wrong gpio index\n");
+        ERROR("Gpio::unconfig wrong gpio index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
@@ -196,7 +196,7 @@ int Gpio::get_config(int t_idx)
     else
     {
         esp_diag.warn(GPIO_GET_CONFIG_WRONG_INDEX);
-        // esplog.error("Gpio::get_config: wrong gpio index\n");
+        ERROR("Gpio::get_config wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
@@ -217,7 +217,7 @@ int Gpio::read(int t_idx)
     else
     {
         esp_diag.warn(GPIO_READ_WRONG_INDEX);
-        // esplog.error("Gpio::read: wrong gpio index.\n");
+        ERROR("Gpio::read wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
@@ -266,14 +266,14 @@ int Gpio::set(int t_idx, int t_value)
                 else
                 {
                     esp_diag.warn(GPIO_SET_WRONG_LEVEL);
-                    // esplog.error("Gpio::set: unknown output level\n");
+                    ERROR("Gpio::set wrong level");
                     return ESPBOT_GPIO_WRONG_LVL;
                 }
             }
             else
             {
                 esp_diag.warn(GPIO_SET_CANNOT_CHANGE);
-                // esplog.error("Gpio::set: cannot change input\n");
+                ERROR("Gpio::set cannot change input");
                 return ESPBOT_GPIO_CANNOT_CHANGE_INPUT;
             }
         }
@@ -283,7 +283,7 @@ int Gpio::set(int t_idx, int t_value)
     else
     {
         esp_diag.warn(GPIO_GETNUM_WRONG_INDEX);
-        // esplog.error("Gpio::set: wrong gpio index.\n");
+        ERROR("Gpio::set wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }

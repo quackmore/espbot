@@ -414,7 +414,7 @@ int Json_str::get_cur_pair_value_len(void)
 //     return m_cursor;
 // }
 
-Json_pair_type Json_str::find_pair(char *t_string)
+Json_pair_type Json_str::find_pair(const char *t_string)
 {
     m_cursor = m_str;
     if (syntax_check() == JSON_SINTAX_OK)

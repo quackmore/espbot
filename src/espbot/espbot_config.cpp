@@ -24,9 +24,9 @@ extern "C"
 #define FILE_TO_JSON_OK 0
 #define FILE_TO_JSON_ERROR 1
 
-File_to_json::File_to_json(char *t_filename)
+File_to_json::File_to_json(const char *t_filename)
 {
-    m_filename = t_filename;
+    m_filename = (char *) t_filename;
     m_cache = NULL;
     m_value_str = NULL;
     m_value_len = 0;
@@ -45,7 +45,7 @@ bool File_to_json::exists(void)
     return (Ffile::exists(&espfs, m_filename));
 }
 
-int File_to_json::find_string(char *t_string)
+int File_to_json::find_string(const char *t_string)
 {
     if (m_value_str)
         delete[] m_value_str;
@@ -54,7 +54,7 @@ int File_to_json::find_string(char *t_string)
     if (!espfs.is_available())
     {
         esp_diag.error(FILE_TO_JSON_FS_NOT_AVAILABLE);
-        // esplog.error("File_to_json::find_string - file system is not available\n");
+        ERROR("File_to_json::find_string FS not available");
         return FILE_TO_JSON_ERROR;
     }
     if (m_cache == NULL) // file content not cached yet
@@ -62,14 +62,14 @@ int File_to_json::find_string(char *t_string)
         if (!Ffile::exists(&espfs, m_filename))
         {
             esp_diag.error(FILE_TO_JSON_FILE_NOT_FOUND);
-            // esplog.error("File_to_json::find_string - file not found\n");
+            ERROR("File_to_json::find_string file not found");
             return FILE_TO_JSON_ERROR;
         }
         Ffile cfgfile(&espfs, m_filename);
         if (!cfgfile.is_available())
         {
             esp_diag.error(FILE_TO_JSON_CANNOT_OPEN_FILE);
-            // esplog.error("File_to_json::find_string - cannot open file %s\n", m_filename);
+            ERROR("File_to_json::find_string cannot open file %s", m_filename);
             return FILE_TO_JSON_ERROR;
         }
         int cache_size = Ffile::size(&espfs, m_filename) + 1;
@@ -77,7 +77,7 @@ int File_to_json::find_string(char *t_string)
         if (m_cache == NULL)
         {
             esp_diag.error(FILE_TO_JSON_HEAP_EXHAUSTED, cache_size);
-            // esplog.error("File_to_json::find_string - Not enough heap space\n");
+            ERROR("File_to_json::find_string heap exhausted %d", cache_size);
             return FILE_TO_JSON_ERROR;
         }
         cfgfile.n_read(m_cache, Ffile::size(&espfs, m_filename));
@@ -87,7 +87,7 @@ int File_to_json::find_string(char *t_string)
     if (j_str.syntax_check() != JSON_SINTAX_OK)
     {
         esp_diag.error(FILE_TO_JSON_CANNOT_PARSE_JSON);
-        // esplog.error("File_to_json::find_string - cannot parse json string\n");
+        ERROR("File_to_json::find_string json err");
         return FILE_TO_JSON_ERROR;
     }
     while (j_str.find_next_pair() == JSON_NEW_PAIR_FOUND)
@@ -104,13 +104,13 @@ int File_to_json::find_string(char *t_string)
             else
             {
                 esp_diag.error(FILE_TO_JSON_HEAP_EXHAUSTED, (m_value_len + 1));
-                // esplog.error("File_to_json::find_string - Not enough heap space\n");
+                ERROR("File_to_json::find_string heap exhausted %d", (m_value_len + 1));
                 return FILE_TO_JSON_ERROR;
             }
         }
     }
     esp_diag.error(FILE_TO_JSON_PAIR_NOT_FOUND);
-    // esplog.error("File_to_json::find_string - string not found\n");
+    ERROR("File_to_json::find_string pair not found");
     return FILE_TO_JSON_ERROR;
     espmem.stack_mon();
 }

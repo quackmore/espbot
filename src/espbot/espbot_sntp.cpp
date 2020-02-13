@@ -21,27 +21,28 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_logger.hpp"
 #include "espbot_sntp.hpp"
+#include "espbot_utils.hpp"
 
 void Sntp::start(void)
 {
-    sntp_setservername(0, "0.pool.ntp.org");
-    sntp_setservername(1, "1.pool.ntp.org");
-    sntp_setservername(2, "2.pool.ntp.org");
+    sntp_setservername(0, (char *) f_str("0.pool.ntp.org"));
+    sntp_setservername(1, (char *) f_str("1.pool.ntp.org"));
+    sntp_setservername(2, (char *) f_str("2.pool.ntp.org"));
     if (sntp_set_timezone(1) == false)
     {
         esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
-        // esplog.error("Sntp::start - cannot set timezone\n");
+        ERROR("Sntp::start cannot set timezone");
     }
     sntp_init();
     esp_diag.info(SNTP_START);
-    // esplog.debug("Sntp started\n");
+    INFO("Sntp started");
 }
 
 void Sntp::stop(void)
 {
     sntp_stop();
     esp_diag.info(SNTP_STOP);
-    // esplog.debug("Sntp ended\n");
+    INFO("Sntp ended");
 }
 
 struct espbot_time

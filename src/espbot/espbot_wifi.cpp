@@ -72,19 +72,15 @@ void wifi_event_handler(System_Event_t *evt)
     {
     case EVENT_STAMODE_CONNECTED:
         esp_diag.info(WIFI_CONNECTED);
-#ifdef DEBUG_TRACE
-        esplog.debug("> %s ch %d\n",
-                     evt->event_info.connected.ssid,
-                     evt->event_info.connected.channel);
-#endif
+        INFO("connected to %s ch %d",
+             evt->event_info.connected.ssid,
+             evt->event_info.connected.channel);
         break;
     case EVENT_STAMODE_DISCONNECTED:
         esp_diag.info(WIFI_DISCONNECTED);
-#ifdef DEBUG_TRACE
-        esplog.debug("< ssid %s rsn %d\n",
-                     evt->event_info.disconnected.ssid,
-                     evt->event_info.disconnected.reason);
-#endif
+        INFO("disconnected from %s rsn %d",
+             evt->event_info.disconnected.ssid,
+             evt->event_info.disconnected.reason);
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
                                                                          // disconnection from AP
         if (is_timeout_timer_active())
@@ -95,35 +91,27 @@ void wifi_event_handler(System_Event_t *evt)
         break;
     case EVENT_STAMODE_AUTHMODE_CHANGE:
         esp_diag.info(WIFI_AUTHMODE_CHANGE, evt->event_info.auth_change.new_mode);
-#ifdef DEBUG_TRACE
-        esplog.debug("auth %d -> %d\n",
-                     evt->event_info.auth_change.old_mode,
-                     evt->event_info.auth_change.new_mode);
-#endif
+        INFO("wifi auth %d -> %d",
+             evt->event_info.auth_change.old_mode,
+             evt->event_info.auth_change.new_mode);
         break;
     case EVENT_STAMODE_DHCP_TIMEOUT:
         esp_diag.warn(WIFI_DHCP_TIMEOUT);
-#ifdef DEBUG_TRACE
-        esplog.debug("dhcp timeout\n");
+        WARN("dhcp timeout");
         // esplog.debug("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
         //              IP2STR(&evt->event_info.got_ip.ip),
         //              IP2STR(&evt->event_info.got_ip.mask),
         //              IP2STR(&evt->event_info.got_ip.gw));
         // os_printf_plus("\n");
-#endif
         break;
     case EVENT_STAMODE_GOT_IP:
         esp_diag.info(WIFI_GOT_IP);
-#ifdef DEBUG_TRACE
-        esplog.debug("IP" IPSTR " " IPSTR " " IPSTR,
-                     IP2STR(&evt->event_info.got_ip.ip),
-                     IP2STR(&evt->event_info.got_ip.mask),
-                     IP2STR(&evt->event_info.got_ip.gw));
-        os_printf_plus("\n");
-#endif
+        INFO("got IP" IPSTR " " IPSTR " " IPSTR,
+             IP2STR(&evt->event_info.got_ip.ip),
+             IP2STR(&evt->event_info.got_ip.mask),
+             IP2STR(&evt->event_info.got_ip.gw));
         // station connected to AP and got an IP address
         // whichever was wifi mode now AP mode is no longer required
-        // esplog.debug("ESP8266 connected as station to %s\n", Wifi::station_get_ssid());
         stop_connect_timeout_timer();
         wifi_set_opmode_current(STATION_MODE);
         system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, '0'); // informing everybody of
@@ -133,66 +121,55 @@ void wifi_event_handler(System_Event_t *evt)
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
         esp_diag.info(WIFI_STA_CONNECTED);
-#ifdef DEBUG_TRACE
-        esplog.debug(MACSTR " > AID %d\n",
-                     MAC2STR(evt->event_info.sta_connected.mac),
-                     evt->event_info.sta_connected.aid);
-#endif
+        INFO(MACSTR " connected (AID %d)",
+             MAC2STR(evt->event_info.sta_connected.mac),
+             evt->event_info.sta_connected.aid);
         system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STACONNECTED, '0'); // informing everybody that
                                                                             // a station connected to ESP8266
         break;
     case EVENT_SOFTAPMODE_STADISCONNECTED:
         esp_diag.info(WIFI_STA_DISCONNECTED);
-#ifdef DEBUG_TRACE
-        esplog.debug(MACSTR " < AID %d\n",
-                     MAC2STR(evt->event_info.sta_disconnected.mac),
-                     evt->event_info.sta_disconnected.aid);
-#endif
+        INFO(MACSTR " disconnected (AID %d)",
+             MAC2STR(evt->event_info.sta_disconnected.mac),
+             evt->event_info.sta_disconnected.aid);
         system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STADISCONNECTED, '0'); // informing everybody of
                                                                                // a station disconnected from ESP8266
         break;
     case EVENT_SOFTAPMODE_PROBEREQRECVED:
-#ifdef DEBUG_TRACE
-        esplog.debug("AP probed\n");
-#endif
+        TRACE("AP probed");
         break;
     case EVENT_OPMODE_CHANGED:
         esp_diag.info(WIFI_OPMODE_CHANGED, wifi_get_opmode());
-#ifdef DEBUG_TRACE
         switch (wifi_get_opmode())
         {
         case STATION_MODE:
-            esplog.debug("> STA\n");
+            INFO("wifi -> STA");
             break;
         case SOFTAP_MODE:
-            esplog.debug("> SOFTAP\n");
+            INFO("wifi -> SOFTAP");
             break;
         case STATIONAP_MODE:
-            esplog.debug("> STATIONAP\n");
+            INFO("wifi -> STATIONAP");
             break;
         default:
             break;
         }
-#endif
         break;
     case EVENT_SOFTAPMODE_DISTRIBUTE_STA_IP:
-#ifdef DEBUG_TRACE
-        esplog.debug("aid %d =>" MACSTR " => " IPSTR "\r\n",
-                     evt->event_info.distribute_sta_ip.aid,
-                     MAC2STR(evt->event_info.distribute_sta_ip.mac),
-                     IP2STR(&evt->event_info.distribute_sta_ip.ip));
-#endif
+        TRACE(IPSTR " assigned to " MACSTR " (aid %d)",
+              IP2STR(&evt->event_info.distribute_sta_ip.ip),
+              MAC2STR(evt->event_info.distribute_sta_ip.mac),
+              evt->event_info.distribute_sta_ip.aid);
         break;
     default:
-#ifdef DEBUG_TRACE
-        esplog.debug("unknown event %x\n", evt->event);
-#endif
+        TRACE("unknown event %x", evt->event);
         break;
     }
 }
 
 void Wifi::set_stationap(void)
 {
+    ALL("Wifi::set_stationap");
     struct ip_info ap_ip;
     struct dhcps_lease dhcp_lease;
     espmem.stack_mon();
@@ -210,33 +187,31 @@ void Wifi::set_stationap(void)
     wifi_softap_set_dhcps_lease(&dhcp_lease);
     wifi_softap_dhcps_start();
 
-#ifdef DEBUG_TRACE
-    esplog.debug("Wi-Fi working as AP\n");
-    esplog.debug("AP config: SSID:        %s\n", ap_config.ssid);
-    esplog.debug("AP config: Password:    %s\n", ap_config.password);
-    esplog.debug("AP config: channel:     %d\n", ap_config.channel);
-    switch (ap_config.authmode)
-    {
-    case AUTH_OPEN:
-        esplog.debug("AP config: Security:    Disabled\n");
-        break;
-    case AUTH_WEP:
-        esplog.debug("AP config: Security:    WEP\n");
-        break;
-    case AUTH_WPA_PSK:
-        esplog.debug("AP config: Security:    WPA_PSK\n");
-        break;
-    case AUTH_WPA2_PSK:
-        esplog.debug("AP config: Security:    WPA2_PSK\n");
-        break;
-    case AUTH_WPA_WPA2_PSK:
-        esplog.debug("AP config: Security:    WPA_WPA2_PSK\n");
-        break;
-    default:
-        esplog.debug("AP config: Security:    Unknown\n");
-        break;
-    }
-#endif
+    // TRACE("Wi-Fi working as AP");
+    // TRACE("AP config: SSID:        %s", ap_config.ssid);
+    // TRACE("AP config: Password:    %s", ap_config.password);
+    // TRACE("AP config: channel:     %d", ap_config.channel);
+    // switch (ap_config.authmode)
+    // {
+    // case AUTH_OPEN:
+    //     TRACE("AP config: Security:    Disabled");
+    //     break;
+    // case AUTH_WEP:
+    //     TRACE("AP config: Security:    WEP");
+    //     break;
+    // case AUTH_WPA_PSK:
+    //     TRACE("AP config: Security:    WPA_PSK");
+    //     break;
+    // case AUTH_WPA2_PSK:
+    //     TRACE("AP config: Security:    WPA2_PSK");
+    //     break;
+    // case AUTH_WPA_WPA2_PSK:
+    //     TRACE("AP config: Security:    WPA_WPA2_PSK");
+    //     break;
+    // default:
+    //     TRACE("AP config: Security:    Unknown");
+    //     break;
+    // }
     // now start the webserver
     espwebsvr.stop(); // in case there was a web server listening on esp station interface
     espwebsvr.start(80);
@@ -244,12 +219,13 @@ void Wifi::set_stationap(void)
 
 void Wifi::connect(void)
 {
+    ALL("Wifi::connect");
     struct station_config stationConf;
 
     if (os_strlen(station_ssid) == 0 || os_strlen(station_pwd) == 0)
     {
         esp_diag.error(WIFI_CONNECT_NO_SSID_OR_PASSWORD_AVAILABLE);
-        // esplog.error("Wifi::connect: no ssid or password available\n");
+        ERROR("Wifi::connect no ssid or password available");
         return;
     }
     bool result = wifi_station_ap_number_set(1);
@@ -274,6 +250,7 @@ void Wifi::connect(void)
 
 static int restore_cfg(void)
 {
+    ALL("Wifi::restore_cfg");
     File_to_json cfgfile("wifi.cfg");
     espmem.stack_mon();
     if (cfgfile.exists())
@@ -281,7 +258,7 @@ static int restore_cfg(void)
         if (cfgfile.find_string("station_ssid"))
         {
             esp_diag.error(WIFI_RESTORE_CFG_INCOMPLETE);
-            // esplog.error("Wifi::restore_cfg - available configuration is incomplete\n");
+            ERROR("Wifi::restore_cfg incomplete cfg");
             return CFG_ERROR;
         }
         os_memset(station_ssid, 0, 32);
@@ -289,7 +266,7 @@ static int restore_cfg(void)
         if (cfgfile.find_string("station_pwd"))
         {
             esp_diag.error(WIFI_RESTORE_CFG_INCOMPLETE);
-            // esplog.error("Wifi::restore_cfg - available configuration is incomplete\n");
+            ERROR("Wifi::restore_cfg incomplete cfg");
             return CFG_ERROR;
         }
         os_memset(station_pwd, 0, 64);
@@ -299,13 +276,14 @@ static int restore_cfg(void)
     else
     {
         esp_diag.error(WIFI_RESTORE_CFG_FILE_NOT_FOUND);
-        // esplog.warn("Wifi::restore_cfg - cfg file not found\n");
+        WARN("Wifi::restore_cfg file not found");
         return CFG_ERROR;
     }
 }
 
 static int saved_cfg_not_update(void)
 {
+    ALL("Wifi::saved_cfg_not_update");
     File_to_json cfgfile("wifi.cfg");
     espmem.stack_mon();
     if (cfgfile.exists())
@@ -313,7 +291,7 @@ static int saved_cfg_not_update(void)
         if (cfgfile.find_string("station_ssid"))
         {
             esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            // esplog.error("Wifi::saved_cfg_not_update - available configuration is incomplete\n");
+            ERROR("Wifi::saved_cfg_not_update incomplete cfg");
             return CFG_ERROR;
         }
         if (os_strcmp(station_ssid, cfgfile.get_value()))
@@ -323,7 +301,7 @@ static int saved_cfg_not_update(void)
         if (cfgfile.find_string("station_pwd"))
         {
             esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            // esplog.error("Wifi::saved_cfg_not_update - available configuration is incomplete\n");
+            ERROR("Wifi::saved_cfg_not_update incomplete cfg");
             return CFG_ERROR;
         }
         if (os_strcmp(station_pwd, cfgfile.get_value()))
@@ -352,7 +330,7 @@ void Wifi::init()
     if (restore_cfg() != CFG_OK) // something went wrong while loading flash config
     {
         esp_diag.warn(WIFI_INIT_CFG_DEFAULT_CFG);
-        // esplog.warn("Wifi::init setting null station config\n");
+        WARN("Wifi::init setting null station cfg");
         os_memset(station_ssid, 0, 32);
         os_memset(station_pwd, 0, 32);
     }
@@ -394,19 +372,22 @@ char *Wifi::station_get_password(void)
 
 int Wifi::save_cfg(void)
 {
+    ALL("Wifi::saved_cfg");
     if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
     {
-        Ffile cfgfile(&espfs, "wifi.cfg");
+        Ffile cfgfile(&espfs, (char *)f_str("wifi.cfg"));
         espmem.stack_mon();
         if (cfgfile.is_available())
         {
             cfgfile.clear();
-            Heap_chunk buffer(200);
+            // {"station_ssid": "","station_pwd": ""}
+            // 38 + 1 + 33 + 65 = 137
+            Heap_chunk buffer(137);
             if (buffer.ref)
             {
-                os_sprintf(buffer.ref,
+                fs_sprintf(buffer.ref,
                            "{\"station_ssid\": \"%s\",\"station_pwd\": \"%s\"}",
                            station_ssid,
                            station_pwd);
@@ -414,22 +395,22 @@ int Wifi::save_cfg(void)
             }
             else
             {
-                esp_diag.error(WIFI_SAVE_CFG_HEAP_EXHAUSTED, 200);
-                // esplog.error("Wifi::save_cfg - not enough heap memory available\n");
+                esp_diag.error(WIFI_SAVE_CFG_HEAP_EXHAUSTED, 137);
+                ERROR("Wifi::save_cfg heap exhausted %d", 137);
                 return CFG_ERROR;
             }
         }
         else
         {
             esp_diag.error(WIFI_SAVE_CFG_CANNOT_OPEN_FILE);
-            // esplog.error("Wifi::save_cfg - cannot open wifi.cfg\n");
+            ERROR("Wifi::save_cfg cannot open file");
             return CFG_ERROR;
         }
     }
     else
     {
         esp_diag.error(WIFI_SAVE_CFG_FS_NOT_AVAILABLE);
-        // esplog.error("Wifi::save_cfg - file system not available\n");
+        ERROR("Wifi::save_cfg FS not available");
         return CFG_ERROR;
     }
     return CFG_OK;
@@ -437,11 +418,12 @@ int Wifi::save_cfg(void)
 
 void Wifi::station_set_ssid(char *t_str, int t_len)
 {
+    ALL("Wifi::station_set_ssid");
     os_memset(station_ssid, 0, 32);
     if (t_len > 31)
     {
         esp_diag.warn(WIFI_TRUNCATING_STRING_TO_31_CHAR);
-        // esplog.warn("Wifi::station_set_ssid: truncating ssid to 31 characters\n");
+        WARN("Wifi::station_set_ssid: truncating ssid to 31 characters");
         os_strncpy(station_ssid, t_str, 31);
     }
     else
@@ -452,11 +434,12 @@ void Wifi::station_set_ssid(char *t_str, int t_len)
 
 void Wifi::station_set_pwd(char *t_str, int t_len)
 {
+    ALL("Wifi::station_set_pwd");
     os_memset(station_pwd, 0, 64);
     if (t_len > 63)
     {
         esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
-        // esplog.warn("Wifi::station_set_pwd: truncating pwd to 63 characters\n");
+        WARN("Wifi::station_set_pwd: truncating pwd to 63 characters");
         os_strncpy(station_pwd, t_str, 63);
     }
     else
@@ -470,6 +453,7 @@ static void *scan_completed_param = NULL;
 
 static void fill_in_ap_list(void *arg, STATUS status)
 {
+    ALL("fill_in_ap_list");
     // delete previuos results
     Wifi::free_ap_list();
     // now check results
@@ -477,23 +461,19 @@ static void fill_in_ap_list(void *arg, STATUS status)
     {
         // start counting APs
         struct bss_info *scan_list = (struct bss_info *)arg;
-#ifdef DEBUG_TRACE
-        esplog.trace("WIFI scan result: BSSID              ch  rssi  SSID\n");
-#endif
+        TRACE("WIFI scan result: BSSID              ch  rssi  SSID");
         while (scan_list)
         {
-#ifdef DEBUG_TRACE
-            esplog.trace("WIFI scan result: %X:%X:%X:%X:%X:%X  %d    %d   %s\n",
-                         scan_list->bssid[0],
-                         scan_list->bssid[1],
-                         scan_list->bssid[2],
-                         scan_list->bssid[3],
-                         scan_list->bssid[4],
-                         scan_list->bssid[5],
-                         scan_list->channel,
-                         scan_list->rssi,
-                         scan_list->ssid);
-#endif
+            TRACE("WIFI scan result: %X:%X:%X:%X:%X:%X  %d    %d   %s",
+                  scan_list->bssid[0],
+                  scan_list->bssid[1],
+                  scan_list->bssid[2],
+                  scan_list->bssid[3],
+                  scan_list->bssid[4],
+                  scan_list->bssid[5],
+                  scan_list->channel,
+                  scan_list->rssi,
+                  scan_list->ssid);
             ap_count++;
             scan_list = scan_list->next.stqe_next;
         }
@@ -513,13 +493,13 @@ static void fill_in_ap_list(void *arg, STATUS status)
         else
         {
             esp_diag.error(WIFI_AP_LIST_HEAP_EXHAUSTED, 33 * ap_count);
-            // esplog.error("Wifi::fill_in_ap_list - not enough heap memory (%d)\n", 33 * ap_count);
+            ERROR("Wifi::fill_in_ap_list heap exhausted %d", 33 * ap_count);
         }
     }
     else
     {
         esp_diag.error(WIFI_AP_LIST_CANNOT_COMPLETE_SCAN);
-        // esplog.error("Wifi::fill_in_ap_list - cannot complete ap scan\n");
+        ERROR("Wifi::fill_in_ap_list cannot complete ap scan");
     }
     if (scan_completed_cb)
         scan_completed_cb(scan_completed_param);

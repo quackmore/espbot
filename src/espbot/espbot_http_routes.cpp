@@ -39,14 +39,14 @@ void init_controllers(void)
 
 static void format_function(void)
 {
-    // esplog.all("format_function\n");
+    ALL("format_function");
     espfs.format();
 }
 
 static void wifi_scan_completed_function(void *param)
 {
     struct espconn *ptr_espconn = (struct espconn *)param;
-    // esplog.all("wifi_scan_completed_function\n");
+    ALL("wifi_scan_completed_function");
     char *scan_list = new char[40 + ((32 + 6) * Wifi::get_ap_count())];
     if (scan_list)
     {
@@ -68,48 +68,49 @@ static void wifi_scan_completed_function(void *param)
     else
     {
         esp_diag.error(ROUTES_WIFI_SCAN_COMPLETED_FUNCTION_HEAP_EXHAUSTED, (40 + ((32 + 6) * Wifi::get_ap_count())));
-        // esplog.error("wifi_scan_completed_function - not enough heap memory %d\n", 32 + (40 + ((32 + 6) * Wifi::get_ap_count())));
+        ERROR("wifi_scan_completed_function heap exhausted %d", (32 + (40 + ((32 + 6) * Wifi::get_ap_count()))));
         // may be the list was too big but there is enough heap memory for a response
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
         Wifi::free_ap_list();
     }
 }
 
-static char *get_file_mime_type(char *filename)
+static const char *get_file_mime_type(char *filename)
 {
+    ALL("get_file_mime_type");
     char *ptr;
     ptr = (char *)os_strstr(filename, ".");
     if (ptr == NULL)
-        return "text/plain";
+        return f_str("text/plain");
     else
     {
         if (os_strcmp(ptr, ".css") == 0)
-            return "text/css";
+            return f_str("text/css");
         else if (os_strcmp(ptr, ".txt") == 0)
-            return "text/plain";
+            return f_str("text/plain");
         else if (os_strcmp(ptr, ".html") == 0)
-            return "text/html";
+            return f_str("text/html");
         else if (os_strcmp(ptr, ".js") == 0)
-            return "text/javascript";
+            return f_str("text/javascript");
         else if (os_strcmp(ptr, ".css") == 0)
-            return "text/css";
+            return f_str("text/css");
         else
-            return "text/plain";
+            return f_str("text/plain");
     }
 }
 
 static void send_remaining_file(struct http_split_send *p_sr)
 {
-    // esplog.all("send_remaining_file\n");
+    ALL("send_remaining_file");
     if (!espfs.is_available())
     {
-        http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         delete[] p_sr->content;
         return;
     }
     if (!Ffile::exists(&espfs, p_sr->content))
     {
-        http_response(p_sr->p_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
+        http_response(p_sr->p_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("File not found"), false);
         delete[] p_sr->content;
         return;
     }
@@ -117,7 +118,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
     Ffile sel_file(&espfs, p_sr->content);
     if (!sel_file.is_available())
     {
-        http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
+        http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Cannot open file"), false);
         delete[] p_sr->content;
         return;
     }
@@ -131,8 +132,8 @@ static void send_remaining_file(struct http_split_send *p_sr)
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size);
-            // esplog.error("send_remaining_file: not enough heap memory (%d)\n", buffer_size);
-            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("send_remaining_file heap exhausted %d", buffer_size);
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             delete[] p_sr->content;
             return;
         }
@@ -140,8 +141,8 @@ static void send_remaining_file(struct http_split_send *p_sr)
         if (p_pending_response == NULL)
         {
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, sizeof(struct http_split_send));
-            // esplog.error("send_remaining_file: not enough heap memory (%d)\n", sizeof(struct http_split_send));
-            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("send_remaining_file not heap exhausted %dn", sizeof(struct http_split_send));
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             delete[] p_sr->content;
             delete[] buffer.ref;
             delete[] p_sr->content;
@@ -158,14 +159,11 @@ static void send_remaining_file(struct http_split_send *p_sr)
         if (result == Queue_full)
         {
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_PENDING_RES_QUEUE_FULL);
-            // esplog.error("send_remaining_file: pending response queue is full\n");
+            ERROR("send_remaining_file full pending res queue");
         }
 
-#ifdef DEBUG_TRACE
-        esplog.trace("send_remaining_msg: *p_espconn: %X\n"
-                     "msg (splitted) len: %d\n",
-                     p_sr->p_espconn, os_strlen(buffer.ref));
-#endif
+        TRACE("send_remaining_file: *p_espconn: %X, msg (splitted) len: %d",
+              p_sr->p_espconn, os_strlen(buffer.ref));
         http_send_buffer(p_sr->p_espconn, buffer.ref);
     }
     else
@@ -175,17 +173,14 @@ static void send_remaining_file(struct http_split_send *p_sr)
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, remaining_size);
-            // esplog.error("send_remaining_file: not enough heap memory (%d)\n", remaining_size);
-            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("send_remaining_file heap exhausted %d", remaining_size);
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             delete[] p_sr->content;
             return;
         }
         sel_file.n_read(buffer.ref, p_sr->content_transferred, remaining_size);
-#ifdef DEBUG_TRACE
-        esplog.trace("send_remaining_msg: *p_espconn: %X\n"
-                     "          msg (last piece) len: %d\n",
-                     p_sr->p_espconn, os_strlen(buffer.ref));
-#endif
+        TRACE("send_remaining_file: *p_espconn: %X, msg (splitted) len: %d",
+              p_sr->p_espconn, os_strlen(buffer.ref));
         http_send_buffer(p_sr->p_espconn, buffer.ref);
         delete[] p_sr->content;
     }
@@ -193,28 +188,28 @@ static void send_remaining_file(struct http_split_send *p_sr)
 
 void return_file(struct espconn *p_espconn, char *filename)
 {
-    // esplog.all("return_file\n");
+    ALL("return_file");
     if (!espfs.is_available())
     {
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         return;
     }
     if (!Ffile::exists(&espfs, filename))
     {
-        http_response(p_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
+        http_response(p_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("File not found"), false);
         return;
     }
     int file_size = Ffile::size(&espfs, filename);
     Ffile sel_file(&espfs, filename);
     if (!sel_file.is_available())
     {
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Cannot open file"), false);
         return;
     }
     // let's start with the header
     Http_header header;
     header.m_code = HTTP_OK;
-    header.m_content_type = get_file_mime_type(filename);
+    header.m_content_type = (char *)get_file_mime_type(filename);
     header.m_content_length = file_size;
     header.m_content_range_start = 0;
     header.m_content_range_end = 0;
@@ -222,7 +217,7 @@ void return_file(struct espconn *p_espconn, char *filename)
     char *header_str = http_format_header(&header);
     if (header_str == NULL)
     {
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
         return;
     }
     // ok send the header
@@ -240,16 +235,16 @@ void return_file(struct espconn *p_espconn, char *filename)
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, buffer_size);
-            // esplog.error("return_file: not enough heap memory (%d)\n", buffer_size);
-            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("return_file heap exhausted %d", buffer_size);
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             return;
         }
         Heap_chunk filename_copy(os_strlen(filename), dont_free);
         if (filename_copy.ref == NULL)
         {
             esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, os_strlen(filename));
-            // esplog.error("return_file - not enough heap memory %d\n", os_strlen(filename));
-            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("return_file heap exhausted %d", os_strlen(filename));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             delete[] buffer.ref;
             return;
         }
@@ -257,8 +252,8 @@ void return_file(struct espconn *p_espconn, char *filename)
         if (p_pending_response == NULL)
         {
             esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, sizeof(struct http_split_send));
-            // esplog.error("return_file - not enough heap memory %d\n", sizeof(struct http_split_send));
-            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("return_file heap exhausted %d", sizeof(struct http_split_send));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             delete[] buffer.ref;
             delete[] filename_copy.ref;
             return;
@@ -275,14 +270,10 @@ void return_file(struct espconn *p_espconn, char *filename)
         if (result == Queue_full)
         {
             esp_diag.error(ROUTES_RETURN_FILE_PENDING_RES_QUEUE_FULL);
-            // esplog.error("return_file: pending response queue is full\n");
+            ERROR("return_file full pending response queue");
         }
         // send the file piece
-#ifdef DEBUG_TRACE
-        esplog.trace("send_response: *p_espconn: %X\n"
-                     "       msg (splitted) len: %d\n",
-                     p_espconn, os_strlen(buffer.ref));
-#endif
+        TRACE("return_file *p_espconn: %X, msg (splitted) len: %d", p_espconn, os_strlen(buffer.ref));
         http_send_buffer(p_espconn, buffer.ref);
         espmem.stack_mon();
     }
@@ -293,31 +284,27 @@ void return_file(struct espconn *p_espconn, char *filename)
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, file_size);
-            // esplog.error("return_file: not enough heap memory (%d)\n", file_size);
-            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+            ERROR("return_file heap exhausted %d", file_size);
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
             return;
         }
         sel_file.n_read(buffer.ref, file_size);
-#ifdef DEBUG_TRACE
-        esplog.trace("send_response: *p_espconn: %X\n"
-                     "           msg (full) len: %d\n",
-                     p_espconn, file_size);
-#endif
+        TRACE("return_file *p_espconn: %X, msg (full) len: %d", p_espconn, file_size);
         http_send_buffer(p_espconn, buffer.ref);
     }
 }
 
 void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
 {
-    // esplog.all("preflight_response\n");
+    ALL("preflight_response");
     Http_header header;
     header.m_code = HTTP_OK;
-    header.m_content_type = get_file_mime_type(HTTP_CONTENT_TEXT);
+    header.m_content_type = (char *)get_file_mime_type(HTTP_CONTENT_TEXT);
     header.m_origin = new char[os_strlen(parsed_req->origin) + 1];
     if (header.m_origin == NULL)
     {
         esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
         return;
     }
     os_strcpy(header.m_origin, parsed_req->origin);
@@ -325,7 +312,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     if (header.m_acrh == NULL)
     {
         esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->acrh) + 1));
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
         return;
     }
     os_strcpy(header.m_acrh, parsed_req->acrh);
@@ -337,78 +324,33 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     if (header_str == NULL)
     {
         esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED);
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Not enough heap memory", false);
+        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
         return;
     }
     // ok send the header
     http_send_buffer(p_espconn, header_str);
 }
 
-#ifdef ESPBOT_TRACE
-static void get_api_debug_log(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-{
-    // check how much memory needed for last logs
-    int logger_log_len = 0;
-    char *err_ptr = esplog.get_log_head();
-    while (err_ptr)
-    {
-        logger_log_len += os_strlen(err_ptr);
-        err_ptr = esplog.get_log_next();
-    }
-    int msg_len = 16 +                          // formatting string
-                  10 +                          // heap mem figures
-                  (3 * esplog.get_log_size()) + // errors formatting
-                  logger_log_len;               // errors
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref, "{\"events\":[");
-        // now add saved errors
-        char *str_ptr;
-        int cnt = 0;
-        espmem.stack_mon();
-        err_ptr = esplog.get_log_head();
-        while (err_ptr)
-        {
-            str_ptr = msg.ref + os_strlen(msg.ref);
-            if (cnt == 0)
-                os_sprintf(str_ptr, "%s", err_ptr);
-            else
-                os_sprintf(str_ptr, ",%s", err_ptr);
-            err_ptr = esplog.get_log_next();
-            cnt++;
-        }
-        str_ptr = msg.ref + os_strlen(msg.ref);
-        fs_sprintf(str_ptr, "]}");
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
-    else
-    {
-        esp_diag.error(ROUTES_GET_API_DEBUG_LOG_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("get_api_debug_log - not enough heap memory %d\n", msg_len);
-    }
-}
-#endif
-
 static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_debug_hexmemdump");
     char *address;
     int length;
     Json_str debug_cfg(parsed_req->req_content, parsed_req->content_len);
     espmem.stack_mon();
     if (debug_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (debug_cfg.find_pair("address") != JSON_NEW_PAIR_FOUND)
+    if (debug_cfg.find_pair(f_str("address")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'address'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'address'"), false);
         return;
     }
     if (debug_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'address' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'address' does not have a string value type"), false);
         return;
     }
     Heap_chunk address_hex_str(debug_cfg.get_cur_pair_value_len() + 1);
@@ -419,18 +361,18 @@ static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_re
     else
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_HEXMEMDUMP_HEAP_EXHAUSTED, debug_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("get_api_debug_hexmemdump - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+        ERROR("get_api_debug_hexmemdump heap exhausted %d", debug_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     address = (char *)atoh(address_hex_str.ref);
-    if (debug_cfg.find_pair("length") != JSON_NEW_PAIR_FOUND)
+    if (debug_cfg.find_pair(f_str("length")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'length'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'length'"), false);
         return;
     }
     if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'length' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'length' does not have an integer value type"), false);
         return;
     }
     Heap_chunk length_str(debug_cfg.get_cur_pair_value_len() + 1);
@@ -441,7 +383,7 @@ static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_re
     else
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_HEXMEMDUMP_HEAP_EXHAUSTED, debug_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("get_api_debug_hexmemdump - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+        ERROR("get_api_debug_hexmemdump heap exhausted %d", debug_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     length = atoi(length_str.ref);
@@ -451,7 +393,7 @@ static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_re
     if (msg.ref == NULL)
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_HEXMEMDUMP_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("get_api_debug_hexmemdump - not enough heap memory %d\n", msg_len);
+        ERROR("get_api_debug_hexmemdump heap exhausted %d", msg_len);
         return;
     }
     fs_sprintf(msg.ref,
@@ -471,23 +413,24 @@ static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_re
 
 static void get_api_debug_memdump(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_debug_memdump");
     char *address;
     int length;
     Json_str debug_cfg(parsed_req->req_content, parsed_req->content_len);
     espmem.stack_mon();
     if (debug_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (debug_cfg.find_pair("address") != JSON_NEW_PAIR_FOUND)
+    if (debug_cfg.find_pair(f_str("address")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'address'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'address'"), false);
         return;
     }
     if (debug_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'address' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'address' does not have a string value type"), false);
         return;
     }
     Heap_chunk address_hex_str(debug_cfg.get_cur_pair_value_len() + 1);
@@ -498,18 +441,18 @@ static void get_api_debug_memdump(struct espconn *ptr_espconn, Http_parsed_req *
     else
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_MEMDUMP_HEAP_EXHAUSTED, debug_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("get_api_debug_memdump - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+        ERROR("get_api_debug_memdump heap exhausted %d", debug_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     address = (char *)atoh(address_hex_str.ref);
-    if (debug_cfg.find_pair("length") != JSON_NEW_PAIR_FOUND)
+    if (debug_cfg.find_pair(f_str("length")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'length'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'length'"), false);
         return;
     }
     if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'length' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'length' does not have an integer value type"), false);
         return;
     }
     Heap_chunk length_str(debug_cfg.get_cur_pair_value_len() + 1);
@@ -520,7 +463,7 @@ static void get_api_debug_memdump(struct espconn *ptr_espconn, Http_parsed_req *
     else
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_MEMDUMP_HEAP_EXHAUSTED, debug_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("get_api_debug_memdump - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
+        ERROR("get_api_debug_memdump heap exhasted %d", debug_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     length = atoi(length_str.ref);
@@ -542,19 +485,18 @@ static void get_api_debug_memdump(struct espconn *ptr_espconn, Http_parsed_req *
     else
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_MEMDUMP_HEAP_EXHAUSTED, 48 + length);
-        // esplog.error("get_api_debug_memdump - not enough heap memory %d\n", 48 + length);
+        ERROR("get_api_debug_memdump heap exhausted %d", 48 + length);
     }
 }
 
 static void get_api_debug_meminfo(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    Heap_chunk msg(166 +   // formatting string
-                       54, // values
-                   dont_free);
+    ALL("get_api_debug_meminfo");
+    Heap_chunk msg(166 + 54, dont_free); // formatting string and values
     if (msg.ref == NULL)
     {
         esp_diag.error(ROUTES_GET_API_DEBUG_MEMINFO_HEAP_EXHAUSTED, (166 + 54));
-        // esplog.error("get_api_debug_meminfo - not enough heap memory %d\n", (166 + 54));
+        ERROR("get_api_debug_meminfo heap exhausted %d", (166 + 54));
         return;
     }
     fs_sprintf(msg.ref,
@@ -573,111 +515,13 @@ static void get_api_debug_meminfo(struct espconn *ptr_espconn, Http_parsed_req *
                "\"heap_objs\": %d,\"heap_max_objs\": %d}",
                espmem.get_heap_objs(),      //  6
                espmem.get_max_heap_objs()); //  6
-    // os_sprintf(msg.ref,
-    //            "{\"stack_max_addr\":\"%X\",\"stack_min_addr\":\"%X\",\"heap_start_addr\":\"%X\",\"heap_free_size\": %d,\"heap_max_size\": %d,\"heap_min_size\": %d,\"heap_objs\": %d,\"heap_max_objs\": %d}",
-    //            espmem.get_max_stack_addr(),  //  8
-    //            espmem.get_min_stack_addr(),  //  8
-    //            espmem.get_start_heap_addr(), //  8
-    //            system_get_free_heap_size(),  //  6
-    //            espmem.get_max_heap_size(),   //  6
-    //            espmem.get_mim_heap_size(),   //  6
-    //            espmem.get_heap_objs(),       //  6
-    //            espmem.get_max_heap_objs());  //  6
     espmem.stack_mon();
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-#ifdef ESPBOT_TRACE
-static void get_api_debug_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-{
-    Heap_chunk msg(64, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}",
-                   esplog.get_serial_level(),
-                   esplog.get_memory_level());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
-    else
-    {
-        esp_diag.error(ROUTES_GET_API_DEBUG_CFG_HEAP_EXHAUSTED, 64);
-        // esplog.error("get_api_debug_cfg - not enough heap memory %d\n", 64);
-    }
-}
-
-static void post_api_debug_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-{
-    Json_str debug_cfg(parsed_req->req_content, parsed_req->content_len);
-    espmem.stack_mon();
-    if (debug_cfg.syntax_check() != JSON_SINTAX_OK)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
-        return;
-    }
-    if (debug_cfg.find_pair("logger_serial_level") != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'logger_serial_level'", false);
-        return;
-    }
-    if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'logger_serial_level' does not have an integer value type", false);
-        return;
-    }
-    Heap_chunk tmp_serial_level(debug_cfg.get_cur_pair_value_len() + 1);
-    if (tmp_serial_level.ref)
-    {
-        os_strncpy(tmp_serial_level.ref, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
-    }
-    else
-    {
-        esp_diag.error(ROUTES_POST_API_DEBUG_CFG_HEAP_EXHAUSTED, debug_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_debug_cfg - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
-        return;
-    }
-    if (debug_cfg.find_pair("logger_memory_level") != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'logger_memory_level'", false);
-        return;
-    }
-    if (debug_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'logger_memory_level' does not have an integer value type", false);
-        return;
-    }
-    Heap_chunk tmp_memory_level(debug_cfg.get_cur_pair_value_len() + 1);
-    if (tmp_memory_level.ref)
-    {
-        os_strncpy(tmp_memory_level.ref, debug_cfg.get_cur_pair_value(), debug_cfg.get_cur_pair_value_len());
-    }
-    else
-    {
-        esp_diag.error(ROUTES_POST_API_DEBUG_CFG_HEAP_EXHAUSTED, debug_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_debug_cfg - not enough heap memory %d\n", debug_cfg.get_cur_pair_value_len() + 1);
-        return;
-    }
-    esplog.set_levels(atoi(tmp_serial_level.ref), atoi(tmp_memory_level.ref));
-    espmem.stack_mon();
-    Heap_chunk msg(64, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"logger_serial_level\": %d,\"logger_memory_level\": %d}",
-                   esplog.get_serial_level(),
-                   esplog.get_memory_level());
-        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
-    }
-    else
-    {
-        esp_diag.error(ROUTES_POST_API_DEBUG_CFG_HEAP_EXHAUSTED, 64);
-        // esplog.error("post_api_debug_cfg - not enough heap memory %d\n", 64);
-    }
-}
-#endif
-
 static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_diag_events");
     // check how much memory needed for last logs
     int evnt_count = 0;
     while (esp_diag.get_event(evnt_count))
@@ -693,9 +537,9 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
     int msg_len = 16 +                // formatting string
                   2 +                 // formatting string
                   (evnt_count * 12) + // timestamp
-                  (evnt_count * 1) + // ack
-                  (evnt_count * 2) + // type
-                  (evnt_count * 4) + // code
+                  (evnt_count * 1) +  // ack
+                  (evnt_count * 2) +  // type
+                  (evnt_count * 4) +  // code
                   (evnt_count * 12) + // val
                   (evnt_count * 38) + // errors formatting
                   1;                  // just in case
@@ -703,7 +547,7 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
     if (msg.ref == NULL)
     {
         esp_diag.error(ROUTES_GET_API_DIAG_EVENTS_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("get_api_debug_log - not enough heap memory %d\n", msg_len);
+        ERROR("get_api_diag_events heap exhausted %d", msg_len);
     }
     fs_sprintf(msg.ref, "{\"diag_events\":[");
     // now add saved errors
@@ -739,12 +583,14 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
 
 static void post_api_diag_ack_events(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_diag_ack_events");
     esp_diag.ack_events();
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, "Events acknoledged", false);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Events acknoledged"), false);
 }
 
 static void get_api_espbot_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_espbot_cfg");
     Heap_chunk msg(64, dont_free);
     if (msg.ref)
     {
@@ -754,27 +600,28 @@ static void get_api_espbot_cfg(struct espconn *ptr_espconn, Http_parsed_req *par
     else
     {
         esp_diag.error(ROUTES_GET_API_ESPBOT_CFG_HEAP_EXHAUSTED, 64);
-        // esplog.error("get_api_espbot_cfg - not enough heap memory %d\n", 64);
+        ERROR("get_api_espbot_cfg heap exhausted %d", 64);
     }
 }
 
 static void post_api_espbot_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_espbot_cfg");
     Json_str espbot_cfg(parsed_req->req_content, parsed_req->content_len);
     espmem.stack_mon();
     if (espbot_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (espbot_cfg.find_pair("espbot_name") != JSON_NEW_PAIR_FOUND)
+    if (espbot_cfg.find_pair(f_str("espbot_name")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'espbot_name'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'espbot_name'"), false);
         return;
     }
     if (espbot_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'espbot_name' does not have a STRING value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'espbot_name' does not have a STRING value type"), false);
         return;
     }
     Heap_chunk tmp_name(espbot_cfg.get_cur_pair_value_len() + 1);
@@ -786,7 +633,7 @@ static void post_api_espbot_cfg(struct espconn *ptr_espconn, Http_parsed_req *pa
     else
     {
         esp_diag.error(ROUTES_POST_API_ESPBOT_CFG_HEAP_EXHAUSTED, espbot_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_espbot_cfg - not enough heap memory %d\n", espbot_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_espbot_cfg heap exhausted %d", espbot_cfg.get_cur_pair_value_len() + 1);
     }
     espmem.stack_mon();
     Heap_chunk msg(64, dont_free);
@@ -798,15 +645,16 @@ static void post_api_espbot_cfg(struct espconn *ptr_espconn, Http_parsed_req *pa
     else
     {
         esp_diag.error(ROUTES_POST_API_ESPBOT_CFG_HEAP_EXHAUSTED, 64);
-        // esplog.error("post_api_espbot_cfg - not enough heap memory %d\n", 64);
+        ERROR("post_api_espbot_cfg heap exhausted %d", 64);
     }
 }
 
 static void get_api_fs_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_fs_info");
     if (!espfs.is_available())
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         return;
     }
     Heap_chunk msg(128, dont_free);
@@ -820,12 +668,13 @@ static void get_api_fs_info(struct espconn *ptr_espconn, Http_parsed_req *parsed
     else
     {
         esp_diag.error(ROUTES_GET_API_FS_INFO_HEAP_EXHAUSTED, 128);
-        // esplog.error("get_api_fs_info - not enough heap memory %d\n", 128);
+        ERROR("get_api_fs_info heap exhausted %d", 128);
     }
 }
 
 static void post_api_fs_format(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_fs_format");
     if (espfs.is_available())
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
@@ -835,15 +684,16 @@ static void post_api_fs_format(struct espconn *ptr_espconn, Http_parsed_req *par
     }
     else
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
     }
 }
 
 static void get_api_files_ls(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_files_ls");
     if (!espfs.is_available())
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         return;
     }
     int file_cnt = 0;
@@ -878,16 +728,17 @@ static void get_api_files_ls(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_GET_API_FILES_LS_HEAP_EXHAUSTED, file_list_len);
-        // esplog.error("get_api_files_ls - not enough heap memory %d\n", file_list_len);
+        ERROR("get_api_files_ls heap exhausted %d", file_list_len);
     }
 }
 
 static void get_api_files_cat(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    char *file_name = parsed_req->url + os_strlen("/api/files/cat/");
+    ALL("get_api_files_cat");
+    char *file_name = parsed_req->url + os_strlen(f_str("/api/files/cat/"));
     if (os_strlen(file_name) == 0)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No file name provided"), false);
         return;
     }
     return_file(ptr_espconn, file_name);
@@ -895,51 +746,53 @@ static void get_api_files_cat(struct espconn *ptr_espconn, Http_parsed_req *pars
 
 static void post_api_files_delete(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    char *file_name = parsed_req->url + os_strlen("/api/files/delete/");
+    ALL("post_api_files_delete");
+    char *file_name = parsed_req->url + os_strlen(f_str("/api/files/delete/"));
     if (os_strlen(file_name) == 0)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No file name provided"), false);
         return;
     }
     if (!espfs.is_available())
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         return;
     }
     if (!Ffile::exists(&espfs, file_name))
     {
-        http_response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, "File not found", false);
+        http_response(ptr_espconn, HTTP_NOT_FOUND, HTTP_CONTENT_JSON, f_str("File not found"), false);
         return;
     }
     Ffile sel_file(&espfs, file_name);
     espmem.stack_mon();
     if (sel_file.is_available())
     {
-        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
+        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, f_str(""), false);
         sel_file.remove();
     }
     else
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Cannot open file"), false);
     }
 }
 
 static void post_api_files_create(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    char *file_name = parsed_req->url + os_strlen("/api/files/create/");
+    ALL("post_api_files_create");
+    char *file_name = parsed_req->url + os_strlen(f_str("/api/files/create/"));
     if (os_strlen(file_name) == 0)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No file name provided"), false);
         return;
     }
     if (!espfs.is_available())
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         return;
     }
     if (Ffile::exists(&espfs, file_name))
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "File already exists", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("File already exists"), false);
         return;
     }
     Ffile sel_file(&espfs, file_name);
@@ -947,30 +800,31 @@ static void post_api_files_create(struct espconn *ptr_espconn, Http_parsed_req *
     if (sel_file.is_available())
     {
         sel_file.n_append(parsed_req->req_content, parsed_req->content_len);
-        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, "", false);
+        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, f_str(""), false);
     }
     else
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Cannot open file"), false);
     }
 }
 
 static void post_api_files_append(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    char *file_name = parsed_req->url + os_strlen("/api/files/append/");
+    ALL("post_api_files_append");
+    char *file_name = parsed_req->url + os_strlen(f_str("/api/files/append/"));
     if (os_strlen(file_name) == 0)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "No file name provided", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No file name provided"), false);
         return;
     }
     if (!espfs.is_available())
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "File system is not available", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
         return;
     }
     if (!Ffile::exists(&espfs, file_name))
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "File does not exists", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("File does not exists"), false);
         return;
     }
     Ffile sel_file(&espfs, file_name);
@@ -978,32 +832,33 @@ static void post_api_files_append(struct espconn *ptr_espconn, Http_parsed_req *
     if (sel_file.is_available())
     {
         sel_file.n_append(parsed_req->req_content, parsed_req->content_len);
-        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, "", false);
+        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, f_str(""), false);
     }
     else
     {
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Cannot open file", false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Cannot open file"), false);
     }
 }
 
 static void post_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_gpio_cfg");
     int gpio_pin;
     int gpio_type;
     Json_str gpio_cfg(parsed_req->req_content, parsed_req->content_len);
     if (gpio_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+    if (gpio_cfg.find_pair(f_str("gpio_pin")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_pin'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio_pin' does not have an integer value type"), false);
         return;
     }
     Heap_chunk tmp_pin(gpio_cfg.get_cur_pair_value_len());
@@ -1014,17 +869,17 @@ static void post_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_POST_API_GPIO_CFG_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_gpio_cfg - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_gpio_cfg heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
-    if (gpio_cfg.find_pair("gpio_type") != JSON_NEW_PAIR_FOUND)
+    if (gpio_cfg.find_pair(f_str("gpio_type")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_type'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_type'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_type' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio_type' does not have a string value type"), false);
         return;
     }
     Heap_chunk tmp_type(gpio_cfg.get_cur_pair_value_len());
@@ -1035,22 +890,22 @@ static void post_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_POST_API_GPIO_CFG_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_gpio_cfg - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_gpio_cfg heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     gpio_pin = atoi(tmp_pin.ref);
-    if ((os_strcmp(tmp_type.ref, "INPUT") == 0) || (os_strcmp(tmp_type.ref, "input") == 0))
+    if ((os_strcmp(tmp_type.ref, f_str("INPUT")) == 0) || (os_strcmp(tmp_type.ref, f_str("input")) == 0))
         gpio_type = ESPBOT_GPIO_INPUT;
-    else if ((os_strcmp(tmp_type.ref, "OUTPUT") == 0) || (os_strcmp(tmp_type.ref, "output") == 0))
+    else if ((os_strcmp(tmp_type.ref, f_str("OUTPUT")) == 0) || (os_strcmp(tmp_type.ref, f_str("output")) == 0))
         gpio_type = ESPBOT_GPIO_OUTPUT;
     else
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio type"), false);
         return;
     }
     if (esp_gpio.config(gpio_pin, gpio_type) == ESPBOT_GPIO_WRONG_IDX)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio pin"), false);
         return;
     }
 
@@ -1063,29 +918,30 @@ static void post_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_POST_API_GPIO_CFG_HEAP_EXHAUSTED, parsed_req->content_len);
-        // esplog.error("post_api_gpio_cfg - not enough heap memory %d\n", parsed_req->content_len);
+        ERROR("post_api_gpio_cfg heap exhausted %d", parsed_req->content_len);
     }
     espmem.stack_mon();
 }
 
 static void post_api_gpio_uncfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_gpio_uncfg");
     int gpio_pin;
     int gpio_type;
     Json_str gpio_cfg(parsed_req->req_content, parsed_req->content_len);
     if (gpio_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
     if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_pin'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio' does not have an integer value type"), false);
         return;
     }
     Heap_chunk tmp_pin(gpio_cfg.get_cur_pair_value_len());
@@ -1096,13 +952,13 @@ static void post_api_gpio_uncfg(struct espconn *ptr_espconn, Http_parsed_req *pa
     else
     {
         esp_diag.error(ROUTES_POST_API_GPIO_UNCFG_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_gpio_uncfg - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_gpio_uncfg heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     gpio_pin = atoi(tmp_pin.ref);
     if (esp_gpio.unconfig(gpio_pin) == ESPBOT_GPIO_WRONG_IDX)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio pin"), false);
         return;
     }
 
@@ -1115,29 +971,30 @@ static void post_api_gpio_uncfg(struct espconn *ptr_espconn, Http_parsed_req *pa
     else
     {
         esp_diag.error(ROUTES_POST_API_GPIO_UNCFG_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_gpio_uncfg - not enough heap memory %d\n", 48);
+        ERROR("post_api_gpio_uncfg heap exhausted %d", 48);
     }
     espmem.stack_mon();
 }
 
 static void get_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_gpio_cfg");
     int gpio_pin;
     int result;
     Json_str gpio_cfg(parsed_req->req_content, parsed_req->content_len);
     if (gpio_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
     if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_pin'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio_pin' does not have an integer value type"), false);
         return;
     }
     Heap_chunk tmp_pin(gpio_cfg.get_cur_pair_value_len());
@@ -1148,7 +1005,7 @@ static void get_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_CFG_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("get_api_gpio_cfg - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("get_api_gpio_cfg heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     gpio_pin = atoi(tmp_pin.ref);
@@ -1161,7 +1018,7 @@ static void get_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
         switch (result)
         {
         case ESPBOT_GPIO_WRONG_IDX:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio pin"), false);
             return;
         case ESPBOT_GPIO_UNPROVISIONED:
             fs_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
@@ -1176,36 +1033,37 @@ static void get_api_gpio_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
             http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
             return;
         default:
-            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "Gpio.get_config error", false);
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Gpio.get_config error"), false);
             return;
         }
     }
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_CFG_HEAP_EXHAUSTED, 48);
-        // esplog.error("get_api_gpio_cfg - not enough heap memory %d\n", 48);
+        ERROR("get_api_gpio_cfg heap exhausted %d", 48);
     }
     espmem.stack_mon();
 }
 
 static void get_api_gpio_read(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_gpio_read");
     int gpio_pin;
     int result;
     Json_str gpio_cfg(parsed_req->req_content, parsed_req->content_len);
     if (gpio_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
     if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_pin'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio_pin' does not have an integer value type"), false);
         return;
     }
     Heap_chunk tmp_pin(gpio_cfg.get_cur_pair_value_len() + 1);
@@ -1216,7 +1074,7 @@ static void get_api_gpio_read(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_READ_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("get_api_gpio_read - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("get_api_gpio_read heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     gpio_pin = atoi(tmp_pin.ref);
@@ -1228,7 +1086,7 @@ static void get_api_gpio_read(struct espconn *ptr_espconn, Http_parsed_req *pars
         switch (result)
         {
         case ESPBOT_GPIO_WRONG_IDX:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio pin"), false);
             return;
         case ESPBOT_GPIO_UNPROVISIONED:
             fs_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
@@ -1246,7 +1104,7 @@ static void get_api_gpio_read(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_READ_HEAP_EXHAUSTED, 48);
-        // esplog.error("get_api_gpio_read - not enough heap memory %d\n", 64);
+        ERROR("get_api_gpio_read heap exhausted %d", 64);
     }
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     espmem.stack_mon();
@@ -1254,23 +1112,24 @@ static void get_api_gpio_read(struct espconn *ptr_espconn, Http_parsed_req *pars
 
 static void post_api_gpio_set(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_gpio_set");
     int gpio_pin;
     int output_level;
     int result;
     Json_str gpio_cfg(parsed_req->req_content, parsed_req->content_len);
     if (gpio_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (gpio_cfg.find_pair("gpio_pin") != JSON_NEW_PAIR_FOUND)
+    if (gpio_cfg.find_pair(f_str("gpio_pin")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_pin'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_pin'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_pin' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio_pin' does not have an integer value type"), false);
         return;
     }
     Heap_chunk tmp_pin(gpio_cfg.get_cur_pair_value_len() + 1);
@@ -1281,17 +1140,17 @@ static void post_api_gpio_set(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_SET_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_gpio_set - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_gpio_set heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
-    if (gpio_cfg.find_pair("gpio_status") != JSON_NEW_PAIR_FOUND)
+    if (gpio_cfg.find_pair(f_str("gpio_status")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'gpio_status'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'gpio_status'"), false);
         return;
     }
     if (gpio_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'gpio_status' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'gpio_status' does not have a string value type"), false);
         return;
     }
     Heap_chunk tmp_level(gpio_cfg.get_cur_pair_value_len() + 1);
@@ -1302,17 +1161,17 @@ static void post_api_gpio_set(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_SET_HEAP_EXHAUSTED, gpio_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_gpio_set - not enough heap memory %d\n", gpio_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_gpio_set heap exhausted %d", gpio_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     gpio_pin = atoi(tmp_pin.ref);
-    if ((os_strcmp(tmp_level.ref, "LOW") == 0) || (os_strcmp(tmp_level.ref, "low") == 0))
+    if ((os_strcmp(tmp_level.ref, f_str("LOW")) == 0) || (os_strcmp(tmp_level.ref, f_str("low")) == 0))
         output_level = ESPBOT_LOW;
-    else if ((os_strcmp(tmp_level.ref, "HIGH") == 0) || (os_strcmp(tmp_level.ref, "high") == 0))
+    else if ((os_strcmp(tmp_level.ref, f_str("HIGH")) == 0) || (os_strcmp(tmp_level.ref, f_str("high")) == 0))
         output_level = ESPBOT_HIGH;
     else
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio level", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio level"), false);
         return;
     }
 
@@ -1323,17 +1182,17 @@ static void post_api_gpio_set(struct espconn *ptr_espconn, Http_parsed_req *pars
         switch (result)
         {
         case ESPBOT_GPIO_WRONG_IDX:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong gpio pin", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong gpio pin"), false);
             return;
         case ESPBOT_GPIO_UNPROVISIONED:
             fs_sprintf(msg.ref, "{\"gpio_pin\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_pin);
             http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, msg.ref, true);
             return;
         case ESPBOT_GPIO_WRONG_LVL:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Wrong output level", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong output level"), false);
             return;
         case ESPBOT_GPIO_CANNOT_CHANGE_INPUT:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot change input", false);
+            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot change input"), false);
             return;
         case ESPBOT_GPIO_OK:
             os_strncpy(msg.ref, parsed_req->req_content, parsed_req->content_len);
@@ -1346,13 +1205,14 @@ static void post_api_gpio_set(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_GET_API_GPIO_SET_HEAP_EXHAUSTED, 48);
-        // esplog.error("post_api_gpio_set - not enough heap memory %d\n", 48);
+        ERROR("post_api_gpio_set heap exhausted %d", 48);
     }
     espmem.stack_mon();
 }
 
 static void get_api_ota_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_ota_info");
     Heap_chunk msg(36, dont_free);
 
     if (msg.ref)
@@ -1363,12 +1223,13 @@ static void get_api_ota_info(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_GET_API_OTA_INFO_HEAP_EXHAUSTED, 36);
-        // esplog.error("get_api_ota_info - not enough heap memory %d\n", 36);
+        ERROR("get_api_ota_info heap exhausted %d", 36);
     }
 }
 
 static void get_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_ota_cfg");
     int msg_len = 90 +
                   16 +
                   6 +
@@ -1386,38 +1247,32 @@ static void get_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed
                    "\"check_version\":\"%s\",\"reboot_on_completion\":\"%s\"}",
                    esp_ota.get_check_version(),
                    esp_ota.get_reboot_on_completion());
-        // fs_sprintf(msg.ref,
-        //            "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",\"check_version\":\"%s\",\"reboot_on_completion\":\"%s\"}",
-        //            esp_ota.get_host(),
-        //            esp_ota.get_port(),
-        //            esp_ota.get_path(),
-        //            esp_ota.get_check_version(),
-        //            esp_ota.get_reboot_on_completion());
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     }
     else
     {
         esp_diag.error(ROUTES_GET_API_OTA_CFG_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("get_api_ota_cfg - not enough heap memory %d\n", msg_len);
+        ERROR("get_api_ota_cfg heap exhausted %d", msg_len);
     }
 }
 
 static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_ota_cfg");
     Json_str ota_cfg(parsed_req->req_content, parsed_req->content_len);
     if (ota_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (ota_cfg.find_pair("host") != JSON_NEW_PAIR_FOUND)
+    if (ota_cfg.find_pair(f_str("host")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'host'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'host'"), false);
         return;
     }
     if (ota_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'host' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'host' does not have a string value type"), false);
         return;
     }
     Heap_chunk tmp_host(ota_cfg.get_cur_pair_value_len() + 1);
@@ -1428,17 +1283,17 @@ static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_POST_API_OTA_CFG_HEAP_EXHAUSTED, ota_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_ota_cfg - not enough heap memory %d\n", ota_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_ota_cfg heap exhausted %d", ota_cfg.get_cur_pair_value_len() + 1);
         return;
     }
-    if (ota_cfg.find_pair("port") != JSON_NEW_PAIR_FOUND)
+    if (ota_cfg.find_pair(f_str("port")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'port'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'port'"), false);
         return;
     }
     if (ota_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'port' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'port' does not have an integer value type"), false);
         return;
     }
     Heap_chunk tmp_port(ota_cfg.get_cur_pair_value_len() + 1);
@@ -1449,17 +1304,17 @@ static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_POST_API_OTA_CFG_HEAP_EXHAUSTED, ota_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_ota_cfg - not enough heap memory %d\n", ota_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_ota_cfg heap exhausted %d", ota_cfg.get_cur_pair_value_len() + 1);
         return;
     }
-    if (ota_cfg.find_pair("path") != JSON_NEW_PAIR_FOUND)
+    if (ota_cfg.find_pair(f_str("path")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'path'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'path'"), false);
         return;
     }
     if (ota_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'path' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'path' does not have a string value type"), false);
         return;
     }
     Heap_chunk tmp_path(ota_cfg.get_cur_pair_value_len());
@@ -1470,17 +1325,17 @@ static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_POST_API_OTA_CFG_HEAP_EXHAUSTED, ota_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_ota_cfg - not enough heap memory %d\n", ota_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_ota_cfg heap exhausted %d", ota_cfg.get_cur_pair_value_len() + 1);
         return;
     }
-    if (ota_cfg.find_pair("check_version") != JSON_NEW_PAIR_FOUND)
+    if (ota_cfg.find_pair(f_str("check_version")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'check_version'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'check_version'"), false);
         return;
     }
     if (ota_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'check_version' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'check_version' does not have a string value type"), false);
         return;
     }
     Heap_chunk tmp_check_version(ota_cfg.get_cur_pair_value_len());
@@ -1491,17 +1346,17 @@ static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_POST_API_OTA_CFG_HEAP_EXHAUSTED, ota_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_ota_cfg - not enough heap memory %d\n", ota_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_ota_cfg heap exhausted %d", ota_cfg.get_cur_pair_value_len() + 1);
         return;
     }
-    if (ota_cfg.find_pair("reboot_on_completion") != JSON_NEW_PAIR_FOUND)
+    if (ota_cfg.find_pair(f_str("reboot_on_completion")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'reboot_on_completion'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'reboot_on_completion'"), false);
         return;
     }
     if (ota_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'reboot_on_completion' does not have a string value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'reboot_on_completion' does not have a string value type"), false);
         return;
     }
     Heap_chunk tmp_reboot_on_completion(ota_cfg.get_cur_pair_value_len());
@@ -1512,7 +1367,7 @@ static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_POST_API_OTA_CFG_HEAP_EXHAUSTED, ota_cfg.get_cur_pair_value_len() + 1);
-        // esplog.error("post_api_ota_cfg - not enough heap memory %d\n", ota_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_ota_cfg heap exhausted %d", ota_cfg.get_cur_pair_value_len() + 1);
         return;
     }
     esp_ota.set_host(tmp_host.ref);
@@ -1540,25 +1395,19 @@ static void post_api_ota_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
                    "\"check_version\":\"%s\",\"reboot_on_completion\":\"%s\"}",
                    esp_ota.get_check_version(),
                    esp_ota.get_reboot_on_completion());
-        // fs_sprintf(msg.ref,
-        //            "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",\"check_version\":\"%s\",\"reboot_on_completion\":\"%s\"}",
-        //            esp_ota.get_host(),
-        //            esp_ota.get_port(),
-        //            esp_ota.get_path(),
-        //            esp_ota.get_check_version(),
-        //            esp_ota.get_reboot_on_completion());
         http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
     }
     else
     {
         esp_diag.error(ROUTES_POST_API_OTA_CFG_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("post_api_ota_cfg - not enough heap memory %d\n", msg_len);
+        ERROR("post_api_ota_cfg heap exhausted %d", msg_len);
     }
     espmem.stack_mon();
 }
 
 static void get_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_wifi_cfg");
     Heap_chunk msg(64, dont_free);
     if (msg.ref)
     {
@@ -1571,38 +1420,39 @@ static void get_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     else
     {
         esp_diag.error(ROUTES_GET_API_WIFI_CFG_HEAP_EXHAUSTED, 64);
-        // esplog.error("get_api_wifi_cfg - not enough heap memory %d\n", 64);
+        ERROR("get_api_wifi_cfg heap exhausted %d", 64);
     }
 }
 
 static void post_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("post_api_wifi_cfg");
     Json_str wifi_cfg(parsed_req->req_content, parsed_req->content_len);
     if (wifi_cfg.syntax_check() != JSON_SINTAX_OK)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (wifi_cfg.find_pair("station_ssid") != JSON_NEW_PAIR_FOUND)
+    if (wifi_cfg.find_pair(f_str("station_ssid")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'station_ssid'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'station_ssid'"), false);
         return;
     }
     if (wifi_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'station_ssid' does not have a STRING value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'station_ssid' does not have a STRING value type"), false);
         return;
     }
     char *tmp_ssid = wifi_cfg.get_cur_pair_value();
     int tmp_ssid_len = wifi_cfg.get_cur_pair_value_len();
-    if (wifi_cfg.find_pair("station_pwd") != JSON_NEW_PAIR_FOUND)
+    if (wifi_cfg.find_pair(f_str("station_pwd")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'station_pwd'", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'station_pwd'"), false);
         return;
     }
     if (wifi_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'station_pwd' does not have an integer value type", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'station_pwd' does not have an integer value type"), false);
         return;
     }
     Wifi::station_set_ssid(tmp_ssid, tmp_ssid_len);
@@ -1622,12 +1472,13 @@ static void post_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_POST_API_WIFI_CFG_HEAP_EXHAUSTED, 140);
-        // esplog.error("post_api_wifi_cfg - not enough heap memory %d\n", 140);
+        ERROR("post_api_wifi_cfg heap exhausted %d", 140);
     }
 }
 
 static void get_api_wifi_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    ALL("get_api_wifi_info");
     Heap_chunk msg(44 + 32 + 42, dont_free);
     if (msg.ref)
     {
@@ -1655,205 +1506,186 @@ static void get_api_wifi_info(struct espconn *ptr_espconn, Http_parsed_req *pars
     else
     {
         esp_diag.error(ROUTES_GET_API_WIFI_INFO_HEAP_EXHAUSTED, 44 + 32 + 42);
-        // esplog.error("get_api_wifi_info - not enough heap memory %d\n", 44 + 32 + 42);
+        ERROR("get_api_wifi_info heap exhausted %d", 44 + 32 + 42);
     }
 }
 
 void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    // esplog.all("espbot_http_routes\n");
+    ALL("espbot_http_routes");
 
     if (parsed_req->req_method == HTTP_OPTIONS) // HTTP CORS
     {
         preflight_response(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/"))) && (parsed_req->req_method == HTTP_GET))
     {
         return_file(ptr_espconn, "index.html");
         return;
     }
-    if ((os_strncmp(parsed_req->url, "/api/", 5)) && (parsed_req->req_method == HTTP_GET))
+    if ((os_strncmp(parsed_req->url, f_str("/api/"), 5)) && (parsed_req->req_method == HTTP_GET))
     {
         // not an api: look for specified file
         char *file_name = parsed_req->url + os_strlen("/");
         return_file(ptr_espconn, file_name);
         return;
     }
-#ifdef DEBUG_TRACE
-    if ((0 == os_strcmp(parsed_req->url, "/api/debug/log")) && (parsed_req->req_method == HTTP_GET))
-    {
-        get_api_debug_log(ptr_espconn, parsed_req);
-        return;
-    }
-#endif
-    if ((0 == os_strcmp(parsed_req->url, "/api/debug/hexmemdump")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/hexmemdump"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_debug_hexmemdump(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/debug/memdump")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/memdump"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_debug_memdump(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/debug/meminfo")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/meminfo"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_debug_meminfo(ptr_espconn, parsed_req);
         return;
     }
-#ifdef DEBUG_TRACE
-    if ((0 == os_strcmp(parsed_req->url, "/api/debug/cfg")) && (parsed_req->req_method == HTTP_GET))
-    {
-        get_api_debug_cfg(ptr_espconn, parsed_req);
-        return;
-    }
-    if ((os_strcmp(parsed_req->url, "/api/debug/cfg") == 0) && (parsed_req->req_method == HTTP_POST))
-    {
-        post_api_debug_cfg(ptr_espconn, parsed_req);
-        return;
-    }
-#endif
-    if ((0 == os_strcmp(parsed_req->url, "/api/diag/events")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/events"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_diag_events(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/diag/ack_events")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/ack_events"))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_diag_ack_events(ptr_espconn, parsed_req);
         return;
     }
-        if ((0 == os_strcmp(parsed_req->url, "/api/espbot/cfg")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/espbot/cfg"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_espbot_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/espbot/cfg") == 0) && (parsed_req->req_method == HTTP_POST))
+    if ((os_strcmp(parsed_req->url, f_str("/api/espbot/cfg")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_espbot_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/espbot/reset")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/espbot/reset"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
         espbot.reset(ESP_REBOOT);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/fs/info")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/fs/info"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_fs_info(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/fs/format")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/fs/format"))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_fs_format(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/files/ls")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/files/ls"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_files_ls(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strncmp(parsed_req->url, "/api/files/cat/", os_strlen("/api/files/cat/"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/files/cat/"), os_strlen(f_str("/api/files/cat/")))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_files_cat(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strncmp(parsed_req->url, "/api/files/delete/", os_strlen("/api/files/delete/"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/files/delete/"), os_strlen(f_str("/api/files/delete/")))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_files_delete(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strncmp(parsed_req->url, "/api/files/create/", os_strlen("/api/files/create/"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/files/create/"), os_strlen(f_str("/api/files/create/")))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_files_create(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strncmp(parsed_req->url, "/api/files/append/", os_strlen("/api/files/append/"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strncmp(parsed_req->url, f_str("/api/files/append/"), os_strlen(f_str("/api/files/append/")))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_files_append(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/gpio/cfg") == 0) && (parsed_req->req_method == HTTP_POST))
+    if ((os_strcmp(parsed_req->url, f_str("/api/gpio/cfg")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_gpio_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/gpio/uncfg") == 0) && (parsed_req->req_method == HTTP_POST))
+    if ((os_strcmp(parsed_req->url, f_str("/api/gpio/uncfg")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_gpio_uncfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/gpio/cfg") == 0) && (parsed_req->req_method == HTTP_GET))
+    if ((os_strcmp(parsed_req->url, f_str("/api/gpio/cfg")) == 0) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_gpio_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/gpio/read") == 0) && (parsed_req->req_method == HTTP_GET))
+    if ((os_strcmp(parsed_req->url, f_str("/api/gpio/read")) == 0) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_gpio_read(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/gpio/set") == 0) && (parsed_req->req_method == HTTP_POST))
+    if ((os_strcmp(parsed_req->url, f_str("/api/gpio/set")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_gpio_set(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/ota/info")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ota/info"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_ota_info(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/ota/cfg")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ota/cfg"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_ota_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/ota/cfg") == 0) && (parsed_req->req_method == HTTP_POST))
+    if ((os_strcmp(parsed_req->url, f_str("/api/ota/cfg")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_ota_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/ota/reboot")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ota/reboot"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
         espbot.reset(ESP_OTA_REBOOT);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/ota/upgrade")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/ota/upgrade"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
         esp_ota.start_upgrade();
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/wifi/cfg")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/cfg"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_wifi_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((os_strcmp(parsed_req->url, "/api/wifi/cfg") == 0) && (parsed_req->req_method == HTTP_POST))
+    if ((os_strcmp(parsed_req->url, f_str("/api/wifi/cfg")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_wifi_cfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/wifi/info")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/info"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_wifi_info(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/wifi/scan")) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/scan"))) && (parsed_req->req_method == HTTP_GET))
     {
         Wifi::scan_for_ap(NULL, wifi_scan_completed_function, (void *)ptr_espconn);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/wifi/connect")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/connect"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
         Wifi::connect();
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, "/api/wifi/disconnect")) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/disconnect"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, "", false);
         Wifi::set_stationap();
@@ -1865,5 +1697,5 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     if (app_http_routes(ptr_espconn, parsed_req))
         return;
     else
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "I'm sorry, my responses are limited. You must ask the right question.", false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("I'm sorry, my responses are limited. You must ask the right question."), false);
 }

@@ -35,49 +35,40 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
     espmem.stack_mon();
     Http_parsed_req parsed_req;
 
-#ifdef DEBUG_TRACE
-    esplog.trace("Websvr::webserver_recv received request len:%u\n", length);
-    esplog.trace("Websvr::webserver_recv received request:\n%s\n", precdata);
-#endif
+    DEBUG("webserver_recv len %u, msg %s", length, precdata);
 
     http_parse_request(precdata, &parsed_req);
 
     system_soft_wdt_feed();
 
-#ifdef DEBUG_TRACE
-    esplog.trace("Websvr::webserver_recv parsed request:\n"
-                 "->                  no_header_message: %d\n"
-                 "->                             method: %d\n"
-                 "->                                url: %s\n"
-                 "->                        content len: %d\n"
-                 "->                            content: %s\n",
-                 parsed_req.no_header_message,
-                 parsed_req.req_method,
-                 parsed_req.url,
-                 parsed_req.content_len,
-                 parsed_req.req_content);
-#endif
+    TRACE("webserver_recv parsed req\n"
+          "no_header_message: %d\n"
+          "           method: %d\n"
+          "              url: %s\n"
+          "      content len: %d\n"
+          "          content: %s",
+          parsed_req.no_header_message,
+          parsed_req.req_method,
+          parsed_req.url,
+          parsed_req.content_len,
+          parsed_req.req_content);
 
     if (!parsed_req.no_header_message && (parsed_req.h_content_len > parsed_req.content_len))
     {
-#ifdef DEBUG_TRACE
-        esplog.debug("Websvr::webserver_recv - message has been splitted waiting for completion ...\n");
-#endif
+        TRACE("webserver_recv message has been splitted waiting for completion ...");
         http_save_pending_request(arg, precdata, length, &parsed_req);
         return;
     }
     if (parsed_req.no_header_message)
     {
-#ifdef DEBUG_TRACE
-        esplog.debug("Websvr::webserver_recv - No header message\n");
-#endif
+        TRACE("webserver_recv no header message");
         http_check_pending_requests(ptr_espconn, parsed_req.req_content, webserver_recv);
         return;
     }
     if (parsed_req.url == NULL)
     {
         esp_diag.debug(WEB_SERVER_EMPTY_URL);
-        // esplog.debug("Websvr::webserver_recv - Empty url\n");
+        DEBUG("webserver_recv empty url");
         return;
     }
     espbot_http_routes(ptr_espconn, &parsed_req);
@@ -87,31 +78,30 @@ static void webserver_recon(void *arg, sint8 err)
 {
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
-#ifdef DEBUG_TRACE
-    esplog.debug("%d.%d.%d.%d:%d err %d reconnect\n", pesp_conn->proto.tcp->remote_ip[0],
-                 pesp_conn->proto.tcp->remote_ip[1],
-                 pesp_conn->proto.tcp->remote_ip[2],
-                 pesp_conn->proto.tcp->remote_ip[3],
-                 pesp_conn->proto.tcp->remote_port,
-                 err);
-#endif
+    DEBUG("webserver %d.%d.%d.%d:%d err %d reconnect",
+          pesp_conn->proto.tcp->remote_ip[0],
+          pesp_conn->proto.tcp->remote_ip[1],
+          pesp_conn->proto.tcp->remote_ip[2],
+          pesp_conn->proto.tcp->remote_ip[3],
+          pesp_conn->proto.tcp->remote_port,
+          err);
 }
 
 static void webserver_discon(void *arg)
 {
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
-#ifdef DEBUG_TRACE
-    esplog.debug("%d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
-                 pesp_conn->proto.tcp->remote_ip[1],
-                 pesp_conn->proto.tcp->remote_ip[2],
-                 pesp_conn->proto.tcp->remote_ip[3],
-                 pesp_conn->proto.tcp->remote_port);
-#endif
+    DEBUG("webserver %d.%d.%d.%d:%d disconnect",
+          pesp_conn->proto.tcp->remote_ip[0],
+          pesp_conn->proto.tcp->remote_ip[1],
+          pesp_conn->proto.tcp->remote_ip[2],
+          pesp_conn->proto.tcp->remote_ip[3],
+          pesp_conn->proto.tcp->remote_port);
 }
 
 static void webserver_listen(void *arg)
 {
+    ALL("webserver_listen");
     struct espconn *pesp_conn = (struct espconn *)arg;
     espmem.stack_mon();
     espconn_regist_recvcb(pesp_conn, webserver_recv);
@@ -139,7 +129,7 @@ void Websvr::start(uint32 port)
     // now the server is up
     m_status = up;
     esp_diag.debug(WEB_SERVER_START);
-    // esplog.debug("web server started\n");
+    DEBUG("webserver started");
 }
 
 void Websvr::stop()
@@ -147,11 +137,11 @@ void Websvr::stop()
     espconn_disconnect(&m_esp_conn);
     espconn_delete(&m_esp_conn);
     m_status = down;
-    
+
     http_queues_clear();
 
     esp_diag.debug(WEB_SERVER_STOP);
-    // esplog.debug("web server stopped\n");
+    DEBUG("webserver stopped");
 }
 
 Websvr_status Websvr::get_status(void)

@@ -57,12 +57,12 @@ void init_test(struct ip_addr ip, uint32 port, char *request)
     host_port = port;
     char ip_str[16];
     os_memset(ip_str, 0, 16);
-    os_sprintf(ip_str, IPSTR, IP2STR(&ip));
-    os_printf("------> ip: %s\n", ip_str);
+    fs_sprintf(ip_str, IPSTR, IP2STR(&ip));
+    fs_printf("------> ip: %s\n", ip_str);
     client_request = new char[38 + os_strlen(ip_str) + os_strlen(request) + 1];
     if (client_request == NULL)
     {
-        os_printf("os_zalloc error\n");
+        fs_printf("fs_zalloc error\n");
         client_request = NULL;
     }
     else
@@ -70,7 +70,7 @@ void init_test(struct ip_addr ip, uint32 port, char *request)
         // GET /user1.bin HTTP/1.1
         // Host: 192.168.1.201
         // Range: bytes=0-1023
-        os_sprintf(client_request, "%s\r\nHost: %s\r\nRange: bytes=0-1023\r\n\r\n", request, ip_str);
+        fs_sprintf(client_request, "%s\r\nHost: %s\r\nRange: bytes=0-1023\r\n\r\n", request, ip_str);
         // os_printf("client_request length: %d, effective length: %d , request: %s\n",
         //          (os_strlen(request) + 1),
         //          os_strlen(client_request),
@@ -92,14 +92,14 @@ void check_version(void *param)
     case WEBCLNT_RESPONSE_READY:
         if (espclient->parsed_response->body)
         {
-            os_printf("Server responded: %s\n", espclient->parsed_response->body);
+            fs_printf("Server responded: %s\n", espclient->parsed_response->body);
         }
         break;
     default:
-        os_printf("wc_get_version: Ops ... webclient status is %d\n", espclient->get_status());
+        fs_printf("wc_get_version: Ops ... webclient status is %d\n", espclient->get_status());
         break;
     }
-    os_printf("Webclient test completed\n");
+    fs_printf("Webclient test completed\n");
     espclient->disconnect(free_client, NULL);
     // delete espclient;
 }
@@ -110,13 +110,13 @@ void get_version(void *param)
     switch (espclient->get_status())
     {
     case WEBCLNT_CONNECTED:
-        os_printf("Sending request [%s]\n", client_request);
+        fs_printf("Sending request [%s]\n", client_request);
         espclient->send_req(client_request, check_version, NULL);
         delete[] client_request;
         break;
     default:
-        os_printf("get_version: Ops ... webclient status is %d\n", espclient->get_status());
-        os_printf("Webclient test completed\n");
+        fs_printf("get_version: Ops ... webclient status is %d\n", espclient->get_status());
+        fs_printf("Webclient test completed\n");
         espclient->disconnect(free_client, NULL);
         // delete espclient;
         break;
@@ -128,7 +128,7 @@ void test_webclient(void)
     // webclient test
     // staus WEBCLNT_DISCONNECTED
     // connect to OTA server and get the version
-    os_printf("Starting connection to server ...\n");
+    fs_printf("Starting connection to server ...\n");
     espclient->connect(host_ip, host_port, get_version, NULL);
 }
 
@@ -637,11 +637,11 @@ void run_test(int idx)
     {
         // Error diagnostic log
         int idx = 0;
-        os_printf("###### start of diagnostic events\n");
+        fs_printf("###### start of diagnostic events\n");
         while (esp_diag.get_event(idx))
         {
             struct dia_event *event_ptr = esp_diag.get_event(idx);
-            os_printf("event %d - %s %d %X %X %d\n",
+            fs_printf("event %d - %s %d %X %X %d\n",
                       idx,
                       esp_sntp.get_timestr(event_ptr->timestamp),
                       event_ptr->ack,
@@ -652,7 +652,7 @@ void run_test(int idx)
             if (idx >= esp_diag.get_max_events_count())
                 break;
         }
-        os_printf("###### end of diagnostic events\n");
+        fs_printf("###### end of diagnostic events\n");
     }
     break;
     case 15:
@@ -665,14 +665,14 @@ void run_test(int idx)
     {
         // get unacknowledged events
         int value = esp_diag.get_unack_events();
-        os_printf("unacknoledged events: %d\n", value);
+        fs_printf("unacknoledged events: %d\n", value);
     }
     break;
     case 17:
     {
         // Error print
         event_counter++;
-        os_printf("A new fatal event (%d) was injected.\n", event_counter);
+        fs_printf("A new fatal event (%d) was injected.\n", event_counter);
         esp_diag.fatal(event_counter, 100 + event_counter);
     }
     break;
@@ -680,7 +680,7 @@ void run_test(int idx)
     {
         // Error print
         event_counter++;
-        os_printf("A new error event (%d) was injected.\n", event_counter);
+        fs_printf("A new error event (%d) was injected.\n", event_counter);
         esp_diag.error(event_counter, 100 + event_counter);
     }
     break;
@@ -688,7 +688,7 @@ void run_test(int idx)
     {
         // Error print
         event_counter++;
-        os_printf("A new warning event (%d) was injected.\n", event_counter);
+        fs_printf("A new warning event (%d) was injected.\n", event_counter);
         esp_diag.warn(event_counter, 100 + event_counter);
     }
     break;
@@ -696,7 +696,7 @@ void run_test(int idx)
     {
         // Error print
         event_counter++;
-        os_printf("A new info event (%d) was injected.\n", event_counter);
+        fs_printf("A new info event (%d) was injected.\n", event_counter);
         esp_diag.info(event_counter, 100 + event_counter);
     }
     break;
@@ -704,7 +704,7 @@ void run_test(int idx)
     {
         // Error print
         event_counter++;
-        os_printf("A new debug event (%d) was injected.\n", event_counter);
+        fs_printf("A new debug event (%d) was injected.\n", event_counter);
         esp_diag.debug(event_counter, 100 + event_counter);
     }
     break;
@@ -712,8 +712,34 @@ void run_test(int idx)
     {
         // Error print
         event_counter++;
-        os_printf("A new trace event (%d) was injected.\n", event_counter);
+        fs_printf("A new trace event (%d) was injected.\n", event_counter);
         esp_diag.trace(event_counter, 100 + event_counter);
+    }
+    break;
+    case 29:
+    {
+        TRACE("testing operations on strings mapped in flash");
+        const char *str = f_str("this string is mapped into flash and is composed by a pretty long number of characters (92)!");
+        TRACE("now printing a string mapped in flash: \"%s\"", str);
+        TRACE("now calculating the len of a string mapped in flash");
+        int len = os_strlen(str);
+        TRACE("the len was %d", len);
+        char tmp_str[100];
+        TRACE("now copying a string mapped in flash");
+        os_strcpy(tmp_str, str);
+        TRACE("string mapped in flash: %s", str);
+        TRACE("string mapped in ram: %s", tmp_str);
+        TRACE("now comparing a string mapped in flash");
+        int res = os_strcmp(str, "example 1");
+        TRACE("result: %d", res);
+        res = os_strcmp(str, f_str("example 1"));
+        TRACE("result: %d", res);
+        TRACE("measuring how long a TRACE takes...");
+        {
+            Profiler("TRACE took");
+            TRACE("this is a trace test %d", 8);
+        }
+        TRACE("done");
     }
     break;
     case 30:
@@ -730,6 +756,7 @@ void run_test(int idx)
         }
         os_printf(str);
     }
+    break;
     case 31:
     {
         // char str[256];
@@ -838,45 +865,45 @@ void run_test(int idx)
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
+        fs_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
                   json_obj.get_cur_pair_value_len());
-        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        fs_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
         json_obj.find_pair("second");
         os_memset(tmp_str, 0, 10);
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
+        fs_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
                   json_obj.get_cur_pair_value_len());
-        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        fs_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
         json_obj.find_pair("third");
         os_memset(tmp_str, 0, 10);
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
+        fs_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
                   json_obj.get_cur_pair_value_len());
-        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        fs_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
         json_obj.find_pair("fourth");
         os_memset(tmp_str, 0, 10);
         os_strncpy(tmp_str, json_obj.get_cur_pair_string(), json_obj.get_cur_pair_string_len());
         os_memset(tmp_value, 0, 10);
         os_strncpy(tmp_value, json_obj.get_cur_pair_value(), json_obj.get_cur_pair_value_len());
-        os_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
+        fs_printf("pair name: %s, pair type: %d, pair value: %s, pair value len: %d\n",
                   tmp_str,
                   json_obj.get_cur_pair_value_type(),
                   tmp_value,
                   json_obj.get_cur_pair_value_len());
-        os_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
+        fs_printf("atoi(%s) = %d\n", tmp_value, atoi(tmp_value));
     }
     break;
     /*

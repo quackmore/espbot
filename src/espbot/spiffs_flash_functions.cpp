@@ -24,7 +24,7 @@ extern "C"
 // flash read function (checkout SPIFFS documentation)
 s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 {
-    // esplog.trace("spiffs read called --------------------------------------\n");
+    // TRACE("spiffs read called --------------------------------------");
     SpiFlashOpResult res;
     // find aligned start address
     u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
@@ -37,8 +37,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
         (start_addr + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) > FS_END))
     {
         esp_diag.error(SPIFFS_FLASH_READ_OUT_OF_BOUNDARY, t_addr);
-        // esplog.error("Flash file system boundary error!\n");
-        // esplog.error("Reading from address: %X, size: %d\n", t_addr, t_size);
+        ERROR("Flash file system boundary error, reading from address: %X, size: %d", t_addr, t_size);
         return SPIFFS_FLASH_BOUNDARY_ERROR;
     }
 
@@ -49,7 +48,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 
     while (t_size > 0)
     {
-        // esplog.trace("bytes to be read %d, unaligned addr %X, aligned addr %X, align bytes %d\n",
+        // TRACE("bytes to be read %d, unaligned addr %X, aligned addr %X, align bytes %d",
         //         t_size, t_addr, start_addr, align_bytes);
         // read F_BUF_SIZE bytes from flash
         res = spi_flash_read(start_addr, buffer, LOG_PAGE_SIZE);
@@ -57,14 +56,14 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
         if (res == SPI_FLASH_RESULT_ERR)
         {
             esp_diag.error(SPIFFS_FLASH_READ_ERROR, start_addr);
-            // esplog.error("Error reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+            ERROR("Error reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
             esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             esp_diag.error(SPIFFS_FLASH_READ_TIMEOUT, start_addr);
-            // esplog.error("Timeout reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+            ERROR("Timeout reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
             esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
@@ -74,7 +73,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
         {
             // discard initial bytes required by alignment (if any)
             // and copy to destination
-            // esplog.trace("copying %d bytes from %X to bytes to %X\n",
+            // TRACE("copying %d bytes from %X to bytes to %X",
             //         (LOG_PAGE_SIZE - align_bytes), buffer + align_bytes, t_dst);
             os_memcpy(t_dst, buffer + align_bytes, (LOG_PAGE_SIZE - align_bytes));
             t_dst += (LOG_PAGE_SIZE - align_bytes);
@@ -85,7 +84,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
         else
         {
             // just copy required bytes
-            // esplog.trace("copying %d bytes from %X to bytes to %X\n",
+            // TRACE("copying %d bytes from %X to bytes to %X",
             //         t_size, buffer + align_bytes, t_dst);
             os_memcpy(t_dst, buffer + align_bytes, t_size);
             t_size = 0;
@@ -98,7 +97,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 // flash write function (checkout SPIFFS documentation)
 s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
 {
-    // esplog.trace("spiffs write called -------------------------------------\n");
+    // TRACE("spiffs write called -------------------------------------");
     SpiFlashOpResult res;
     // find aligned start address
     u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
@@ -110,8 +109,7 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
         (start_addr + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) > FS_END))
     {
         esp_diag.error(SPIFFS_FLASH_WRITE_OUT_OF_BOUNDARY, t_addr);
-        // esplog.error("Flash file system boundary error!\n");
-        // esplog.error("Writing to address: %X, size: %d\n", t_addr, t_size);
+        ERROR("Flash file system boundary error, writing to address: %X, size: %d", t_addr, t_size);
         return SPIFFS_FLASH_BOUNDARY_ERROR;
     }
 
@@ -123,7 +121,7 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
 
     while (t_size > 0)
     {
-        // esplog.trace("bytes to be written %d, unaligned addr %X, aligned addr %X, align bytes %d\n",
+        // TRACE("bytes to be written %d, unaligned addr %X, aligned addr %X, align bytes %d",
         //         t_size, t_addr, start_addr, align_bytes);
         // read LOG_PAGE_SIZE bytes from flash into buffer
         res = spi_flash_read(start_addr, (uint32 *)buffer, LOG_PAGE_SIZE);
@@ -131,14 +129,14 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
         if (res == SPI_FLASH_RESULT_ERR)
         {
             esp_diag.error(SPIFFS_FLASH_WRITE_READ_ERROR, start_addr);
-            // esplog.error("Error reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+            ERROR("Error reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
             esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             esp_diag.error(SPIFFS_FLASH_WRITE_READ_TIMEOUT, start_addr);
-            // esplog.error("Timeout reading flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+            ERROR("Timeout reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
             esp_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
@@ -147,11 +145,11 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
         {
             // discard initial bytes required by alignment (if any)
             // and copy source data to buffer
-            // esplog.trace("copying %d bytes from %X to bytes to %X\n",
+            // TRACE("copying %d bytes from %X to bytes to %X",
             //         LOG_PAGE_SIZE - align_bytes, t_src, (u8_t *)buffer + align_bytes);
             os_memcpy((u8_t *)buffer + align_bytes, t_src, LOG_PAGE_SIZE - align_bytes);
             // and write buffer to flash
-            // esplog.trace("writing %d bytes to flash %X from %X\n",
+            // TRACE("writing %d bytes to flash %X from %X",
             //         LOG_PAGE_SIZE, start_addr, buffer);
             res = spi_flash_write(start_addr, (uint32 *)buffer, LOG_PAGE_SIZE);
             system_soft_wdt_feed();
@@ -159,14 +157,14 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
             if (res == SPI_FLASH_RESULT_ERR)
             {
                 esp_diag.error(SPIFFS_FLASH_WRITE_WRITE_ERROR, start_addr);
-                // esplog.error("Error writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+                ERROR("Error writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
                 esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_ERR;
             }
             if (res == SPI_FLASH_RESULT_TIMEOUT)
             {
                 esp_diag.error(SPIFFS_FLASH_WRITE_WRITE_TIMEOUT, start_addr);
-                // esplog.error("Timeout writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+                ERROR("Timeout writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
                 esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_TIMEOUT;
             }
@@ -179,11 +177,11 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
         else
         {
             // just copy required bytes to buffer
-            // esplog.trace("copying %d bytes from %X to bytes to %X\n",
+            // TRACE("copying %d bytes from %X to bytes to %X",
             //         t_size, t_src, (u8_t *)buffer + align_bytes);
             os_memcpy((u8_t *)buffer + align_bytes, t_src, t_size);
             // and write buffer to flash
-            // esplog.trace("writing %d bytes to flash %X from %X\n",
+            // TRACE("writing %d bytes to flash %X from %X",
             //         LOG_PAGE_SIZE, start_addr, buffer);
             res = spi_flash_write(start_addr, (uint32 *)buffer, LOG_PAGE_SIZE);
             system_soft_wdt_feed();
@@ -191,14 +189,14 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
             if (res == SPI_FLASH_RESULT_ERR)
             {
                 esp_diag.error(SPIFFS_FLASH_WRITE_WRITE_ERROR, start_addr);
-                // esplog.error("Error writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+                ERROR("Error writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
                 esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_ERR;
             }
             if (res == SPI_FLASH_RESULT_TIMEOUT)
             {
                 esp_diag.error(SPIFFS_FLASH_WRITE_WRITE_TIMEOUT, start_addr);
-                // esplog.error("Timeout writing flash from %X for %d bytes\n", start_addr, LOG_PAGE_SIZE);
+                ERROR("Timeout writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
                 esp_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_TIMEOUT;
             }
@@ -212,7 +210,7 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
 // flash erase function (checkout SPIFFS documentation)
 s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size)
 {
-    // esplog.trace("spiffs erase called ------------------------------------\n");
+    // TRACE("spiffs erase called ------------------------------------");
     SpiFlashOpResult res;
     // boundary checks
     if ((((t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) < FS_START) ||
@@ -220,8 +218,7 @@ s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size)
         (((t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) + ((t_size / FS_ALIGN_BYTES) * FS_ALIGN_BYTES) > FS_END))
     {
         esp_diag.error(SPIFFS_FLASH_ERASE_OUT_OF_BOUNDARY, t_addr);
-        // esplog.error("Flash file system boundary error!\n");
-        // esplog.error("Erasing from address: %X, size: %d\n", t_addr, t_size);
+        ERROR("Flash file system boundary error, erasing from address: %X, size: %d", t_addr, t_size);
         return SPIFFS_FLASH_BOUNDARY_ERROR;
     }
 
@@ -232,20 +229,20 @@ s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size)
 
     while (t_size > 0)
     {
-        // esplog.trace("bytes to be erased %d, sector num %d, sector offset %d\n",
+        // TRACE("bytes to be erased %d, sector num %d, sector offset %d",
         //         t_size, sect_number, sect_offset);
         // erase sector
         res = spi_flash_erase_sector(sect_number);
         if (res == SPI_FLASH_RESULT_ERR)
         {
             esp_diag.error(SPIFFS_FLASH_ERASE_ERROR, sect_number);
-            // esplog.error("Error erasing flash sector %d\n", sect_number);
+            ERROR("Error erasing flash sector %d", sect_number);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             esp_diag.error(SPIFFS_FLASH_ERASE_TIMEOUT, sect_number);
-            // esplog.error("Timeout erasing flash sector %d\n", sect_number);
+            ERROR("Timeout erasing flash sector %d", sect_number);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
 

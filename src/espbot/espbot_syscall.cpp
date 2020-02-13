@@ -17,7 +17,7 @@ extern "C"
 
 extern "C" void __cxa_pure_virtual(void)
 {
-    // esplog.warn("Uh oh, someone called a pure virtual function\n");
+    WARN("Uh oh, someone called a pure virtual function");
 }
 
 void *operator new(size_t size)

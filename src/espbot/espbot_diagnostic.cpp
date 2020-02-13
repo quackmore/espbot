@@ -37,6 +37,7 @@ void Espbot_diag::init(void)
         PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
         GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
     }
+    _serial_log = EVNT_ALL | EVNT_TRACE | EVNT_DEBUG | EVNT_INFO | EVNT_WARN | EVNT_ERROR | EVNT_FATAL;
 }
 
 inline void Espbot_diag::add_event(char type, int code, uint32 value)

@@ -41,39 +41,39 @@ int get_http_msg_max_size(void)
     return http_msg_max_size;
 }
 
-char *code_msg(int code)
+const char *code_msg(int code)
 {
     switch (code)
     {
     case HTTP_OK:
-        return "OK";
+        return f_str("OK");
     case HTTP_CREATED:
-        return "Created";
+        return f_str("Created");
     case HTTP_ACCEPTED:
-        return "Accepted";
+        return f_str("Accepted");
     case HTTP_BAD_REQUEST:
-        return "Bad Request";
+        return f_str("Bad Request");
     case HTTP_UNAUTHORIZED:
-        return "Unauthorized";
+        return f_str("Unauthorized");
     case HTTP_FORBIDDEN:
-        return "Forbidden";
+        return f_str("Forbidden");
     case HTTP_NOT_FOUND:
-        return "Not Found";
+        return f_str("Not Found");
     case HTTP_CONFLICT:
-        return "Conflict";
+        return f_str("Conflict");
     case HTTP_SERVER_ERROR:
-        return "Internal Server Error";
+        return f_str("Internal Server Error");
     default:
-        return "";
+        return f_str("");
     }
 }
 
-char *json_error_msg(int code, char *msg)
+char *json_error_msg(int code, const char *msg)
 {
     Heap_chunk err_msg(54 + 3 + 22 + os_strlen(msg), dont_free);
     if (err_msg.ref)
     {
-        os_sprintf(err_msg.ref,
+        fs_sprintf(err_msg.ref,
                    "{\"error\":{\"code\": %d,\"message\": \"%s\",\"reason\": \"%s\"}}",
                    code, code_msg(code), msg);
         return err_msg.ref;
@@ -81,7 +81,7 @@ char *json_error_msg(int code, char *msg)
     else
     {
         esp_diag.error(HTTP_JSON_ERROR_MSG_HEAP_EXHAUSTED, (56 + os_strlen(msg)));
-        // esplog.error("json_error_msg - not enough heap memory %d\n", (56 + os_strlen(msg)));
+        ERROR("json_error_msg heap exhausted %d", (56 + os_strlen(msg)));
         return NULL;
     }
 }
@@ -121,9 +121,7 @@ static os_timer_t clear_busy_sending_data_timer;
 static void clear_busy_sending_data(void *arg)
 {
     esp_diag.debug(HTTP_CLEAR_BUSY_SENDING_DATA);
-#ifdef DEBUG_TRACE
-    esplog.trace("clear_busy_sending_data\n");
-#endif
+    DEBUG("clear_busy_sending_data");
     // something went wrong and this timeout was triggered
     // clear the flag, the buffer and trigger a check of the pending responses queue
     os_timer_disarm(&clear_busy_sending_data_timer);
@@ -138,12 +136,11 @@ static void clear_busy_sending_data(void *arg)
 
 void http_check_pending_send(void)
 {
+    ALL("http_check_pending_send");
     if (espwebsvr.get_status() == down)
     {
         // meanwhile the server went down
-#ifdef DEBUG_TRACE
-        esplog.trace("http_check_pending_send - clearing pending send and response queues\n");
-#endif
+        TRACE("http_check_pending_send - clearing pending send and response queues");
         // clear the pending send queue
         struct http_send *p_pending_send = pending_send->front();
         while (p_pending_send)
@@ -169,10 +166,8 @@ void http_check_pending_send(void)
     struct http_send *p_pending_send = pending_send->front();
     if (p_pending_send)
     {
-#ifdef DEBUG_TRACE
-        esplog.trace("pending send found: *p_espconn: %X, msg len: %d\n",
-                     p_pending_send->p_espconn, os_strlen(p_pending_send->msg));
-#endif
+        TRACE("http_check_pending_send pending send on *p_espconn: %X, len %d",
+              p_pending_send->p_espconn, p_pending_send->msg);
         http_send_buffer(p_pending_send->p_espconn, p_pending_send->msg);
         // the send procedure will clear the buffer so just delete the http_send
         // esplog.trace("http_check_pending_send: deleting p_pending_send\n");
@@ -187,16 +182,11 @@ void http_check_pending_send(void)
     struct http_split_send *p_pending_response = pending_split_send->front();
     if (p_pending_response)
     {
-#ifdef DEBUG_TRACE
-        esplog.trace("pending split response found: *p_espconn: %X\n"
-                     "                            content_size: %d\n"
-                     "                     content_transferred: %d\n"
-                     "                         action_function: %X\n",
-                     p_pending_response->p_espconn,
-                     p_pending_response->content_size,
-                     p_pending_response->content_transferred,
-                     p_pending_response->action_function);
-#endif
+        TRACE("http_check_pending_send pending response on *p_espconn: %X, content_size: %d, content transferred %d, action_function %X",
+              p_pending_response->p_espconn,
+              p_pending_response->content_size,
+              p_pending_response->content_transferred,
+              p_pending_response->action_function);
         p_pending_response->action_function(p_pending_response);
         // don't free the content yet
         // esplog.trace("http_check_pending_send: deleting p_pending_response\n");
@@ -209,13 +199,14 @@ void http_check_pending_send(void)
 
 void http_sentcb(void *arg)
 {
+    ALL("http_sentcb");
     struct espconn *ptr_espconn = (struct espconn *)arg;
     // clear the flag and the timeout timer
     os_timer_disarm(&clear_busy_sending_data_timer);
     // clear the message_buffer
     if (send_buffer)
     {
-        // esplog.trace("http_sentcb: deleting send_buffer %X\n", send_buffer);
+        TRACE("http_sentcb: deleting send_buffer %X", send_buffer);
         delete[] send_buffer;
         send_buffer = NULL;
     }
@@ -233,9 +224,7 @@ void http_send_buffer(struct espconn *p_espconn, char *msg)
     if (esp_busy_sending_data) // previous espconn_send not completed yet
     {
         ETS_INTR_UNLOCK();
-#ifdef DEBUG_TRACE
-        esplog.trace("http_send_buffer - previous espconn_send not completed yet\n");
-#endif
+        TRACE("http_send_buffer - espconn_send busy");
         struct http_send *response_data = new struct http_send;
         espmem.stack_mon();
         if (response_data)
@@ -246,25 +235,20 @@ void http_send_buffer(struct espconn *p_espconn, char *msg)
             if (result == Queue_full)
             {
                 esp_diag.error(HTTP_SEND_BUFFER_SEND_QUEUE_FULL);
-                // esplog.error("http_send_buffer: pending send queue is full\n");
+                ERROR("http_send_buffer: full pending send queue");
             }
         }
         else
         {
             esp_diag.error(HTTP_SEND_BUFFER_HEAP_EXHAUSTED, sizeof(struct http_send));
-            // esplog.error("http_send_buffer: not enough heap memory (%d)\n", sizeof(struct http_send));
+            ERROR("http_send_buffer heap exhausted %d", sizeof(struct http_send));
         }
     }
     else // previous espconn_send completed
     {
         esp_busy_sending_data = true;
         ETS_INTR_UNLOCK();
-#ifdef DEBUG_TRACE
-        esplog.trace("espconn_send: *p_espconn: %X\n"
-                     "                     msg: %s\n",
-                     p_espconn,
-                     msg);
-#endif
+        DEBUG("espconn_send *p_espconn: %X, msg: %s", p_espconn, msg);
         // set a timeout timer for clearing the esp_busy_sending_data in case something goes wrong
         os_timer_disarm(&clear_busy_sending_data_timer);
         os_timer_setfn(&clear_busy_sending_data_timer, (os_timer_func_t *)clear_busy_sending_data, NULL);
@@ -276,7 +260,7 @@ void http_send_buffer(struct espconn *p_espconn, char *msg)
         if (res != 0)
         {
             esp_diag.error(HTTP_SEND_BUFFER_ERROR, res);
-            // esplog.error("http_send_buffer: error sending response, error code %d\n", res);
+            ERROR("espconn_send error %d", res);
             esp_busy_sending_data = false;
             if (send_buffer)
             {
@@ -290,16 +274,9 @@ void http_send_buffer(struct espconn *p_espconn, char *msg)
     system_soft_wdt_feed();
 }
 
-void http_response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg)
+void http_response(struct espconn *p_espconn, int code, char *content_type, const char *msg, bool free_msg)
 {
-#ifdef DEBUG_TRACE
-    esplog.trace("response: *p_espconn: %X\n"
-                 "                code: %d\n"
-                 "        content-type: %s\n"
-                 "          msg length: %d\n"
-                 "            free_msg: %d\n",
-                 p_espconn, code, content_type, os_strlen(msg), free_msg);
-#endif
+    TRACE("response: *p_espconn: %X, code %d, msg len %d", p_espconn, code, os_strlen(msg));
     // when code is not 200 format the error msg as json
     if (code >= HTTP_BAD_REQUEST)
     {
@@ -328,8 +305,8 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, char
     Heap_chunk msg_header(header_len, dont_free);
     if (msg_header.ref == NULL)
     {
-        esp_diag.error(HTTP_RESPONSE_HEAT_EXHAUSTED, header_len);
-        // esplog.error("http_response: not enough heap memory (%d)\n", header_len);
+        esp_diag.error(HTTP_RESPONSE_HEAP_EXHAUSTED, header_len);
+        ERROR("http_response heap exhausted %d", header_len);
         return;
     }
     os_sprintf(msg_header.ref, "HTTP/1.1 %d %s\r\nServer: espbot/2.0\r\n"
@@ -346,7 +323,7 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, char
         return;
     if (free_msg)
     {
-        http_send(p_espconn, msg);
+        http_send(p_espconn, (char *)msg);
     }
     else
     {
@@ -360,8 +337,8 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, char
         }
         else
         {
-            esp_diag.error(HTTP_RESPONSE_HEAT_EXHAUSTED, os_strlen(msg));
-            // esplog.error("http_response: not enough heap memory (%d)\n", os_strlen(msg));
+            esp_diag.error(HTTP_RESPONSE_HEAP_EXHAUSTED, os_strlen(msg));
+            ERROR("http_response heap exhausted %d", os_strlen(msg));
         }
     }
     espmem.stack_mon();
@@ -371,6 +348,7 @@ Queue<struct http_split_send> *pending_split_send;
 
 static void send_remaining_msg(struct http_split_send *p_sr)
 {
+    ALL("send_remaining_msg");
     if ((p_sr->content_size - p_sr->content_transferred) > http_msg_max_size)
     {
         // the message is bigger than response_max_size
@@ -395,18 +373,15 @@ static void send_remaining_msg(struct http_split_send *p_sr)
                     esp_diag.error(HTTP_SEND_REMAINING_MSG_RES_QUEUE_FULL);
                     // esplog.error("send_remaining_msg: pending response queue is full\n");
                 }
-
-#ifdef DEBUG_TRACE
-                esplog.trace("send_remaining_msg: *p_espconn: %X\n"
-                             "msg (splitted) len: %d\n",
-                             p_sr->p_espconn, os_strlen(buffer.ref));
-#endif
+                TRACE("send_remaining_msg *p_espconn %X, msg (splitted) len %d",
+                      p_sr->p_espconn,
+                      os_strlen(buffer.ref));
                 http_send_buffer(p_sr->p_espconn, buffer.ref);
             }
             else
             {
                 esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, sizeof(struct http_split_send));
-                // esplog.error("send_remaining_msg: not enough heap memory (%d)\n", sizeof(struct http_split_send));
+                ERROR("send_remaining_msg heap exhausted %d", sizeof(struct http_split_send));
                 delete[] buffer.ref;
                 delete[] p_sr->content;
             }
@@ -414,7 +389,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
         else
         {
             esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size);
-            // esplog.error("send_remaining_msg: not enough heap memory (%d)\n", buffer_size);
+            ERROR("send_remaining_msg heap exhausted %d", buffer_size);
             delete[] p_sr->content;
         }
     }
@@ -426,19 +401,17 @@ static void send_remaining_msg(struct http_split_send *p_sr)
         if (buffer.ref)
         {
             os_strncpy(buffer.ref, p_sr->content + p_sr->content_transferred, buffer_size);
-#ifdef DEBUG_TRACE
-            esplog.trace("send_remaining_msg: *p_espconn: %X\n"
-                         "          msg (last piece) len: %d\n",
-                         p_sr->p_espconn, os_strlen(buffer.ref));
-#endif
+            TRACE("send_remaining_msg *p_espconn %X, msg (last piece) len: %d",
+                  p_sr->p_espconn, 
+                  os_strlen(buffer.ref));
             http_send_buffer(p_sr->p_espconn, buffer.ref);
         }
         else
         {
             esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size);
-            // esplog.error("send_remaining_msg: not enough heap memory (%d)\n", buffer_size);
+            ERROR("send_remaining_msg heap exhausted %d", buffer_size);
         }
-        // esplog.trace("send_remaining_msg: deleting p_sr->content\n");
+        // TRACE("send_remaining_msg deleting p_sr->content\n");
         delete[] p_sr->content;
     }
 }
@@ -448,6 +421,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
 //
 void http_send(struct espconn *p_espconn, char *msg)
 {
+    ALL("http_send");
     // Profiler ret_file("http_send");
     if (os_strlen(msg) > http_msg_max_size)
     {
@@ -471,20 +445,15 @@ void http_send(struct espconn *p_espconn, char *msg)
                 if (result == Queue_full)
                 {
                     esp_diag.error(HTTP_SEND_RES_QUEUE_FULL);
-                    // esplog.error("http_send: pending response queue is full\n");
+                    ERROR("http_send full pending response queue");
                 }
-
-#ifdef DEBUG_TRACE
-                esplog.trace("http_send: *p_espconn: %X\n"
-                             "       msg (splitted) len: %d\n",
-                             p_espconn, os_strlen(buffer.ref));
-#endif
+                TRACE("http_send *p_espconn: %X, msg (splitted) len: %d", p_espconn, os_strlen(buffer.ref));
                 http_send_buffer(p_espconn, buffer.ref);
             }
             else
             {
                 esp_diag.error(HTTP_SEND_HEAP_EXHAUSTED, sizeof(struct http_split_send));
-                // esplog.error("http_send: not enough heap memory (%d)\n", sizeof(struct http_split_send));
+                ERROR("http_send heap exhausted %d", sizeof(struct http_split_send));
                 delete[] buffer.ref;
                 delete[] msg;
             }
@@ -492,24 +461,21 @@ void http_send(struct espconn *p_espconn, char *msg)
         else
         {
             esp_diag.error(HTTP_SEND_HEAP_EXHAUSTED, buffer_size);
-            // esplog.error("http_send: not enough heap memory (%d)\n", buffer_size);
+            ERROR("http_send heap exhausted %d", buffer_size);
             delete[] msg;
         }
     }
     else
     {
         // no need to split the message, just send it
-#ifdef DEBUG_TRACE
-        esplog.trace("http_send: *p_espconn: %X\n"
-                     "           msg (full) len: %d\n",
-                     p_espconn, os_strlen(msg));
-#endif
+        TRACE("http_send *p_espconn: %X, msg (full) len: %d", p_espconn, os_strlen(msg));
         http_send_buffer(p_espconn, msg);
     }
 }
 
 char *http_format_header(class Http_header *p_header)
 {
+    ALL("http_format_header");
     // allocate a buffer
     // HTTP...        ->  37 + 3 + 22 =  62
     // Content-Type   ->  19 + 17     =  36
@@ -522,7 +488,7 @@ char *http_format_header(class Http_header *p_header)
     {
         header_length += 37; // Access-Control-Request-Headers string format
         header_length += os_strlen(p_header->m_acrh);
-        header_length += os_strlen("Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
+        header_length += os_strlen(f_str("Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n"));
     }
 
     if (p_header->m_origin)
@@ -536,39 +502,39 @@ char *http_format_header(class Http_header *p_header)
     {
         // setup the header
         char *ptr = header_msg.ref;
-        os_sprintf(ptr, "HTTP/1.1 %d %s\r\nServer: espbot/2.0\r\n",
+        fs_sprintf(ptr, "HTTP/1.1 %d %s\r\nServer: espbot/2.0\r\n",
                    p_header->m_code, code_msg(p_header->m_code));
         ptr = ptr + os_strlen(ptr);
-        os_sprintf(ptr, "Content-Type: %s\r\n", p_header->m_content_type);
+        fs_sprintf(ptr, "Content-Type: %s\r\n", p_header->m_content_type);
         ptr = ptr + os_strlen(ptr);
         if (p_header->m_content_range_total > 0)
         {
-            os_sprintf(ptr, "Content-Range: bytes %d-%d/%d\r\n", p_header->m_content_range_total, p_header->m_content_range_total, p_header->m_content_range_total);
+            fs_sprintf(ptr, "Content-Range: bytes %d-%d/%d\r\n", p_header->m_content_range_total, p_header->m_content_range_total, p_header->m_content_range_total);
             ptr = ptr + os_strlen(ptr);
         }
-        os_sprintf(ptr, "Content-Length: %d\r\n", p_header->m_content_length);
+        fs_sprintf(ptr, "Content-Length: %d\r\n", p_header->m_content_length);
         ptr = ptr + os_strlen(ptr);
         // os_sprintf(ptr, "Date: Wed, 28 Nov 2018 12:00:00 GMT\r\n");
         // os_printf("---->msg: %s\n", msg.ref);
         if (p_header->m_origin)
         {
-            os_sprintf(ptr, "Access-Control-Allow-Origin: %s\r\n", p_header->m_origin);
+            fs_sprintf(ptr, "Access-Control-Allow-Origin: %s\r\n", p_header->m_origin);
             ptr = ptr + os_strlen(ptr);
         }
         if (p_header->m_acrh)
         {
-            os_sprintf(ptr, "Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
+            fs_sprintf(ptr, "Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
             ptr = ptr + os_strlen(ptr);
-            os_sprintf(ptr, "Access-Control-Allow-Headers: Content-Type,%s\r\n", p_header->m_acrh);
+            fs_sprintf(ptr, "Access-Control-Allow-Headers: Content-Type,%s\r\n", p_header->m_acrh);
             ptr = ptr + os_strlen(ptr);
         }
-        os_sprintf(ptr, "Pragma: no-cache\r\n\r\n");
+        fs_sprintf(ptr, "Pragma: no-cache\r\n\r\n");
         return header_msg.ref;
     }
     else
     {
         esp_diag.error(HTTP_FORMAT_HEADER_HEAP_EXHAUSTED, header_length);
-        // esplog.error("http_format_header: not enough heap memory (%d)\n", header_length);
+        ERROR("http_format_header heap exhausted %d", header_length);
         return NULL;
     }
 }
@@ -604,6 +570,7 @@ Http_parsed_req::~Http_parsed_req()
 
 void http_parse_request(char *req, Http_parsed_req *parsed_req)
 {
+    ALL("http_parse_request");
     char *tmp_ptr = req;
     char *end_ptr = NULL;
     espmem.stack_mon();
@@ -612,36 +579,36 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
     if (tmp_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_PARSE_EMPTY_MSG);
-        // esplog.error("http_parse_request - cannot parse empty message\n");
+        ERROR("http_parse_request - empty message");
         return;
     }
 
-    if (os_strncmp(tmp_ptr, "GET ", 4) == 0)
+    if (os_strncmp(tmp_ptr, f_str("GET "), 4) == 0)
     {
         parsed_req->req_method = HTTP_GET;
         tmp_ptr += 4;
     }
-    else if (os_strncmp(tmp_ptr, "POST ", 5) == 0)
+    else if (os_strncmp(tmp_ptr, f_str("POST "), 5) == 0)
     {
         parsed_req->req_method = HTTP_POST;
         tmp_ptr += 5;
     }
-    else if (os_strncmp(tmp_ptr, "PUT ", 4) == 0)
+    else if (os_strncmp(tmp_ptr, f_str("PUT "), 4) == 0)
     {
         parsed_req->req_method = HTTP_PUT;
         tmp_ptr += 4;
     }
-    else if (os_strncmp(tmp_ptr, "PATCH ", 6) == 0)
+    else if (os_strncmp(tmp_ptr, f_str("PATCH "), 6) == 0)
     {
         parsed_req->req_method = HTTP_PATCH;
         tmp_ptr += 6;
     }
-    else if (os_strncmp(tmp_ptr, "DELETE ", 7) == 0)
+    else if (os_strncmp(tmp_ptr, f_str("DELETE "), 7) == 0)
     {
         parsed_req->req_method = HTTP_DELETE;
         tmp_ptr += 7;
     }
-    else if (os_strncmp(tmp_ptr, "OPTIONS ", 8) == 0)
+    else if (os_strncmp(tmp_ptr, f_str("OPTIONS "), 8) == 0)
     {
         parsed_req->req_method = HTTP_OPTIONS;
         tmp_ptr += 8;
@@ -658,7 +625,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (parsed_req->req_content == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_HEAP_EXHAUSTED, (parsed_req->content_len + 1));
-            // esplog.error("http_parse_request - not enough heap memory\n");
+            ERROR("http_parse_request heap exhausted %d", (parsed_req->content_len + 1));
             return;
         }
         os_memcpy(parsed_req->req_content, tmp_ptr, parsed_req->content_len);
@@ -672,7 +639,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
     if (end_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_HTTP_TOKEN);
-        // esplog.error("http_parse_request - cannot find HTTP token\n");
+        ERROR("http_parse_request cannot find HTTP token");
         return;
     }
     len = end_ptr - tmp_ptr;
@@ -680,7 +647,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
     if (parsed_req->url == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_HEAP_EXHAUSTED, (len + 1));
-        // esplog.error("http_parse_request - not enough heap memory\n");
+        ERROR("http_parse_request heap exhausted %d", (len + 1));
         return;
     }
     os_memcpy(parsed_req->url, tmp_ptr, len);
@@ -700,7 +667,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_ACC_CTRL_REQ_HEADERS);
-            // esplog.error("http_parse_request - cannot find Access-Control-Request-Headers\n");
+            ERROR("http_parse_request cannot find Access-Control-Request-Headers");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -708,7 +675,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (parsed_req->acrh == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_HEAP_EXHAUSTED, (len + 1));
-            // esplog.error("http_parse_request - not enough heap memory\n");
+            ERROR("http_parse_request heap exhausted %d", (len + 1));
             return;
         }
         os_strncpy(parsed_req->acrh, tmp_ptr, len);
@@ -729,7 +696,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_ORIGIN);
-            // esplog.error("http_parse_request - cannot find origin\n");
+            ERROR("http_parse_request cannot find origin");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -737,7 +704,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (parsed_req->origin == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_HEAP_EXHAUSTED, (len + 1));
-            // esplog.error("http_parse_request - not enough heap memory\n");
+            ERROR("http_parse_request heap exhausted %d", (len + 1));
             return;
         }
         os_strncpy(parsed_req->origin, tmp_ptr, len);
@@ -750,7 +717,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
     if (tmp_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_CONTENT_START);
-        // esplog.error("http_parse_request - cannot find Content start\n");
+        ERROR("http_parse_request cannot find Content start");
         return;
     }
     tmp_ptr += 4;
@@ -759,7 +726,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
     if (parsed_req->req_content == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_HEAP_EXHAUSTED, (parsed_req->content_len + 1));
-        //esplog.error("http_parse_request - not enough heap memory\n");
+        ERROR("http_parse_request heap exhausted %d", (parsed_req->content_len + 1));
         return;
     }
     os_memcpy(parsed_req->req_content, tmp_ptr, parsed_req->content_len);
@@ -774,9 +741,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         tmp_ptr = (char *)os_strstr(tmp_ptr, "content-length: ");
         if (tmp_ptr == NULL)
         {
-#ifdef DEBUG_TRACE
-            esplog.trace("http_parse_request - didn't find any Content-Length\n");
-#endif
+            TRACE("http_parse_request didn't find any Content-Length");
         }
     }
     if (tmp_ptr != NULL)
@@ -786,7 +751,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_CONTENT_LEN);
-            // esplog.error("http_parse_request - cannot find Content-Length value\n");
+            ERROR("http_parse_request cannot find Content-Length value");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -794,7 +759,7 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         if (tmp_str.ref == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_HEAP_EXHAUSTED, (len + 1));
-            // esplog.error("http_parse_request - not enough heap memory\n");
+            ERROR("http_parse_request heap exhausted %d", (len + 1));
             return;
         }
         os_strncpy(tmp_str.ref, tmp_ptr, len);
@@ -831,11 +796,12 @@ static List<Http_pending_req> *pending_requests;
 
 void http_save_pending_request(void *arg, char *precdata, unsigned short length, Http_parsed_req *parsed_req)
 {
+    ALL("http_save_pending_request");
     Http_pending_req *pending_req = new Http_pending_req;
     if (pending_req == NULL)
     {
         esp_diag.error(HTTP_SAVE_PENDING_REQUEST_HEAP_EXHAUSTED, sizeof(Http_pending_req));
-        // esplog.error("http_save_pending_request - not enough heap memory [%d]\n", sizeof(Http_pending_req));
+        ERROR("http_save_pending_request heap exhausted %d", sizeof(Http_pending_req));
         return;
     }
     // total expected message length
@@ -844,7 +810,7 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
     if (pending_req->request == NULL)
     {
         esp_diag.error(HTTP_SAVE_PENDING_REQUEST_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("http_save_pending_request - not enough heap memory [%d]\n", msg_len);
+        ERROR("http_save_pending_request heap exhausted %d", msg_len);
         delete pending_req;
         return;
     }
@@ -856,7 +822,7 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
     if (err != list_ok)
     {
         esp_diag.error(HTTP_SAVE_PENDING_REQUEST_CANNOT_SAVE_REQ);
-        // esplog.error("http_save_pending_request - cannot save pending request\n");
+        ERROR("http_save_pending_request cannot save pending request");
         delete pending_req;
         return;
     }
@@ -864,6 +830,7 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
 
 void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void (*msg_complete)(void *, char *, unsigned short))
 {
+    ALL("http_check_pending_requests");
     // look for a pending request on p_espconn
     Http_pending_req *p_p_req = pending_requests->front();
     while (p_p_req)
@@ -875,7 +842,7 @@ void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void 
     if (p_p_req == NULL)
     {
         esp_diag.error(HTTP_CHECK_PENDING_REQUESTS_CANNOT_FIND_REQ, (uint32)p_espconn);
-        // esplog.error("http_check_pending_requests - cannot find pending request on espconn %X\n", p_espconn);
+        ERROR("http_check_pending_requests cannot find pending req for espconn %X", p_espconn);
         return;
     }
     // add the received message part
@@ -892,6 +859,7 @@ void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void 
 
 void clean_pending_responses(struct espconn *p_espconn)
 {
+    ALL("http_check_pending_requests");
     // look for a pending request on p_espconn
     Http_pending_req *p_p_req = pending_requests->front();
     while (p_p_req)
@@ -899,9 +867,7 @@ void clean_pending_responses(struct espconn *p_espconn)
         if (p_p_req->p_espconn == p_espconn)
         {
             esp_diag.debug(HTTP_DELETED_PENDING_RESPONSE);
-#ifdef DEBUG_TRACE
-            esplog.warn("Removed pending response on espconn %X\n", p_espconn);
-#endif
+            WARN("cleaning pending responses for espconn %X", p_espconn);
             pending_requests->remove();
             // one element removed from list, better restart from front
             p_p_req = pending_requests->front();
@@ -961,11 +927,12 @@ static List<Http_pending_res> *pending_responses;
 
 void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsigned short length, Http_parsed_response *parsed_res)
 {
+    ALL("http_save_pending_response");
     Http_pending_res *pending_res = new Http_pending_res;
     if (pending_res == NULL)
     {
         esp_diag.error(HTTP_SAVE_PENDING_RESPONSE_HEAP_EXHAUSTED, sizeof(Http_pending_res));
-        // esplog.error("http_save_pending_response - not enough heap memory [%d]\n", sizeof(Http_pending_res));
+        ERROR("http_save_pending_response heap exhausted %d", sizeof(Http_pending_res));
         return;
     }
     // total expected message length
@@ -974,7 +941,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
     if (pending_res->response == NULL)
     {
         esp_diag.error(HTTP_SAVE_PENDING_RESPONSE_HEAP_EXHAUSTED, msg_len);
-        // esplog.error("http_save_pending_response - not enough heap memory [%d]\n", msg_len);
+        ERROR("http_save_pending_response heap exhausted %d", msg_len);
         delete pending_res;
         return;
     }
@@ -986,7 +953,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
     if (err != list_ok)
     {
         esp_diag.error(HTTP_SAVE_PENDING_RESPONSE_CANNOT_SAVE_RES);
-        // esplog.error("http_save_pending_response - cannot save pending response\n");
+        ERROR("http_save_pending_response cannot save pending res");
         delete pending_res;
         return;
     }
@@ -994,6 +961,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
 
 void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int length, void (*msg_complete)(void *, char *, unsigned short))
 {
+    ALL("http_check_pending_responses");
     // look for a pending request on p_espconn
     Http_pending_res *p_p_res = pending_responses->front();
     while (p_p_res)
@@ -1005,7 +973,7 @@ void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int 
     if (p_p_res == NULL)
     {
         esp_diag.error(HTTP_CHECK_PENDING_RESPONSE_CANNOT_FIND_RES, (uint32)p_espconn);
-        // esplog.error("http_check_pending_responses - cannot find pending response on espconn %X\n", p_espconn);
+        ERROR("http_check_pending_responses cannot find pending response for espconn %X", p_espconn);
         return;
     }
     // add the received message part
@@ -1022,7 +990,8 @@ void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int 
 
 void http_init(void)
 {
-    http_msg_max_size = 1024;
+    // http_msg_max_size = 1024;
+    http_msg_max_size = 1460;
 
     pending_send = new Queue<struct http_send>(8);
     pending_split_send = new Queue<struct http_split_send>(8);
@@ -1032,6 +1001,7 @@ void http_init(void)
 
 void http_queues_clear(void)
 {
+    ALL("http_queues_clear");
     struct http_send *p_send = pending_send->front();
     while (p_send)
     {
@@ -1073,6 +1043,7 @@ Http_parsed_response::~Http_parsed_response()
 
 void http_parse_response(char *response, int length, Http_parsed_response *parsed_response)
 {
+    ALL("http_parse_response");
     char *tmp_ptr = response;
     char *end_ptr = NULL;
     char *tmp_str = NULL;
@@ -1082,7 +1053,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     if (tmp_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_PARSE_EMPTY_MSG);
-        // esplog.error("http_parse_response - cannot parse empty message\n");
+        ERROR("http_parse_response empty message");
         return;
     }
 
@@ -1110,7 +1081,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (parsed_response->body == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (parsed_response->content_len + 1));
-            // esplog.error("http_parse_response - not enough heap memory\n");
+            ERROR("http_parse_response heap exhausted %d", (parsed_response->content_len + 1));
             return;
         }
         os_memcpy(parsed_response->body, tmp_ptr, parsed_response->content_len);
@@ -1121,7 +1092,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     if (end_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_HTTP_TOKEN);
-        // esplog.error("http_parse_response - cannot find HTTP code\n");
+        ERROR("http_parse_response - cannot find HTTP token");
         return;
     }
     len = end_ptr - tmp_ptr;
@@ -1130,7 +1101,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (tmp_str.ref == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (len + 1));
-            // esplog.error("http_parse_response - not enough heap memory\n");
+            ERROR("http_parse_response heap exhausted %d", (len + 1));
             return;
         }
         os_strncpy(tmp_str.ref, tmp_ptr, len);
@@ -1142,9 +1113,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Length: ");
     if (tmp_ptr == NULL)
     {
-#ifdef DEBUG_TRACE
-        esplog.trace("http_parse_response - didn't find any Content-Length\n");
-#endif
+        TRACE("http_parse_response didn't find any Content-Length");
     }
     else
     {
@@ -1153,7 +1122,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_CONTENT_LEN);
-            // esplog.error("http_parse_response - cannot find Content-Length value\n");
+            ERROR("http_parse_response cannot find Content-Length value");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -1161,7 +1130,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (tmp_str.ref == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (len + 1));
-            // esplog.error("http_parse_response - not enough heap memory\n");
+            ERROR("http_parse_response heap exhausted %d", (len + 1));
             return;
         }
         os_strncpy(tmp_str.ref, tmp_ptr, len);
@@ -1172,9 +1141,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Range: ");
     if (tmp_ptr == NULL)
     {
-#ifdef DEBUG_TRACE
-        esplog.trace("http_parse_response - didn't find any Content-Range\n");
-#endif
+        TRACE("http_parse_response didn't find any Content-Range");
     }
     else
     {
@@ -1182,7 +1149,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (tmp_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_CONTENT_RANGE);
-            // esplog.error("http_parse_response - cannot find Content-Range value\n");
+            ERROR("http_parse_response cannot find Content-Range value");
             return;
         }
         // range start
@@ -1191,7 +1158,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_RANGE_START);
-            // esplog.error("http_parse_response - cannot find range start\n");
+            ERROR("http_parse_response cannot find range start");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -1200,7 +1167,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
             if (tmp_str.ref == NULL)
             {
                 esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (len + 1));
-                // esplog.error("http_parse_response - not enough heap memory\n");
+                ERROR("http_parse_response heap exhausted %d", (len + 1));
                 return;
             }
             os_strncpy(tmp_str.ref, tmp_ptr, len);
@@ -1212,7 +1179,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_RANGE_END);
-            // esplog.error("http_parse_response - cannot find range end\n");
+            ERROR("http_parse_response cannot find range end");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -1221,7 +1188,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
             if (tmp_str.ref == NULL)
             {
                 esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (len + 1));
-                // esplog.error("http_parse_response - not enough heap memory\n");
+                ERROR("http_parse_response heap exhausted %d", (len + 1));
                 return;
             }
             os_strncpy(tmp_str.ref, tmp_ptr, len);
@@ -1233,7 +1200,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_RANGE_SIZE);
-            // esplog.error("http_parse_response - cannot find Content-Range size\n");
+            ERROR("http_parse_response cannot find Content-Range size");
             return;
         }
         len = end_ptr - tmp_ptr;
@@ -1242,7 +1209,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
             if (tmp_str.ref == NULL)
             {
                 esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (len + 1));
-                // esplog.error("http_parse_response - not enough heap memory\n");
+                ERROR("http_parse_response heap exhausted %d", (len + 1));
                 return;
             }
             os_strncpy(tmp_str.ref, tmp_ptr, len);
@@ -1255,7 +1222,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     if (tmp_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_CONTENT_START);
-        // esplog.error("http_parse_response - cannot find Content start\n");
+        ERROR("http_parse_response cannot find Content start");
         return;
     }
     tmp_ptr += 4;
@@ -1265,7 +1232,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     if (parsed_response->body == NULL)
     {
         esp_diag.error(HTTP_PARSE_RESPONSE_HEAP_EXHAUSTED, (len + 1));
-        // esplog.error("http_parse_response - not enough heap memory\n");
+        ERROR("http_parse_response heap exhausted %d", (len + 1));
         return;
     }
     os_memcpy(parsed_response->body, tmp_ptr, len);

@@ -14,12 +14,15 @@ extern "C"
 #include "c_types.h"
 }
 
+#include "espbot_mem_sections.h"
+
 #define EVNT_FATAL 0x01
 #define EVNT_ERROR 0x02
 #define EVNT_WARN 0x04
 #define EVNT_INFO 0x08
 #define EVNT_DEBUG 0x10
 #define EVNT_TRACE 0x20
+#define EVNT_ALL 0x40
 
 #define EVNT_QUEUE_SIZE 40 // 40 * sizeof(strut dia_event) => 480 bytes
 
@@ -40,19 +43,21 @@ private:
   struct dia_event _evnt_queue[EVNT_QUEUE_SIZE];
   int _event_count;
   char _last_event;
-  char _diag_led_mask;  // bitmask 00?? ????
-                        //           || ||||_ 1 -> show FATAL events on led
-                        //           || |||__ 1 -> show ERROR events on led
-                        //           || ||___ 1 -> show WARNING events on led
-                        //           || |____ 1 -> show INFO events on led
-                        //           ||______ 1 -> show DEBUG events on led
-                        //           |_______ 1 -> show TRACE events on led
-                        // setting _diag_led_mask will avoid any led control
+  char _diag_led_mask; // bitmask 00?? ????
+                       //           || ||||_ 1 -> show FATAL events on led
+                       //           || |||__ 1 -> show ERROR events on led
+                       //           || ||___ 1 -> show WARNING events on led
+                       //           || |____ 1 -> show INFO events on led
+                       //           ||______ 1 -> show DEBUG events on led
+                       //           |_______ 1 -> show TRACE events on led
+                       // setting _diag_led_mask will avoid any led control
   void add_event(char type, int code, uint32 value);
 
 public:
   Espbot_diag(){};
   ~Espbot_diag(){};
+
+  char _serial_log;
 
   void init(void);
 
@@ -72,5 +77,145 @@ public:
   char get_led_mask(void);                  //
   void set_led_mask(char);                  //
 };
+
+#define FATAL(fmt, ...)                                             \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_FATAL)                          \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[F] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
+
+#define ERROR(fmt, ...)                                             \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_ERROR)                          \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[E] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
+
+#define WARN(fmt, ...)                                              \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_WARN)                           \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[W] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
+
+#define INFO(fmt, ...)                                              \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_INFO)                           \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[I] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
+
+#define DEBUG(fmt, ...)                                             \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_DEBUG)                          \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[D] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
+
+#define TRACE(fmt, ...)                                             \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_TRACE)                          \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[T] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
+
+#define ALL(fmt, ...)                                               \
+  do                                                                \
+  {                                                                 \
+    if (esp_diag._serial_log & EVNT_ALL)                            \
+    {                                                               \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "[A] "; \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = fmt;    \
+        os_printf_plus(flash_str, ##__VA_ARGS__);                   \
+      }                                                             \
+      {                                                             \
+        static const char flash_str[] IROM_TEXT ALIGNED_4 = "\n";   \
+        os_printf_plus(flash_str);                                  \
+      }                                                             \
+    }                                                               \
+  } while (0)
 
 #endif

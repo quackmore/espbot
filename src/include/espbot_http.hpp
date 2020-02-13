@@ -144,7 +144,7 @@ void http_check_pending_send(void);
 // quick format an http response and send it
 //    free_msg must be false when passing a "string" allocated into text or data segment
 //    free_msg must be true when passing an heap allocated string
-void http_response(struct espconn *p_espconn, int code, char *content_type, char *msg, bool free_msg);
+void http_response(struct espconn *p_espconn, int code, char *content_type, const char *msg, bool free_msg);
 
 // format header string
 char *http_format_header(class Http_header *);

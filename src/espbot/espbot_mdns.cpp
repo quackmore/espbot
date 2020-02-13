@@ -35,7 +35,7 @@ void Mdns::start(char *app_alias)
         m_info.txt_data[0] = app_alias;
         espconn_mdns_init(&m_info);
         esp_diag.info(MDNS_START);
-        // esplog.debug("mDns started\n");
+        INFO("mDns started");
     }
 }
 
@@ -43,5 +43,5 @@ void Mdns::stop(void)
 {
     espconn_mdns_close();
     esp_diag.info(MDNS_STOP);
-    // esplog.debug("mDns ended\n");
+    INFO("mDns ended");
 }

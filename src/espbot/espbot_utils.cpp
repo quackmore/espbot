@@ -91,7 +91,7 @@ void atoipaddr(struct ip_addr *ip, char *str)
         if (end_ptr == NULL)
         {
             esp_diag.error(UTILS_CANNOT_PARSE_IP);
-            // esplog.trace("str_to_ipaddr - cannot parse IP\n");
+            TRACE("atoipaddr cannot parse IP");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;
         }
@@ -99,7 +99,7 @@ void atoipaddr(struct ip_addr *ip, char *str)
         if(len > 3)
         {
             esp_diag.error(UTILS_CANNOT_PARSE_IP);
-            // esplog.trace("str_to_ipaddr - cannot parse IP\n");
+            TRACE("atoipaddr cannot parse IP");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;
         }
@@ -128,7 +128,7 @@ char *f2str(char *str, float value, int decimals)
     int pow = 1;
     for (idx = 0; idx < decimals; idx++)
         pow = pow * 10;
-    os_sprintf(str, "%d.%d", (int32)value, (int32)(value_dec * pow));
+    fs_sprintf(str, "%d.%d", (int32)value, (int32)(value_dec * pow));
     return str;
 }
 

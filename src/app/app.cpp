@@ -17,6 +17,7 @@ extern "C"
 
 #include "app.hpp"
 #include "espbot_global.hpp"
+#include "espbot_utils.hpp"
 #include "library_dht.hpp"
 
 /*
@@ -71,7 +72,7 @@ void app_init_after_wifi(void)
     }
     // test if sntp get_timestamp works fine
     uint32 timestamp = esp_sntp.get_timestamp();
-    os_printf("=======> current timestamp %s\n", esp_sntp.get_timestr(timestamp));
+    fs_printf("=======> current timestamp %s\n", esp_sntp.get_timestr(timestamp));
 }
 
 uint32 get_last_reboot_date(void)
