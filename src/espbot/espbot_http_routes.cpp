@@ -519,6 +519,107 @@ static void get_api_debug_meminfo(struct espconn *ptr_espconn, Http_parsed_req *
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
+static void post_api_diag_ack_events(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_diag_ack_events");
+    esp_diag.ack_events();
+    http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_TEXT, f_str("Events acknoledged"), false);
+}
+
+static void get_api_diag_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_diag_cfg");
+    // "{"diag_led_mask": 256,"serial_log_mask": 256}" 46 chars
+    int msg_len = 46;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"diag_led_mask\": %d,\"serial_log_mask\": %d}",
+                   esp_diag.get_led_mask(),
+                   esp_diag.get_serial_log_mask());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_GET_API_DIAG_CFG_HEAP_EXHAUSTED, msg_len);
+        ERROR("get_api_diag_cfg heap exhausted %d", msg_len);
+    }
+}
+
+static void post_api_diag_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_diag_cfg");
+    Json_str diag_cfg(parsed_req->req_content, parsed_req->content_len);
+    if (diag_cfg.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    if (diag_cfg.find_pair(f_str("diag_led_mask")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'diag_led_mask'"), false);
+        return;
+    }
+    if (diag_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'diag_led_mask' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_diag_led_mask(diag_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_diag_led_mask.ref)
+    {
+        os_strncpy(tmp_diag_led_mask.ref, diag_cfg.get_cur_pair_value(), diag_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_DIAG_CFG_HEAP_EXHAUSTED, diag_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_diag_cfg heap exhausted %d", diag_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (diag_cfg.find_pair(f_str("serial_log_mask")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'serial_log_mask'"), false);
+        return;
+    }
+    if (diag_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'serial_log_mask' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_serial_log_mask(diag_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_serial_log_mask.ref)
+    {
+        os_strncpy(tmp_serial_log_mask.ref, diag_cfg.get_cur_pair_value(), diag_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_DIAG_CFG_HEAP_EXHAUSTED, diag_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_diag_cfg heap exhausted %d", diag_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    esp_diag.set_led_mask(atoi(tmp_diag_led_mask.ref));
+    esp_diag.set_serial_log_mask(atoi(tmp_serial_log_mask.ref));
+    esp_diag.save_cfg();
+
+    int msg_len = 46;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"diag_led_mask\": %d,\"serial_log_mask\": %d}",
+                   esp_diag.get_led_mask(),
+                   esp_diag.get_serial_log_mask());
+        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_DIAG_CFG_HEAP_EXHAUSTED, msg_len);
+        ERROR("post_api_diag_cfg heap exhausted %d", msg_len);
+    }
+    espmem.stack_mon();
+}
+
 static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("get_api_diag_events");
@@ -579,13 +680,6 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
     str_ptr = msg.ref + os_strlen(msg.ref);
     fs_sprintf(str_ptr, "]}");
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-}
-
-static void post_api_diag_ack_events(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-{
-    ALL("post_api_diag_ack_events");
-    esp_diag.ack_events();
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, f_str("Events acknoledged"), false);
 }
 
 static void get_api_espbot_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1546,14 +1640,24 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
         get_api_debug_meminfo(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/events"))) && (parsed_req->req_method == HTTP_GET))
-    {
-        get_api_diag_events(ptr_espconn, parsed_req);
-        return;
-    }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/ack_events"))) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_diag_ack_events(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/cfg"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_diag_cfg(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/cfg"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_diag_cfg(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/diag/events"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_diag_events(ptr_espconn, parsed_req);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/espbot/cfg"))) && (parsed_req->req_method == HTTP_GET))

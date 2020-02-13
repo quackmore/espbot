@@ -16,6 +16,9 @@ extern "C"
 
 #include "espbot_mem_sections.h"
 
+#define DIAG_LED_DISABLED 0x00
+
+#define EVNT_NONE 0x00
 #define EVNT_FATAL 0x01
 #define EVNT_ERROR 0x02
 #define EVNT_WARN 0x04
@@ -53,11 +56,17 @@ private:
                        // setting _diag_led_mask will avoid any led control
   void add_event(char type, int code, uint32 value);
 
+  int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
+  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+                                  // return CFG_REQUIRES_UPDATE when cfg require update
+                                  // return CFG_ERROR otherwise
+
 public:
   Espbot_diag(){};
   ~Espbot_diag(){};
 
-  char _serial_log;
+  // easy access
+  char _serial_log_mask;
 
   void init(void);
 
@@ -76,12 +85,15 @@ public:
   void ack_events(void);                    // acknoledge all the saved events
   char get_led_mask(void);                  //
   void set_led_mask(char);                  //
+  char get_serial_log_mask(void);
+  void set_serial_log_mask(char);
+  int save_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
 };
 
 #define FATAL(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_FATAL)                          \
+    if (esp_diag._serial_log_mask & EVNT_FATAL)                     \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[F] "; \
@@ -101,7 +113,7 @@ public:
 #define ERROR(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_ERROR)                          \
+    if (esp_diag._serial_log_mask & EVNT_ERROR)                     \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[E] "; \
@@ -121,7 +133,7 @@ public:
 #define WARN(fmt, ...)                                              \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_WARN)                           \
+    if (esp_diag._serial_log_mask & EVNT_WARN)                      \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[W] "; \
@@ -141,7 +153,7 @@ public:
 #define INFO(fmt, ...)                                              \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_INFO)                           \
+    if (esp_diag._serial_log_mask & EVNT_INFO)                      \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[I] "; \
@@ -161,7 +173,7 @@ public:
 #define DEBUG(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_DEBUG)                          \
+    if (esp_diag._serial_log_mask & EVNT_DEBUG)                     \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[D] "; \
@@ -181,7 +193,7 @@ public:
 #define TRACE(fmt, ...)                                             \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_TRACE)                          \
+    if (esp_diag._serial_log_mask & EVNT_TRACE)                     \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[T] "; \
@@ -201,7 +213,7 @@ public:
 #define ALL(fmt, ...)                                               \
   do                                                                \
   {                                                                 \
-    if (esp_diag._serial_log & EVNT_ALL)                            \
+    if (esp_diag._serial_log_mask & EVNT_ALL)                       \
     {                                                               \
       {                                                             \
         static const char flash_str[] IROM_TEXT ALIGNED_4 = "[A] "; \
