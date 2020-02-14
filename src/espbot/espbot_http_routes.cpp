@@ -128,7 +128,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
         // the remaining file size is bigger than response_max_size
         // will split the remaining file over multiple messages
         int buffer_size = get_http_msg_max_size();
-        Heap_chunk buffer(buffer_size + 1, dont_free);
+        Heap_chunk buffer(buffer_size, dont_free);
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size);
@@ -163,13 +163,13 @@ static void send_remaining_file(struct http_split_send *p_sr)
         }
 
         TRACE("send_remaining_file: *p_espconn: %X, msg (splitted) len: %d",
-              p_sr->p_espconn, os_strlen(buffer.ref));
-        http_send_buffer(p_sr->p_espconn, buffer.ref);
+              p_sr->p_espconn, buffer_size);
+        http_send_buffer(p_sr->p_espconn, buffer.ref, buffer_size);
     }
     else
     {
         // this is the last piece of the message
-        Heap_chunk buffer(remaining_size + 1, dont_free);
+        Heap_chunk buffer(remaining_size, dont_free);
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, remaining_size);
@@ -180,8 +180,8 @@ static void send_remaining_file(struct http_split_send *p_sr)
         }
         sel_file.n_read(buffer.ref, p_sr->content_transferred, remaining_size);
         TRACE("send_remaining_file: *p_espconn: %X, msg (splitted) len: %d",
-              p_sr->p_espconn, os_strlen(buffer.ref));
-        http_send_buffer(p_sr->p_espconn, buffer.ref);
+              p_sr->p_espconn, remaining_size);
+        http_send_buffer(p_sr->p_espconn, buffer.ref, remaining_size);
         delete[] p_sr->content;
     }
 }
@@ -221,7 +221,7 @@ void return_file(struct espconn *p_espconn, char *filename)
         return;
     }
     // ok send the header
-    http_send_buffer(p_espconn, header_str);
+    http_send_buffer(p_espconn, header_str, os_strlen(header_str));
     // and now the file
     if (file_size == 0)
         // the file in empty => nothing to do
@@ -230,8 +230,9 @@ void return_file(struct espconn *p_espconn, char *filename)
     if (file_size > get_http_msg_max_size())
     {
         // will split the file over multiple messages
+        // each the size of http_msg_max_size
         int buffer_size = get_http_msg_max_size();
-        Heap_chunk buffer(buffer_size + 1, dont_free);
+        Heap_chunk buffer(buffer_size, dont_free);
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, buffer_size);
@@ -273,14 +274,14 @@ void return_file(struct espconn *p_espconn, char *filename)
             ERROR("return_file full pending response queue");
         }
         // send the file piece
-        TRACE("return_file *p_espconn: %X, msg (splitted) len: %d", p_espconn, os_strlen(buffer.ref));
-        http_send_buffer(p_espconn, buffer.ref);
+        TRACE("return_file *p_espconn: %X, msg (splitted) len: %d", p_espconn, buffer_size);
+        http_send_buffer(p_espconn, buffer.ref, buffer_size);
         espmem.stack_mon();
     }
     else
     {
         // no need to split the file over multiple messages
-        Heap_chunk buffer(file_size + 1, dont_free);
+        Heap_chunk buffer(file_size, dont_free);
         if (buffer.ref == NULL)
         {
             esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, file_size);
@@ -290,7 +291,7 @@ void return_file(struct espconn *p_espconn, char *filename)
         }
         sel_file.n_read(buffer.ref, file_size);
         TRACE("return_file *p_espconn: %X, msg (full) len: %d", p_espconn, file_size);
-        http_send_buffer(p_espconn, buffer.ref);
+        http_send_buffer(p_espconn, buffer.ref, file_size);
     }
 }
 
@@ -328,7 +329,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
         return;
     }
     // ok send the header
-    http_send_buffer(p_espconn, header_str);
+    http_send_buffer(p_espconn, header_str, os_strlen(header_str));
 }
 
 static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)

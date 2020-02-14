@@ -61,6 +61,7 @@ public:
   os_timer_t m_send_req_timeout_timer;
 
   char *request;
+  int req_len;
   Http_parsed_response *parsed_response;
 
   // connect will temporary change webclient status to WEBCLNT_CONNECTING
@@ -83,7 +84,7 @@ public:
   // WEBCLNT_CONNECTED
   // WEBCLNT_CONNECT_TIMEOUT
   // WEBCLNT_DISCONNECTED (??) not sure so just in case
-  void send_req(char *msg, void (*completed_func)(void *), void *param);
+  void send_req(char *msg, int msg_len, void (*completed_func)(void *), void *param);
 
   Webclnt_status_type get_status(void);
 

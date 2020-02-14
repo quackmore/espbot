@@ -128,7 +128,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
     Webclnt *client = get_client(ptr_espconn);
     if (client == NULL)
     {
-        esp_diag.error(WEB_CLIENT_RECV_CANNOT_FIND_ESPCONN, (uint32)ptr_espconn);
+        esp_diag.error(WEB_CLIENT_RECV_CANNOT_FIND_ESPCONN, (uint32) ptr_espconn);
         ERROR("webclient_recv - cannot get client ref for espconn %X", ptr_espconn);
         return;
     }
@@ -142,10 +142,8 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
     // for (ii = 0; ii < length; ii++)
     //     os_printf("%X ", precdata[ii]);
     // os_printf("\n");
-
     Http_parsed_response *parsed_response = new Http_parsed_response;
     http_parse_response(precdata, length, parsed_response);
-
     TRACE("webclient_recv parsed res\n"
           "            espconn %X\n"
           "          http code %d\n"
@@ -163,7 +161,6 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
           parsed_response->h_content_len, 
           parsed_response->content_len, 
           parsed_response->body);
-
     if (!parsed_response->no_header_message && (parsed_response->h_content_len > parsed_response->content_len))
     {
         os_timer_arm(&client->m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
@@ -335,27 +332,28 @@ void Webclnt::disconnect(void (*completed_func)(void *), void *param)
     espconn_disconnect(&m_esp_conn);
 }
 
-void Webclnt::send_req(char *t_msg, void (*completed_func)(void *), void *param)
+void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *), void *param)
 {
     ALL("Webclnt::send_req");
     espmem.stack_mon();
     m_completed_func = completed_func;
     m_param = param;
-    this->request = new char[os_strlen(t_msg) + 1];
+    this->request = new char[msg_len + 1];
     if (this->request == NULL)
     {
-        esp_diag.error(WEB_CLIENT_SEND_REQ_HEAP_EXHAUSTED, (os_strlen(t_msg) + 1));
-        ERROR("Webclnt::send_req heap exhausted %d", (os_strlen(t_msg) + 1));
+        esp_diag.error(WEB_CLIENT_SEND_REQ_HEAP_EXHAUSTED, (msg_len + 1));
+        ERROR("Webclnt::send_req heap exhausted %d", (msg_len + 1));
         return;
     }
-    os_memcpy(this->request, t_msg, os_strlen(t_msg) + 1);
+    req_len = msg_len;
+    os_memcpy(this->request, t_msg, req_len);
 
     switch (m_status)
     {
     case WEBCLNT_CONNECTED:
     case WEBCLNT_RESPONSE_READY:
         DEBUG("Webclnt::send_req msg %s\n", this->request);
-        http_send(&m_esp_conn, this->request);
+        http_send(&m_esp_conn, this->request, this->req_len);
         m_status = WEBCLNT_WAITING_RESPONSE;
         os_timer_disarm(&m_send_req_timeout_timer);
         os_timer_setfn(&m_send_req_timeout_timer, (os_timer_func_t *)webclnt_send_req_timeout_function, (void *)this);

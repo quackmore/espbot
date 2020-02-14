@@ -167,8 +167,8 @@ void http_check_pending_send(void)
     if (p_pending_send)
     {
         TRACE("http_check_pending_send pending send on *p_espconn: %X, len %d",
-              p_pending_send->p_espconn, p_pending_send->msg);
-        http_send_buffer(p_pending_send->p_espconn, p_pending_send->msg);
+              p_pending_send->p_espconn, p_pending_send->msg_len);
+        http_send_buffer(p_pending_send->p_espconn, p_pending_send->msg, p_pending_send->msg_len);
         // the send procedure will clear the buffer so just delete the http_send
         // TRACE("http_check_pending_send: deleting p_pending_send\n");
         delete p_pending_send;
@@ -217,7 +217,7 @@ void http_sentcb(void *arg)
 //
 // won't check the length of the sent message
 //
-void http_send_buffer(struct espconn *p_espconn, char *msg)
+void http_send_buffer(struct espconn *p_espconn, char *msg, int len)
 {
     // Profiler ret_file("http_send_buffer");
     ETS_INTR_LOCK();
@@ -231,6 +231,7 @@ void http_send_buffer(struct espconn *p_espconn, char *msg)
         {
             response_data->p_espconn = p_espconn;
             response_data->msg = msg;
+            response_data->msg_len = len;
             Queue_err result = pending_send->push(response_data);
             if (result == Queue_full)
             {
@@ -255,7 +256,7 @@ void http_send_buffer(struct espconn *p_espconn, char *msg)
         os_timer_arm(&clear_busy_sending_data_timer, 1000, 0);
 
         send_buffer = msg;
-        sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, os_strlen(send_buffer));
+        sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, len);
         espmem.stack_mon();
         if (res != 0)
         {
@@ -317,13 +318,13 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, cons
     // send separately the header from the content
     // to avoid allocating twice the memory for the message
     // especially very large ones
-    http_send_buffer(p_espconn, msg_header.ref);
+    http_send_buffer(p_espconn, msg_header.ref, os_strlen(msg_header.ref));
     // when there is no message that's all
     if (os_strlen(msg) == 0)
         return;
     if (free_msg)
     {
-        http_send(p_espconn, (char *)msg);
+        http_send(p_espconn, (char *)msg, os_strlen(msg));
     }
     else
     {
@@ -333,7 +334,7 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, cons
         if (msg_header.ref)
         {
             os_strcpy(msg_short.ref, msg);
-            http_send(p_espconn, msg_short.ref);
+            http_send(p_espconn, msg_short.ref, os_strlen(msg));
         }
         else
         {
@@ -375,8 +376,8 @@ static void send_remaining_msg(struct http_split_send *p_sr)
                 }
                 TRACE("send_remaining_msg *p_espconn %X, msg (splitted) len %d",
                       p_sr->p_espconn,
-                      os_strlen(buffer.ref));
-                http_send_buffer(p_sr->p_espconn, buffer.ref);
+                      buffer_size);
+                http_send_buffer(p_sr->p_espconn, buffer.ref, buffer_size);
             }
             else
             {
@@ -388,28 +389,28 @@ static void send_remaining_msg(struct http_split_send *p_sr)
         }
         else
         {
-            esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size);
-            ERROR("send_remaining_msg heap exhausted %d", buffer_size);
+            esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size + 1);
+            ERROR("send_remaining_msg heap exhausted %d", buffer_size + 1);
             delete[] p_sr->content;
         }
     }
     else
     {
         // this is the last piece of the message
-        int buffer_size = http_msg_max_size;
-        Heap_chunk buffer(buffer_size + 1, dont_free);
+        int buffer_size = p_sr->content_size - p_sr->content_transferred;
+        Heap_chunk buffer((buffer_size + 1), dont_free);
         if (buffer.ref)
         {
             os_strncpy(buffer.ref, p_sr->content + p_sr->content_transferred, buffer_size);
             TRACE("send_remaining_msg *p_espconn %X, msg (last piece) len: %d",
                   p_sr->p_espconn,
-                  os_strlen(buffer.ref));
-            http_send_buffer(p_sr->p_espconn, buffer.ref);
+                  buffer_size);
+            http_send_buffer(p_sr->p_espconn, buffer.ref, buffer_size);
         }
         else
         {
-            esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size);
-            ERROR("send_remaining_msg heap exhausted %d", buffer_size);
+            esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, (buffer_size + 1));
+            ERROR("send_remaining_msg heap exhausted %d", (buffer_size + 1));
         }
         // TRACE("send_remaining_msg deleting p_sr->content\n");
         delete[] p_sr->content;
@@ -419,16 +420,16 @@ static void send_remaining_msg(struct http_split_send *p_sr)
 //
 // will split the message when the length is greater than http response_max_size
 //
-void http_send(struct espconn *p_espconn, char *msg)
+void http_send(struct espconn *p_espconn, char *msg, int msg_len)
 {
     ALL("http_send");
     // Profiler ret_file("http_send");
-    if (os_strlen(msg) > http_msg_max_size)
+    if (msg_len > http_msg_max_size)
     {
         // the message is bigger than response_max_size
         // will split the message
         int buffer_size = http_msg_max_size;
-        Heap_chunk buffer(buffer_size + 1, dont_free);
+        Heap_chunk buffer((buffer_size + 1), dont_free);
         if (buffer.ref)
         {
             struct http_split_send *p_pending_response = new struct http_split_send;
@@ -438,7 +439,7 @@ void http_send(struct espconn *p_espconn, char *msg)
                 // setup the remaining message
                 p_pending_response->p_espconn = p_espconn;
                 p_pending_response->content = msg;
-                p_pending_response->content_size = os_strlen(msg);
+                p_pending_response->content_size = msg_len;
                 p_pending_response->content_transferred = buffer_size;
                 p_pending_response->action_function = send_remaining_msg;
                 Queue_err result = pending_split_send->push(p_pending_response);
@@ -447,8 +448,8 @@ void http_send(struct espconn *p_espconn, char *msg)
                     esp_diag.error(HTTP_SEND_RES_QUEUE_FULL);
                     ERROR("http_send full pending response queue");
                 }
-                TRACE("http_send *p_espconn: %X, msg (splitted) len: %d", p_espconn, os_strlen(buffer.ref));
-                http_send_buffer(p_espconn, buffer.ref);
+                TRACE("http_send *p_espconn: %X, msg (splitted) len: %d", p_espconn, buffer_size);
+                http_send_buffer(p_espconn, buffer.ref, buffer_size);
             }
             else
             {
@@ -460,16 +461,16 @@ void http_send(struct espconn *p_espconn, char *msg)
         }
         else
         {
-            esp_diag.error(HTTP_SEND_HEAP_EXHAUSTED, buffer_size);
-            ERROR("http_send heap exhausted %d", buffer_size);
+            esp_diag.error(HTTP_SEND_HEAP_EXHAUSTED, (buffer_size + 1));
+            ERROR("http_send heap exhausted %d", (buffer_size + 1));
             delete[] msg;
         }
     }
     else
     {
         // no need to split the message, just send it
-        TRACE("http_send *p_espconn: %X, msg (full) len: %d", p_espconn, os_strlen(msg));
-        http_send_buffer(p_espconn, msg);
+        TRACE("http_send *p_espconn: %X, msg (full) len: %d", p_espconn, msg_len);
+        http_send_buffer(p_espconn, msg, msg_len);
     }
 }
 
@@ -568,7 +569,7 @@ Http_parsed_req::~Http_parsed_req()
         delete[] req_content;
 }
 
-void http_parse_request(char *req, Http_parsed_req *parsed_req)
+void http_parse_request(char *req, unsigned short length, Http_parsed_req *parsed_req)
 {
     ALL("http_parse_request");
     char *tmp_ptr = req;
@@ -582,7 +583,6 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         ERROR("http_parse_request - empty message");
         return;
     }
-
     if (os_strncmp(tmp_ptr, f_str("GET "), 4) == 0)
     {
         parsed_req->req_method = HTTP_GET;
@@ -620,7 +620,8 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
 
     if (parsed_req->no_header_message)
     {
-        parsed_req->content_len = os_strlen(tmp_ptr);
+        // parsed_req->content_len = os_strlen(tmp_ptr);
+        parsed_req->content_len = length;
         parsed_req->req_content = new char[parsed_req->content_len + 1];
         if (parsed_req->req_content == NULL)
         {
@@ -721,7 +722,8 @@ void http_parse_request(char *req, Http_parsed_req *parsed_req)
         return;
     }
     tmp_ptr += 4;
-    parsed_req->content_len = os_strlen(tmp_ptr);
+    // parsed_req->content_len = os_strlen(tmp_ptr);
+    parsed_req->content_len = length - (tmp_ptr - req);
     parsed_req->req_content = new char[parsed_req->content_len + 1];
     if (parsed_req->req_content == NULL)
     {

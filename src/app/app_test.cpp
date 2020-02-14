@@ -111,7 +111,7 @@ void get_version(void *param)
     {
     case WEBCLNT_CONNECTED:
         fs_printf("Sending request [%s]\n", client_request);
-        espclient->send_req(client_request, check_version, NULL);
+        espclient->send_req(client_request, os_strlen(client_request), check_version, NULL);
         delete[] client_request;
         break;
     default:
@@ -632,7 +632,6 @@ void run_test(int idx)
         exe_do_seq_us(seq);
     }
     break;
-    */
     case 14:
     {
         // Error diagnostic log

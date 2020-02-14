@@ -32,15 +32,10 @@ extern "C"
 static void webserver_recv(void *arg, char *precdata, unsigned short length)
 {
     struct espconn *ptr_espconn = (struct espconn *)arg;
-    espmem.stack_mon();
     Http_parsed_req parsed_req;
-
     DEBUG("webserver_recv len %u, msg %s", length, precdata);
-
-    http_parse_request(precdata, &parsed_req);
-
+    http_parse_request(precdata, length, &parsed_req);
     system_soft_wdt_feed();
-
     TRACE("webserver_recv parsed req\n"
           "no_header_message: %d\n"
           "           method: %d\n"
@@ -52,7 +47,6 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
           parsed_req.url,
           parsed_req.content_len,
           parsed_req.req_content);
-
     if (!parsed_req.no_header_message && (parsed_req.h_content_len > parsed_req.content_len))
     {
         TRACE("webserver_recv message has been splitted waiting for completion ...");
@@ -72,6 +66,7 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
         return;
     }
     espbot_http_routes(ptr_espconn, &parsed_req);
+    espmem.stack_mon();
 }
 
 static void webserver_recon(void *arg, sint8 err)
