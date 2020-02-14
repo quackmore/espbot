@@ -132,6 +132,10 @@ void test_webclient(void)
     espclient->connect(host_ip, host_port, get_version, NULL);
 }
 
+void test_exe_task_fun(void)
+{
+    fs_printf("now executing a function called by a task\n");
+}
 /*
 static void output_seq_completed(void *param)
 {
@@ -218,7 +222,7 @@ void run_test(int idx)
     static int event_counter = 0;
     switch (idx)
     {
-    /*
+        /*
     case 1:
     {
         PIN_FUNC_SELECT(ESPBOT_D4_MUX, ESPBOT_D4_FUNC);
@@ -851,6 +855,16 @@ void run_test(int idx)
         // os_printf("%s\n", str);
     }
     break;
+*/
+
+    case 40:
+    {
+        fs_printf("testing function execution from task\n");
+        subsequent_function(test_exe_task_fun);
+        fs_printf("completing testing function\n");
+    }
+    break;
+        /*
     case 101:
     {
         // check json numbers

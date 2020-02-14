@@ -71,6 +71,14 @@ static void espbot_coordinator_task(os_event_t *e)
         // getting here from webserver after send callback completed
         http_check_pending_send();
         break;
+    case SIG_NEXT_FUNCTION:
+        // execute a function
+        {
+            void (*command)(void) = (void (*)(void))e->par;
+            if (command)
+                command();
+        }
+        break;
     default:
         break;
     }
@@ -218,7 +226,7 @@ int Espbot::save_cfg(void)
         return CFG_OK;
     if (espfs.is_available())
     {
-        Ffile cfgfile(&espfs, (char *) f_str("espbot.cfg"));
+        Ffile cfgfile(&espfs, (char *)f_str("espbot.cfg"));
         if (cfgfile.is_available())
         {
             cfgfile.clear();
@@ -321,4 +329,10 @@ void Espbot::init(void)
     // setup the task
     _queue = new os_event_t[QUEUE_LEN];
     system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, _queue, QUEUE_LEN);
+}
+
+// execute a function from a task
+void subsequent_function(void (*fun)(void))
+{
+    system_os_post(USER_TASK_PRIO_0, SIG_NEXT_FUNCTION, (ETSParam)fun); // informing everybody of
 }

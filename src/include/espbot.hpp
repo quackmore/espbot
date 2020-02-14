@@ -19,6 +19,11 @@ extern "C"
 #define SIG_SOFTAPMODE_STACONNECTED 2
 #define SIG_SOFTAPMODE_STADISCONNECTED 3
 #define SIG_HTTP_CHECK_PENDING_RESPONSE 4
+#define SIG_NEXT_FUNCTION 5
+
+// execute a function from a task
+void subsequent_function(void (*fun)(void));
+
 
 #define ESP_REBOOT 0
 #define ESP_OTA_REBOOT 1

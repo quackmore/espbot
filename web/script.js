@@ -308,7 +308,6 @@ function get_evnt_str(type) {
 
 function get_code_str(code) {
   var code_str = [];
-  console.log(code);
 
   code_str[parseInt("0010", 16)] = "FILE_TO_JSON_FS_NOT_AVAILABLE";
   code_str[parseInt("0011", 16)] = "FILE_TO_JSON_FILE_NOT_FOUND";
