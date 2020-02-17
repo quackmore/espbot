@@ -20,6 +20,7 @@ extern "C"
 #include "app.hpp"
 #include "espbot.hpp"
 #include "espbot_config.hpp"
+#include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
@@ -119,13 +120,13 @@ char *Espbot::get_name(void)
 
 void Espbot::set_name(char *t_name)
 {
-    os_memset(_name, 0, 32);
-    if (os_strlen(t_name) > 31)
+    os_memset(_name, 0, 33);
+    if (os_strlen(t_name) > 32)
     {
         esp_diag.warn(ESPOT_SET_NAME_TRUNCATED);
-        WARN("Espbot::set_name truncating name to 31 characters");
+        WARN("Espbot::set_name truncating name to 32 characters");
     }
-    os_strncpy(_name, t_name, 31);
+    os_strncpy(_name, t_name, 32);
     save_cfg();
 }
 
@@ -166,6 +167,7 @@ void espbot_init(void)
     espwebsvr.init();
     init_webclients_data_stuctures();
     esp_gpio.init();
+    cron_init();
     app_init_before_wifi();
 
     Wifi::init();
@@ -321,10 +323,12 @@ void Espbot::init(void)
     }
     os_timer_disarm(&graceful_rst_timer);
 
-    // start an heartbeat timer
-    os_timer_disarm(&_heartbeat);
-    os_timer_setfn(&_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
-    os_timer_arm(&_heartbeat, HEARTBEAT_PERIOD, 1);
+    // REPLACED BY A CRON JOB (2020-02-17)
+    //
+    // start an heartbeat timer 
+    // os_timer_disarm(&_heartbeat);
+    // os_timer_setfn(&_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
+    // os_timer_arm(&_heartbeat, HEARTBEAT_PERIOD, 1);
 
     // setup the task
     _queue = new os_event_t[QUEUE_LEN];

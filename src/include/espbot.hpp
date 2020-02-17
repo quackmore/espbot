@@ -31,14 +31,16 @@ void subsequent_function(void (*fun)(void));
 class Espbot
 {
 private:
-  char _name[32];
+  char _name[33];
   bool _mdns_enabled;
   // espbot task
   static const int QUEUE_LEN = 8;
   os_event_t *_queue;
+
+  // REPLACED BY A CRON JOB (2020-02-17)
   // heartbeat timer
-  static const int HEARTBEAT_PERIOD = 60000;
-  os_timer_t _heartbeat;
+  // static const int HEARTBEAT_PERIOD = 60000;
+  // os_timer_t _heartbeat;
 
   int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
   int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update

@@ -18,6 +18,7 @@ extern "C"
 class Sntp
 {
 private:
+  int _timezone;
 
 public:
   Sntp(){};
@@ -27,6 +28,8 @@ public:
   void stop(void);
   uint32 get_timestamp();
   char *get_timestr(uint32);
+  void set_tz(int);
+  int tz();
 };
 
 #endif

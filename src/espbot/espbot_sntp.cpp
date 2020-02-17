@@ -28,11 +28,7 @@ void Sntp::start(void)
     sntp_setservername(0, (char *) f_str("0.pool.ntp.org"));
     sntp_setservername(1, (char *) f_str("1.pool.ntp.org"));
     sntp_setservername(2, (char *) f_str("2.pool.ntp.org"));
-    if (sntp_set_timezone(1) == false)
-    {
-        esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
-        ERROR("Sntp::start cannot set timezone");
-    }
+    set_tz(1);
     sntp_init();
     esp_diag.info(SNTP_START);
     INFO("Sntp started");
@@ -81,4 +77,19 @@ char *Sntp::get_timestr(uint32 t_time)
     if (tmp_ptr)
         *tmp_ptr = '\0';
     return time_str;
+}
+
+void Sntp::set_tz(int tz)
+{
+    _timezone = tz;
+    if (sntp_set_timezone(_timezone) == false)
+    {
+        esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
+        ERROR("Sntp::set_tz cannot set timezone");
+    }
+}
+
+int Sntp::tz(void)
+{
+    return _timezone;
 }

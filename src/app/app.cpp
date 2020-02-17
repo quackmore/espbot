@@ -16,6 +16,7 @@ extern "C"
 }
 
 #include "app.hpp"
+#include "espbot_cron.hpp"
 #include "espbot_global.hpp"
 #include "espbot_utils.hpp"
 #include "library_dht.hpp"
@@ -35,6 +36,14 @@ char *app_release = APP_RELEASE;
 
 // Dht *dht22;
 
+static void heartbeat_cb(void)
+{
+    TRACE("ESPBOT HEARTBEAT: ---------------------------------------------------");
+    uint32 current_timestamp = esp_sntp.get_timestamp();
+    // TRACE("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
+    TRACE("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
+}
+
 uint32 lastRebootTime;
 
 void app_init_before_wifi(void)
@@ -42,6 +51,13 @@ void app_init_before_wifi(void)
     lastRebootTime = 0;
     init_dio_task();
     // dht22 = new Dht(ESPBOT_D2, DHT22, 1000, 2000, 0, 10);
+    cron_add_job(0, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_add_job(10, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_add_job(20, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_add_job(30, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_add_job(40, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_add_job(50, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_sync();
 }
 
 os_timer_t delay_after_wifi;
