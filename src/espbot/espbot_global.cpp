@@ -26,7 +26,7 @@ Espbot_diag esp_diag;
 Esp_mem espmem;
 Espbot espbot;
 Mdns esp_mDns;
-Sntp esp_sntp;
+TimeDate esp_time;
 Websvr espwebsvr;
 Ota_upgrade esp_ota;
 Gpio esp_gpio;

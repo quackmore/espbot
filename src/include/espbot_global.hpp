@@ -21,7 +21,7 @@ extern "C"
 #include "espbot_mdns.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_ota.hpp"
-#include "espbot_sntp.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_webserver.hpp"
 #include "espbot_wifi.hpp"
 #include "spiffs_esp8266.hpp"
@@ -32,7 +32,7 @@ extern Espbot_diag esp_diag;
 extern Esp_mem espmem;
 extern Espbot espbot;
 extern Mdns esp_mDns;
-extern Sntp esp_sntp;
+extern TimeDate esp_time;
 extern Websvr espwebsvr;
 extern Ota_upgrade esp_ota;
 extern Gpio esp_gpio;

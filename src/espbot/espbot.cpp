@@ -52,14 +52,17 @@ static void espbot_coordinator_task(os_event_t *e)
     {
     case SIG_STAMODE_GOT_IP:
         // [wifi station] got IP
-        esp_sntp.start();
+        esp_time.start_sntp();
+        esp_mDns.start(espbot.get_name());
         espwebsvr.stop(); // in case there was a web server listening on esp AP interface
         espwebsvr.start(80);
         app_init_after_wifi();
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
-        esp_sntp.stop();
+        esp_time.stop_sntp();
+        esp_mDns.stop();
+        espwebsvr.stop();
         app_deinit_on_wifi_disconnect();
         break;
     case SIG_SOFTAPMODE_STACONNECTED:
@@ -88,8 +91,8 @@ static void espbot_coordinator_task(os_event_t *e)
 static void heartbeat_cb(void)
 {
     TRACE("ESPBOT HEARTBEAT: ---------------------------------------------------");
-    uint32 current_timestamp = esp_sntp.get_timestamp();
-    TRACE("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
+    uint32 current_timestamp = esp_time.get_timestamp();
+    TRACE("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_time.get_timestr(current_timestamp));
     TRACE("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
 }
 
@@ -130,22 +133,6 @@ void Espbot::set_name(char *t_name)
     save_cfg();
 }
 
-bool Espbot::mdns_enabled(void)
-{
-    return _mdns_enabled;
-}
-
-void Espbot::enable_mdns(void)
-{
-    _mdns_enabled = true;
-    save_cfg();
-}
-
-void Espbot::disable_mdns(void)
-{
-    _mdns_enabled = false;
-    save_cfg();
-}
 
 // make espbot_init available to user_main.c
 extern "C" void espbot_init(void);
@@ -162,6 +149,8 @@ void espbot_init(void)
     espfs.init();
     esp_diag.init();
     espbot.init();
+    esp_time.init();
+    esp_mDns.init();
     esp_ota.init();
     http_init();
     espwebsvr.init();
@@ -196,17 +185,17 @@ int Espbot::restore_cfg(void)
     }
 }
 
-int Espbot::saved_cfg_not_update(void)
+int Espbot::saved_cfg_not_updated(void)
 {
-    ALL("Espbot::saved_cfg_not_update");
+    ALL("Espbot::saved_cfg_not_updated");
     File_to_json cfgfile(f_str("espbot.cfg"));
     espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string(f_str("espbot_name")))
         {
-            esp_diag.error(ESPBOT_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("Espbot::saved_cfg_not_update incomplete cfg");
+            esp_diag.error(ESPBOT_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("Espbot::saved_cfg_not_updated incomplete cfg");
             return CFG_ERROR;
         }
         if (os_strcmp(_name, cfgfile.get_value()))
@@ -224,7 +213,7 @@ int Espbot::saved_cfg_not_update(void)
 int Espbot::save_cfg(void)
 {
     ALL("Espbot::save_cfg");
-    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
     {
@@ -290,7 +279,7 @@ void Espbot::reset(int t_reset)
     case 1:
         espwebsvr.stop();
         esp_mDns.stop();
-        esp_sntp.stop();
+        esp_time.stop_sntp();
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 200, 0);
         break;

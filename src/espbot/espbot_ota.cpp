@@ -21,7 +21,6 @@ extern "C"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
-#include "espbot_logger.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_ota.hpp"
 #include "espbot_utils.hpp"
@@ -359,17 +358,17 @@ int Ota_upgrade::restore_cfg(void)
     }
 }
 
-int Ota_upgrade::saved_cfg_not_update(void)
+int Ota_upgrade::saved_cfg_not_updated(void)
 {
-    ALL("saved_cfg_not_update");
+    ALL("saved_cfg_not_updated");
     File_to_json cfgfile(f_str("ota.cfg"));
     espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string(f_str("host")))
         {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_update cannot find 'host'");
+            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("OTA saved_cfg_not_updated cannot find 'host'");
             return CFG_ERROR;
         }
         if (os_strcmp(get_host(), cfgfile.get_value()))
@@ -378,8 +377,8 @@ int Ota_upgrade::saved_cfg_not_update(void)
         }
         if (cfgfile.find_string(f_str("port")))
         {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_update cannot find 'port'");
+            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("OTA saved_cfg_not_updated cannot find 'port'");
             return CFG_ERROR;
         }
         if (m_port != (atoi(cfgfile.get_value())))
@@ -388,8 +387,8 @@ int Ota_upgrade::saved_cfg_not_update(void)
         }
         if (cfgfile.find_string(f_str("path")))
         {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_update cannot find 'path'");
+            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("OTA saved_cfg_not_updated cannot find 'path'");
             return CFG_ERROR;
         }
         if (os_strcmp(get_path(), cfgfile.get_value()))
@@ -398,8 +397,8 @@ int Ota_upgrade::saved_cfg_not_update(void)
         }
         if (cfgfile.find_string(f_str("check_version")))
         {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_update cannot find 'check_version'");
+            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("OTA saved_cfg_not_updated cannot find 'check_version'");
             return CFG_ERROR;
         }
         if (os_strcmp(get_check_version(), cfgfile.get_value()))
@@ -408,8 +407,8 @@ int Ota_upgrade::saved_cfg_not_update(void)
         }
         if (cfgfile.find_string(f_str("reboot_on_completion")))
         {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_update cannot find 'reboot_on_completion'");
+            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("OTA saved_cfg_not_updated cannot find 'reboot_on_completion'");
             return CFG_ERROR;
         }
         if (os_strcmp(get_reboot_on_completion(), cfgfile.get_value()))
@@ -427,7 +426,7 @@ int Ota_upgrade::saved_cfg_not_update(void)
 int Ota_upgrade::save_cfg(void)
 {
     ALL("save_cfg");
-    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (!espfs.is_available())
     {

@@ -21,7 +21,6 @@ extern "C"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_json.hpp"
-#include "espbot_logger.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_wifi.hpp"
@@ -280,17 +279,17 @@ static int restore_cfg(void)
     }
 }
 
-static int saved_cfg_not_update(void)
+static int saved_cfg_not_updated(void)
 {
-    ALL("Wifi::saved_cfg_not_update");
+    ALL("Wifi::saved_cfg_not_updated");
     File_to_json cfgfile(f_str("wifi.cfg"));
     espmem.stack_mon();
     if (cfgfile.exists())
     {
         if (cfgfile.find_string(f_str("station_ssid")))
         {
-            esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("Wifi::saved_cfg_not_update incomplete cfg");
+            esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("Wifi::saved_cfg_not_updated incomplete cfg");
             return CFG_ERROR;
         }
         if (os_strcmp(station_ssid, cfgfile.get_value()))
@@ -299,8 +298,8 @@ static int saved_cfg_not_update(void)
         }
         if (cfgfile.find_string(f_str("station_pwd")))
         {
-            esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            ERROR("Wifi::saved_cfg_not_update incomplete cfg");
+            esp_diag.error(WIFI_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            ERROR("Wifi::saved_cfg_not_updated incomplete cfg");
             return CFG_ERROR;
         }
         if (os_strcmp(station_pwd, cfgfile.get_value()))
@@ -372,7 +371,7 @@ char *Wifi::station_get_password(void)
 int Wifi::save_cfg(void)
 {
     ALL("Wifi::saved_cfg");
-    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
     {

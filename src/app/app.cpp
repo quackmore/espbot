@@ -38,10 +38,13 @@ char *app_release = APP_RELEASE;
 
 static void heartbeat_cb(void)
 {
-    TRACE("ESPBOT HEARTBEAT: ---------------------------------------------------");
-    uint32 current_timestamp = esp_sntp.get_timestamp();
-    // TRACE("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_sntp.get_timestr(current_timestamp));
-    TRACE("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
+    DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------");
+    uint32 current_timestamp = esp_time.get_timestamp();
+    DEBUG("ESPBOT HEARTBEAT: [%d] [UTC+%d] %s", 
+          current_timestamp,
+          esp_time.get_timezone(),
+          esp_time.get_timestr(current_timestamp));
+    DEBUG("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
 }
 
 uint32 lastRebootTime;
@@ -68,7 +71,7 @@ void app_init_after_wifi_delayed(void)
     static bool first_time = true;
     if (first_time)
     {
-        lastRebootTime = esp_sntp.get_timestamp();
+        lastRebootTime = esp_time.get_timestamp();
 
         first_time = false;
     }
@@ -76,7 +79,6 @@ void app_init_after_wifi_delayed(void)
 
 void app_init_after_wifi(void)
 {
-    esp_mDns.start(espbot.get_name());
     os_timer_disarm(&delay_after_wifi);
     os_timer_setfn(&delay_after_wifi, (os_timer_func_t *)app_init_after_wifi_delayed, NULL);
     os_timer_arm(&delay_after_wifi, 5000, 0);
@@ -87,8 +89,8 @@ void app_init_after_wifi(void)
         first_time = false;
     }
     // test if sntp get_timestamp works fine
-    uint32 timestamp = esp_sntp.get_timestamp();
-    fs_printf("=======> current timestamp %s\n", esp_sntp.get_timestr(timestamp));
+    uint32 timestamp = esp_time.get_timestamp();
+    fs_printf("=======> current timestamp %s\n", esp_time.get_timestr(timestamp));
 }
 
 uint32 get_last_reboot_date(void)
@@ -98,5 +100,4 @@ uint32 get_last_reboot_date(void)
 
 void app_deinit_on_wifi_disconnect()
 {
-    esp_mDns.stop();
 }

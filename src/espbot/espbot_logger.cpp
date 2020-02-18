@@ -87,7 +87,7 @@ int Logger::restore_cfg(void)
     }
 }
 
-int Logger::saved_cfg_not_update(void)
+int Logger::saved_cfg_not_updated(void)
 {
     File_to_json cfgfile("logger.cfg");
     espmem.stack_mon();
@@ -96,8 +96,8 @@ int Logger::saved_cfg_not_update(void)
     {
         if (cfgfile.find_string("logger_serial_level"))
         {
-            esp_diag.error(LOGGER_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            // esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
+            esp_diag.error(LOGGER_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            // esplog.error("Logger::saved_cfg_not_updated - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         if (m_serial_level != atoi(cfgfile.get_value()))
@@ -106,8 +106,8 @@ int Logger::saved_cfg_not_update(void)
         }
         if (cfgfile.find_string("logger_memory_level"))
         {
-            esp_diag.error(LOGGER_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-            // esplog.error("Logger::saved_cfg_not_update - available configuration is incomplete\n");
+            esp_diag.error(LOGGER_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            // esplog.error("Logger::saved_cfg_not_updated - available configuration is incomplete\n");
             return CFG_ERROR;
         }
         if (m_memory_level != atoi(cfgfile.get_value()))
@@ -124,7 +124,7 @@ int Logger::saved_cfg_not_update(void)
 
 int Logger::save_cfg(void)
 {
-    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (espfs.is_available())
     {
@@ -223,7 +223,7 @@ void Logger::fatal(const char *t_format, ...)
             os_printf_plus("[FATAL] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_LEV_FATAL)
         {
-            uint32 timestamp = esp_sntp.get_timestamp();
+            uint32 timestamp = esp_time.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
             if (json_ptr.ref == NULL)
                 return;
@@ -233,7 +233,7 @@ void Logger::fatal(const char *t_format, ...)
                 *tmp_ptr = '\0';
             os_sprintf(json_ptr.ref,
                        "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}",
-                       esp_sntp.get_timestr(timestamp),
+                       esp_time.get_timestr(timestamp),
                        tmp_buffer.ref);
             m_log->push_back(json_ptr.ref, override_when_full);
         }
@@ -259,7 +259,7 @@ void Logger::error(const char *t_format, ...)
             os_printf_plus("[ERROR] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_LEV_ERROR)
         {
-            uint32 timestamp = esp_sntp.get_timestamp();
+            uint32 timestamp = esp_time.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
             if (json_ptr.ref == NULL)
                 return;
@@ -269,7 +269,7 @@ void Logger::error(const char *t_format, ...)
                 *tmp_ptr = '\0';
             os_sprintf(json_ptr.ref,
                        "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}",
-                       esp_sntp.get_timestr(timestamp),
+                       esp_time.get_timestr(timestamp),
                        tmp_buffer.ref);
             m_log->push_back(json_ptr.ref, override_when_full);
         }
@@ -295,7 +295,7 @@ void Logger::warn(const char *t_format, ...)
             os_printf_plus("[WARN] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_LEV_WARN)
         {
-            uint32 timestamp = esp_sntp.get_timestamp();
+            uint32 timestamp = esp_time.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
             if (json_ptr.ref == NULL)
                 return;
@@ -305,7 +305,7 @@ void Logger::warn(const char *t_format, ...)
                 *tmp_ptr = '\0';
             os_sprintf(json_ptr.ref,
                        "{\"time\":\"%s\",\"msg\":\"[WARN] %s\"}",
-                       esp_sntp.get_timestr(timestamp),
+                       esp_time.get_timestr(timestamp),
                        tmp_buffer.ref);
             m_log->push_back(json_ptr.ref, override_when_full);
         }
@@ -331,7 +331,7 @@ void Logger::info(const char *t_format, ...)
             os_printf_plus("[INFO] %s", tmp_buffer.ref);
         if (m_memory_level >= LOG_LEV_INFO)
         {
-            uint32 timestamp = esp_sntp.get_timestamp();
+            uint32 timestamp = esp_time.get_timestamp();
             Heap_chunk json_ptr(32 + 24 + os_strlen(tmp_buffer.ref), dont_free);
             if (json_ptr.ref == NULL)
                 return;
@@ -341,7 +341,7 @@ void Logger::info(const char *t_format, ...)
                 *tmp_ptr = '\0';
             os_sprintf(json_ptr.ref,
                        "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}",
-                       esp_sntp.get_timestr(timestamp),
+                       esp_time.get_timestr(timestamp),
                        tmp_buffer.ref);
             m_log->push_back(json_ptr.ref, override_when_full);
         }

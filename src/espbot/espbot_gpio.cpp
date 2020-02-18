@@ -21,7 +21,6 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_json.hpp"
-#include "espbot_logger.hpp"
 #include "espbot_mem_mon.hpp"
 #include "spiffs_esp8266.hpp"
 

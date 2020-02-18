@@ -93,10 +93,10 @@ static int get_month(char *str)
 
 static void state_current_time(struct date *time)
 {
-    uint32 timestamp = esp_sntp.get_timestamp();
+    uint32 timestamp = esp_time.get_timestamp();
     time->timestamp = timestamp;
-    char *timestamp_str = esp_sntp.get_timestr(timestamp);
-    TRACE("state_current_time date: %s (UTC+%d) [%d]", timestamp_str, esp_sntp.tz(), timestamp);
+    char *timestamp_str = esp_time.get_timestr(timestamp);
+    TRACE("state_current_time date: %s (UTC+%d) [%d]", timestamp_str, esp_time.get_timezone(), timestamp);
     char tmp_str[5];
     // get day of week
     char *init_ptr = timestamp_str;
@@ -221,7 +221,7 @@ void cron_sync(void)
 {
     ALL("cron_sync");
     uint32 cron_period;
-    uint32 timestamp = esp_sntp.get_timestamp();
+    uint32 timestamp = esp_time.get_timestamp();
     timestamp = timestamp % 60;
 
     if (timestamp < 30)

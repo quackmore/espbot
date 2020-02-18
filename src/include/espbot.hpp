@@ -43,7 +43,7 @@ private:
   // os_timer_t _heartbeat;
 
   int restore_cfg(void);          // return CFG_OK on success, otherwise CFG_ERROR
-  int saved_cfg_not_update(void); // return CFG_OK when cfg does not require update
+  int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
                                   // return CFG_REQUIRES_UPDATE when cfg require update
                                   // return CFG_ERROR otherwise
   int save_cfg(void);             // return CFG_OK on success, otherwise CFG_ERROR
@@ -61,9 +61,6 @@ public:
   char *get_version(void);
   char *get_name(void);
   void set_name(char *); // requires string
-  bool mdns_enabled(void);
-  void enable_mdns(void);
-  void disable_mdns(void);
 };
 
 #endif

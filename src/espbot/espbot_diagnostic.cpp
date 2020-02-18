@@ -56,7 +56,7 @@ inline void Espbot_diag::add_event(char type, int code, uint32 value)
     int idx = _last_event + 1;
     if (idx >= EVNT_QUEUE_SIZE)
         idx = 0;
-    _evnt_queue[idx].timestamp = esp_sntp.get_timestamp();
+    _evnt_queue[idx].timestamp = esp_time.get_timestamp();
     _evnt_queue[idx].ack = 0;
     _evnt_queue[idx].type = type;
     _evnt_queue[idx].code = code;
@@ -191,9 +191,9 @@ int Espbot_diag::restore_cfg(void)
     return CFG_OK;
 }
 
-int Espbot_diag::saved_cfg_not_update(void)
+int Espbot_diag::saved_cfg_not_updated(void)
 {
-    ALL("Espbot_diag::saved_cfg_not_update");
+    ALL("Espbot_diag::saved_cfg_not_updated");
     File_to_json cfgfile(DIAG_FILENAME);
     espmem.stack_mon();
     if (!cfgfile.exists())
@@ -202,8 +202,8 @@ int Espbot_diag::saved_cfg_not_update(void)
     }
     if (cfgfile.find_string(f_str("diag_led_mask")))
     {
-        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-        ERROR("Espbot_diag::saved_cfg_not_update incomplete cfg");
+        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
         return CFG_ERROR;
     }
     if (_diag_led_mask != atoi(cfgfile.get_value()))
@@ -212,8 +212,8 @@ int Espbot_diag::saved_cfg_not_update(void)
     }
     if (cfgfile.find_string(f_str("serial_log_mask")))
     {
-        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATE_INCOMPLETE);
-        ERROR("Espbot_diag::saved_cfg_not_update incomplete cfg");
+        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
         return CFG_ERROR;
     }
     if (_serial_log_mask != atoi(cfgfile.get_value()))
@@ -226,7 +226,7 @@ int Espbot_diag::saved_cfg_not_update(void)
 int Espbot_diag::save_cfg(void)
 {
     ALL("Espbot_diag::save_cfg");
-    if (saved_cfg_not_update() != CFG_REQUIRES_UPDATE)
+    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
         return CFG_OK;
     if (!espfs.is_available())
     {
