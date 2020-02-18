@@ -124,11 +124,13 @@ char TimeDate::get_timezone(void)
 void TimeDate::enable_sntp(void)
 {
     _sntp_enabled = true;
+    this->start_sntp();
 }
 
 void TimeDate::disable_sntp(void)
 {
     _sntp_enabled = false;
+    this->stop_sntp();
 }
 
 bool TimeDate::sntp_enabled(void)

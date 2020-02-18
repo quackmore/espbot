@@ -49,8 +49,23 @@ void cron_sync(void);
 
 int cron_add_job(char min, char hour, char day_of_month, char month, char day_of_week, void (*command)(void));
 
-void init_current_time(void);
+/*
+ * get current time as struct date
+ */
 struct date *get_current_time(void);
 
+/*
+ * force initialization of current time before than cron execution
+ */
+void init_current_time(void);
+
+
+/*
+ * CONFIGURATION & PERSISTENCY
+ */
+void enable_cron(void);
+void disable_cron(void);
+bool cron_enabled(void);
+int save_cron_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
 
 #endif

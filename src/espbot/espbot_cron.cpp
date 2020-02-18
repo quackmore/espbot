@@ -13,13 +13,13 @@ extern "C"
 #include "c_types.h"
 }
 
+#include "espbot_config.hpp"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
+#include "espbot_list.hpp"
 #include "espbot_utils.hpp"
-
-static os_timer_t heater_period_timer;
 
 struct job
 {
@@ -35,6 +35,8 @@ static os_timer_t cron_timer;
 
 static List<struct job> *job_list;
 
+static bool cron_exe_enabled;
+
 static int get_day_of_week(char *str)
 {
     // 0 - Sun      Sunday
@@ -45,48 +47,48 @@ static int get_day_of_week(char *str)
     // 5 - Fri      Friday
     // 6 - Sat      Saturday
     // 7 - Sun      Sunday
-    if (0 == os_strncmp(str, "Sun", 3))
+    if (0 == os_strncmp(str, f_str("Sun"), 3))
         return 0;
-    if (0 == os_strncmp(str, "Mon", 3))
+    if (0 == os_strncmp(str, f_str("Mon"), 3))
         return 1;
-    if (0 == os_strncmp(str, "Tue", 3))
+    if (0 == os_strncmp(str, f_str("Tue"), 3))
         return 2;
-    if (0 == os_strncmp(str, "Wed", 3))
+    if (0 == os_strncmp(str, f_str("Wed"), 3))
         return 3;
-    if (0 == os_strncmp(str, "Thu", 3))
+    if (0 == os_strncmp(str, f_str("Thu"), 3))
         return 4;
-    if (0 == os_strncmp(str, "Fri", 3))
+    if (0 == os_strncmp(str, f_str("Fri"), 3))
         return 5;
-    if (0 == os_strncmp(str, "Sat", 3))
+    if (0 == os_strncmp(str, f_str("Sat"), 3))
         return 6;
     return -1;
 }
 
 static int get_month(char *str)
 {
-    if (0 == os_strncmp(str, "Jan", 3))
+    if (0 == os_strncmp(str, f_str("Jan"), 3))
         return 1;
-    if (0 == os_strncmp(str, "Feb", 3))
+    if (0 == os_strncmp(str, f_str("Feb"), 3))
         return 2;
-    if (0 == os_strncmp(str, "Mar", 3))
+    if (0 == os_strncmp(str, f_str("Mar"), 3))
         return 3;
-    if (0 == os_strncmp(str, "Apr", 3))
+    if (0 == os_strncmp(str, f_str("Apr"), 3))
         return 4;
-    if (0 == os_strncmp(str, "May", 3))
+    if (0 == os_strncmp(str, f_str("May"), 3))
         return 5;
-    if (0 == os_strncmp(str, "Jun", 3))
+    if (0 == os_strncmp(str, f_str("Jun"), 3))
         return 6;
-    if (0 == os_strncmp(str, "Jul", 3))
+    if (0 == os_strncmp(str, f_str("Jul"), 3))
         return 7;
-    if (0 == os_strncmp(str, "Aug", 3))
+    if (0 == os_strncmp(str, f_str("Aug"), 3))
         return 8;
-    if (0 == os_strncmp(str, "Sep", 3))
+    if (0 == os_strncmp(str, f_str("Sep"), 3))
         return 9;
-    if (0 == os_strncmp(str, "Oct", 3))
+    if (0 == os_strncmp(str, f_str("Oct"), 3))
         return 10;
-    if (0 == os_strncmp(str, "Nov", 3))
+    if (0 == os_strncmp(str, f_str("Nov"), 3))
         return 11;
-    if (0 == os_strncmp(str, "Dec", 3))
+    if (0 == os_strncmp(str, f_str("Dec"), 3))
         return 12;
     return -1;
 }
@@ -205,12 +207,31 @@ static void cron_execute(void)
     }
 }
 
+static int cron_restore_cfg(void);
+
 void cron_init(void)
 {
+    cron_exe_enabled = false;
+    if (cron_restore_cfg())
+    {
+        esp_diag.warn(CRON_INIT_DEFAULT_CFG);
+        WARN("cron_init no cfg available");
+    }
+    if (cron_exe_enabled)
+    {
+        esp_diag.info(CRON_STARTED);
+        INFO("cron started");
+    }
+    else
+    {
+        esp_diag.info(CRON_STOPPED);
+        INFO("cron stopped");
+    }
     os_timer_disarm(&cron_timer);
     os_timer_setfn(&cron_timer, (os_timer_func_t *)cron_execute, NULL);
     job_list = new List<struct job>(CRON_MAX_JOBS);
     os_memset(&current_time, 0, sizeof(struct date));
+    state_current_time(&current_time);
 }
 
 /*
@@ -220,6 +241,8 @@ void cron_init(void)
 void cron_sync(void)
 {
     ALL("cron_sync");
+    if (!cron_exe_enabled)
+        return;
     uint32 cron_period;
     uint32 timestamp = esp_time.get_timestamp();
     timestamp = timestamp % 60;
@@ -258,4 +281,100 @@ int cron_add_job(char minutes,
     new_job->command = command;
     int result = job_list->push_back(new_job);
     return result;
+}
+
+/*
+ * CONFIGURATION & PERSISTENCY
+ */
+void enable_cron(void)
+{
+    cron_exe_enabled = true;
+    cron_sync();
+    esp_diag.info(CRON_STARTED);
+    INFO("cron started");
+}
+
+void disable_cron(void)
+{
+    cron_exe_enabled = false;
+    esp_diag.info(CRON_STOPPED);
+    INFO("cron stopped");
+}
+
+bool cron_enabled(void)
+{
+    return cron_exe_enabled;
+}
+
+#define CRON_FILENAME f_str("cron.cfg")
+
+static int cron_restore_cfg(void)
+{
+    ALL("cron_restore_cfg");
+    File_to_json cfgfile(CRON_FILENAME);
+    espmem.stack_mon();
+    if (!cfgfile.exists())
+    {
+        WARN("cron_restore_cfg file not found");
+        return CFG_ERROR;
+    }
+    if (cfgfile.find_string(f_str("enabled")))
+    {
+        esp_diag.error(CRON_RESTORE_CFG_INCOMPLETE);
+        ERROR("cron_restore_cfg incomplete cfg");
+        return CFG_ERROR;
+    }
+    cron_exe_enabled = atoi(cfgfile.get_value());
+    return CFG_OK;
+}
+
+static int cron_saved_cfg_not_updated(void)
+{
+    ALL("cron_saved_cfg_not_updated");
+    File_to_json cfgfile(CRON_FILENAME);
+    espmem.stack_mon();
+    if (!cfgfile.exists())
+    {
+        return CFG_REQUIRES_UPDATE;
+    }
+    if (cfgfile.find_string(f_str("enabled")))
+    {
+        esp_diag.error(CRON_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+        ERROR("cron_saved_cfg_not_updated incomplete cfg");
+        return CFG_ERROR;
+    }
+    if (cron_exe_enabled != atoi(cfgfile.get_value()))
+    {
+        return CFG_REQUIRES_UPDATE;
+    }
+    return CFG_OK;
+}
+
+int cron_save_cfg(void)
+{
+    ALL("cron_save_cfg");
+    if (cron_saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
+        return CFG_OK;
+    if (!espfs.is_available())
+    {
+        esp_diag.error(CRON_SAVE_CFG_FS_NOT_AVAILABLE);
+        ERROR("cron_save_cfg FS not available");
+        return CFG_ERROR;
+    }
+    Ffile cfgfile(&espfs, (char *)CRON_FILENAME);
+    if (!cfgfile.is_available())
+    {
+        esp_diag.error(CRON_SAVE_CFG_CANNOT_OPEN_FILE);
+        ERROR("cron_save_cfg cannot open file");
+        return CFG_ERROR;
+    }
+    cfgfile.clear();
+    // "{"enabled": 0}" // 15 chars
+    char buffer[37];
+    espmem.stack_mon();
+    fs_sprintf(buffer,
+               "{\"enabled\": %d}",
+               cron_exe_enabled);
+    cfgfile.n_append(buffer, os_strlen(buffer));
+    return CFG_OK;
 }

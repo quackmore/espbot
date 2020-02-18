@@ -9,6 +9,10 @@
 #ifndef __CONFIG_HPP__
 #define __CONFIG_HPP__
 
+#define CFG_OK 0
+#define CFG_REQUIRES_UPDATE 1
+#define CFG_ERROR 2
+
 class File_to_json
 {
 private:

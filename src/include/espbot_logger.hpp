@@ -32,10 +32,6 @@ extern "C"
 #define DEBUG_MAX_SAVED_ERRORS 10
 #define DEBUG_MAX_FILE_SAVED_ERRORS 20
 
-#define CFG_OK 0
-#define CFG_REQUIRES_UPDATE 1
-#define CFG_ERROR 2
-
 class Logger
 {
 private:
