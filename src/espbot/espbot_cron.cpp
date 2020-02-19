@@ -245,6 +245,7 @@ void cron_sync(void)
         return;
     uint32 cron_period;
     uint32 timestamp = esp_time.get_timestamp();
+    // TRACE("cron timestamp: %d", timestamp);
     timestamp = timestamp % 60;
 
     if (timestamp < 30)
@@ -253,6 +254,7 @@ void cron_sync(void)
     else
         // you are early -> next minute period in (60 + (60 - timestamp)) seconds
         cron_period = 120000 - timestamp * 1000;
+    // TRACE("cron period: %d", cron_period);
     os_timer_arm(&cron_timer, cron_period, 0);
 }
 
@@ -296,6 +298,7 @@ void enable_cron(void)
 
 void disable_cron(void)
 {
+    os_timer_disarm(&cron_timer);
     cron_exe_enabled = false;
     esp_diag.info(CRON_STOPPED);
     INFO("cron stopped");
@@ -350,7 +353,7 @@ static int cron_saved_cfg_not_updated(void)
     return CFG_OK;
 }
 
-int cron_save_cfg(void)
+int save_cron_cfg(void)
 {
     ALL("cron_save_cfg");
     if (cron_saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)

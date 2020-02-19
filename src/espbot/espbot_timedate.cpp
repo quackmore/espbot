@@ -42,7 +42,11 @@ void TimeDate::start_sntp(void)
         sntp_setservername(0, (char *)f_str("0.pool.ntp.org"));
         sntp_setservername(1, (char *)f_str("1.pool.ntp.org"));
         sntp_setservername(2, (char *)f_str("2.pool.ntp.org"));
-        set_timezone(_timezone);
+        if (sntp_set_timezone(0) == false)
+        {
+            esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
+            ERROR("TimeDate::start_sntp cannot set timezone");
+        }
         sntp_init();
         esp_diag.info(SNTP_START);
         INFO("Sntp started");
@@ -65,7 +69,7 @@ struct espbot_time
 uint32 TimeDate::get_timestamp()
 {
     uint32 timestamp = sntp_get_current_timestamp();
-    if (timestamp > 0)
+    if ((timestamp > 0))
     {
         // save timestamp and corresponding RTC time into RTC memory
         struct espbot_time time_pair;
@@ -77,21 +81,28 @@ uint32 TimeDate::get_timestamp()
     {
         // get last timestamp and corresponding RTC time from RTC memory
         // and calculate current timestamp
-        struct espbot_time old_time, time_pair;
+        struct espbot_time old_time, cur_time;
         system_rtc_mem_read(64, &old_time, sizeof(struct espbot_time));
-        uint32 rtc_diff_us = ((system_get_rtc_time() - old_time.rtc_time) * system_rtc_clock_cali_proc()) >> 12;
-        timestamp = old_time.sntp_time + rtc_diff_us / 1000000;
+        cur_time.rtc_time = system_get_rtc_time();
+        uint32 rtc_cal = system_rtc_clock_cali_proc();
+        uint32 rtc_diff_us = (uint32)(((uint64)(cur_time.rtc_time - old_time.rtc_time)) *
+                                      ((uint64)((rtc_cal * 1000) >> 12)) / 1000);
+        // if (rtc_diff_us > 0.5 s) add 1 second to the timestamp
+        if ((rtc_diff_us % 1000000) >= 500000)
+            timestamp = old_time.sntp_time + (rtc_diff_us / 1000000) + 1;
+        else
+            timestamp = old_time.sntp_time + (rtc_diff_us / 1000000);
+
         // refresh saved time pair
-        time_pair.rtc_time = system_get_rtc_time();
-        time_pair.sntp_time = timestamp;
-        system_rtc_mem_write(64, &time_pair, sizeof(struct espbot_time));
+        cur_time.sntp_time = timestamp;
+        system_rtc_mem_write(64, &cur_time, sizeof(struct espbot_time));
     }
     return timestamp;
 }
 
 char *TimeDate::get_timestr(uint32 t_time)
 {
-    char *time_str = sntp_get_real_time(t_time);
+    char *time_str = sntp_get_real_time(t_time + _timezone * 3600);
     char *tmp_ptr = os_strstr(time_str, "\n");
     if (tmp_ptr)
         *tmp_ptr = '\0';
@@ -106,17 +117,12 @@ void TimeDate::set_time_manually(uint32 t_time)
     system_rtc_mem_write(64, &time_pair, sizeof(struct espbot_time));
 }
 
-void TimeDate::set_timezone(char tz)
+void TimeDate::set_timezone(signed char tz)
 {
     _timezone = tz;
-    if (sntp_set_timezone(_timezone) == false)
-    {
-        esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
-        ERROR("TimeDate::set_tz cannot set timezone");
-    }
 }
 
-char TimeDate::get_timezone(void)
+signed char TimeDate::get_timezone(void)
 {
     return _timezone;
 }

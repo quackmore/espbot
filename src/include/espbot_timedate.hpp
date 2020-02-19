@@ -19,7 +19,7 @@ class TimeDate
 {
 private:
   bool _sntp_enabled;
-  char _timezone;
+  signed char _timezone;
 
   int restore_cfg(void);           // return CFG_OK on success, otherwise CFG_ERROR
   int saved_cfg_not_updated(void); // return CFG_OK when cfg does not require update
@@ -40,10 +40,10 @@ public:
   void start_sntp(void);
   void stop_sntp(void);
 
-  void set_timezone(char);
-  char get_timezone(void);
+  void set_timezone(signed char);
+  signed char get_timezone(void);
 
-  void set_time_manually(uint32);
+  void set_time_manually(uint32); // takes UTC time
 
   uint32 get_timestamp();
   char *get_timestr(uint32);

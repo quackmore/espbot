@@ -40,9 +40,11 @@ static void heartbeat_cb(void)
 {
     DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------");
     uint32 current_timestamp = esp_time.get_timestamp();
-    DEBUG("ESPBOT HEARTBEAT: [%d] [UTC+%d] %s", 
+    signed char tz = esp_time.get_timezone();
+    DEBUG("ESPBOT HEARTBEAT: [%d] [UTC%c%d] %s", 
           current_timestamp,
-          esp_time.get_timezone(),
+          (tz>=0?'+':' '),
+          tz,
           esp_time.get_timestr(current_timestamp));
     DEBUG("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
 }
@@ -54,12 +56,13 @@ void app_init_before_wifi(void)
     lastRebootTime = 0;
     init_dio_task();
     // dht22 = new Dht(ESPBOT_D2, DHT22, 1000, 2000, 0, 10);
-    cron_add_job(0, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
-    cron_add_job(10, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
-    cron_add_job(20, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
-    cron_add_job(30, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
-    cron_add_job(40, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
-    cron_add_job(50, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    cron_add_job(CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    // cron_add_job(0, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    // cron_add_job(10, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    // cron_add_job(20, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    // cron_add_job(30, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    // cron_add_job(40, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
+    // cron_add_job(50, CRON_STAR, CRON_STAR, CRON_STAR, CRON_STAR, heartbeat_cb);
     cron_sync();
 }
 

@@ -23,13 +23,16 @@ extern "C"
 
 #include "app.hpp"
 #include "app_test.hpp"
+#include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
+#include "espbot_mdns.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_mem_sections.h"
 #include "espbot_profiler.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
 
@@ -864,7 +867,99 @@ void run_test(int idx)
         fs_printf("completing testing function\n");
     }
     break;
-        /*
+    // CRON
+    case 50:
+    {
+        fs_printf("Disabling cron...\n");
+        disable_cron();
+        save_cron_cfg();
+        fs_printf("cron status is %d\n", cron_enabled());
+    }
+    break;
+    case 51:
+    {
+        fs_printf("Enabling cron...\n");
+        enable_cron();
+        save_cron_cfg();
+        fs_printf("cron status is %d\n", cron_enabled());
+    }
+    break;
+    // MDNS
+    case 52:
+    {
+        fs_printf("Disabling mdns...\n");
+        esp_mDns.disable();
+        esp_mDns.save_cfg();
+        fs_printf("mdns status is %d\n", esp_mDns.is_enabled());
+    }
+    break;
+    case 53:
+    {
+        fs_printf("Enabling mdns...\n");
+        esp_mDns.enable();
+        esp_mDns.save_cfg();
+        fs_printf("mdns status is %d\n", esp_mDns.is_enabled());
+    }
+    break;
+    // SNTP
+    case 54:
+    {
+        fs_printf("Disabling sntp...\n");
+        esp_time.disable_sntp();
+        esp_time.save_cfg();
+        fs_printf("sntp status is %d\n", esp_time.sntp_enabled());
+    }
+    break;
+    case 55:
+    {
+        fs_printf("Enabling sntp...\n");
+        esp_time.enable_sntp();
+        esp_time.save_cfg();
+        fs_printf("sntp status is %d\n", esp_time.sntp_enabled());
+    }
+    break;
+    case 56:
+    {
+        fs_printf("Setting time manually...\n");
+        esp_time.set_time_manually(1582124400);
+        fs_printf("time set \n");
+    }
+    break;
+    // 1582124400
+    case 58:
+    case 59:
+    case 60:
+    case 61:
+    case 62:
+    case 63:
+    case 64:
+    case 65:
+    case 66:
+    case 67:
+    case 68:
+    case 69:
+    case 70:
+    case 71:
+    case 72:
+    case 73:
+    case 74:
+    case 75:
+    case 76:
+    case 77:
+    case 78:
+    case 79:
+    case 80:
+    case 81:
+    case 82:
+    {
+        fs_printf("setting timezone...\n");
+        signed char tz = idx - 70;
+        esp_time.set_timezone(tz);
+        // esp_time.save_cfg();
+        fs_printf("timezone is %d\n", esp_time.get_timezone());
+    }
+    break;
+/*
     case 101:
     {
         // check json numbers
