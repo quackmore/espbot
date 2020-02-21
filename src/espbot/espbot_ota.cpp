@@ -560,7 +560,7 @@ static void ota_engine(void)
     {
     case OTA_IDLE:
     {
-        if (os_strcmp(esp_ota.get_check_version(), "true") == 0)
+        if (os_strcmp(esp_ota.get_check_version(), f_str("true")) == 0)
         {
             esp_ota.set_status(OTA_VERSION_CHECKING);
             ota_client = new Webclnt;
@@ -610,7 +610,7 @@ static void ota_engine(void)
         if (upgrade_svr == NULL)
         {
             esp_diag.error(OTA_ENGINE_HEAP_EXHAUSTED, sizeof(upgrade_server_info));
-            ERROR("OTA save_cfg heap exhausted %d", sizeof(upgrade_server_info));
+            ERROR("ota_engine heap exhausted %d", sizeof(upgrade_server_info));
             esp_ota.set_status(OTA_FAILED);
             subsequent_function(ota_engine);
             return;
