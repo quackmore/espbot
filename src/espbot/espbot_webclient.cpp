@@ -211,16 +211,16 @@ static void webclient_discon(void *arg)
           pesp_conn->proto.tcp->remote_ip[2],
           pesp_conn->proto.tcp->remote_ip[3],
           pesp_conn->proto.tcp->remote_port);
-    Webclnt *client = get_client(pesp_conn);
-    espmem.stack_mon();
-    if (client == NULL)
-    {
-        esp_diag.error(WEB_CLIENT_DISCON_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
-        ERROR("webclient_discon cannot get webclient ref for espconn %X", pesp_conn);
-        return;
-    }
-    client->update_status(WEBCLNT_DISCONNECTED);
-    client->call_completed_func();
+    // Webclnt *client = get_client(pesp_conn);
+    // espmem.stack_mon();
+    // if (client == NULL)
+    // {
+    //     esp_diag.error(WEB_CLIENT_DISCON_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
+    //     ERROR("webclient_discon cannot get webclient ref for espconn %X", pesp_conn);
+    //     return;
+    // }
+    // client->update_status(WEBCLNT_DISCONNECTED);
+    // client->call_completed_func();
 }
 
 static void webclient_connected(void *arg)
@@ -330,6 +330,7 @@ void Webclnt::disconnect(void (*completed_func)(void *), void *param)
     //     delete[] this->request;
 
     espconn_disconnect(&m_esp_conn);
+    call_completed_func();
 }
 
 void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *), void *param)

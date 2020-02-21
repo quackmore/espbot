@@ -959,6 +959,28 @@ void run_test(int idx)
         fs_printf("timezone is %d\n", esp_time.get_timezone());
     }
     break;
+    case 90:
+    {
+        fs_printf("OTA testing...\n");
+        // esp_ota.new_start_upgrade();
+    }
+    break;
+    case 91:
+    {
+        fs_printf("OTA success...\n");
+        esp_ota.set_status(OTA_SUCCESS);
+        // extern void ota_engine(void);
+        // subsequent_function(ota_engine);
+    }
+    break;
+    case 92:
+    {
+        fs_printf("OTA failed...\n");
+        esp_ota.set_status(OTA_FAILED);
+        // extern void ota_engine(void);
+        // subsequent_function(ota_engine);
+    }
+    break;
 /*
     case 101:
     {
