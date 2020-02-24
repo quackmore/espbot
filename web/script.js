@@ -1,8 +1,8 @@
 const esp8266 = {
-  //  "url": "",
-  //  "cors": false
-  "url": "http://192.168.1.229",
-  "cors": true
+  "url": "",
+  "cors": false
+  // "url": "http://192.168.1.229",
+  // "cors": true
 };
 
 $(document).ready(function () {
@@ -248,7 +248,6 @@ function esp_get_diag_events(success_cb, error_cb) {
     url: esp8266.url + '/api/diag/events',
     dataType: 'json',
     crossDomain: esp8266.cors,
-    //success: success_cb(data),
     success: function (data) {
       success_cb(data);
     },
@@ -270,7 +269,6 @@ function get_diag_events(success_cb, error_cb) {
     url: esp8266.url + '/api/diag/events',
     dataType: 'json',
     crossDomain: esp8266.cors,
-    //success: success_cb(data),
     success: function (data) {
       success_cb(data);
     },

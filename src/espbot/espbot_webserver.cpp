@@ -122,8 +122,8 @@ void Websvr::start(uint32 port)
 
     // now the server is up
     m_status = up;
-    esp_diag.debug(WEB_SERVER_START);
-    DEBUG("webserver started");
+    esp_diag.info(WEB_SERVER_START);
+    INFO("webserver started");
 }
 
 void Websvr::stop()
@@ -134,8 +134,8 @@ void Websvr::stop()
 
     http_queues_clear();
 
-    esp_diag.debug(WEB_SERVER_STOP);
-    DEBUG("webserver stopped");
+    esp_diag.info(WEB_SERVER_STOP);
+    INFO("webserver stopped");
 }
 
 Websvr_status Websvr::get_status(void)
