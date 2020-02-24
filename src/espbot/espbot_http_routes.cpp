@@ -633,7 +633,7 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
     }
     // format strings
     // "{"diag_events":["
-    // ",{"ts":,"ack":,"type":,"code":,"val":}"
+    // ",{"ts":,"ack":,"type":"","code":"","val":}"
     // "]}"
     int msg_len = 16 +                // formatting string
                   2 +                 // formatting string
@@ -642,7 +642,7 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
                   (evnt_count * 2) +  // type
                   (evnt_count * 4) +  // code
                   (evnt_count * 12) + // val
-                  (evnt_count * 38) + // errors formatting
+                  (evnt_count * 42) + // errors formatting
                   1;                  // just in case
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref == NULL)
@@ -662,14 +662,14 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
         event_ptr = esp_diag.get_event(idx);
         str_ptr = msg.ref + os_strlen(msg.ref);
         if (idx == 0)
-            fs_sprintf(str_ptr, "{\"ts\":%d, \"ack\":%d, \"type\":%X, \"code\":%X, \"val\":%d}",
+            fs_sprintf(str_ptr, "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
                        (event_ptr->timestamp - time_zone_shift),
                        event_ptr->ack,
                        event_ptr->type,
                        event_ptr->code,
                        event_ptr->value);
         else
-            fs_sprintf(str_ptr, ", {\"ts\":%d, \"ack\":%d, \"type\":%X, \"code\":%X, \"val\":%d}",
+            fs_sprintf(str_ptr, ",{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
                        (event_ptr->timestamp - time_zone_shift),
                        event_ptr->ack,
                        event_ptr->type,
