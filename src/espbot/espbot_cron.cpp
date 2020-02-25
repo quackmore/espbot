@@ -23,6 +23,7 @@ extern "C"
 
 struct job
 {
+    signed char id;
     char minutes;
     char hours;
     char day_of_month;
@@ -219,17 +220,17 @@ void cron_init(void)
     }
     if (cron_exe_enabled)
     {
-        esp_diag.info(CRON_STARTED);
+        esp_diag.info(CRON_START);
         INFO("cron started");
     }
     else
     {
-        esp_diag.info(CRON_STOPPED);
+        esp_diag.info(CRON_STOP);
         INFO("cron stopped");
     }
     os_timer_disarm(&cron_timer);
     os_timer_setfn(&cron_timer, (os_timer_func_t *)cron_execute, NULL);
-    job_list = new List<struct job>(CRON_MAX_JOBS);
+    job_list = new List<struct job>(CRON_MAX_JOBS, delete_content);
     os_memset(&current_time, 0, sizeof(struct date));
     state_current_time(&current_time);
 }
@@ -275,14 +276,90 @@ int cron_add_job(char minutes,
     // * # |  |  |  |  |
     // * # *  *  *  *  * funcntion
     struct job *new_job = new struct job;
+    if (new_job == NULL)
+    {
+        esp_diag.error(CRON_ADD_JOB_HEAP_EXHAUSTED, sizeof(struct job));
+        ERROR("cron_add_job heap exhausted %d", sizeof(struct job));
+        return -1;
+    }
     new_job->minutes = minutes;
     new_job->hours = hours;
     new_job->day_of_month = day_of_month;
     new_job->month = month;
     new_job->day_of_week = day_of_week;
     new_job->command = command;
+    // assign a fake id
+    new_job->id = -1;
+    // find a free id
+    struct job *job_itr = job_list->front();
+    int idx;
+    bool id_used;
+    // looking for a not used id from 0 to job_list->size()
+    for (idx = 1; idx <= job_list->size(); idx++)
+    {
+        id_used = false;
+        while (job_itr)
+        {
+            // os_printf("-----------> current job\n");
+            // os_printf("          id: %d\n", current_job->id);
+            if (job_itr->id == idx)
+            {
+                id_used = true;
+                break;
+            }
+            job_itr = job_list->next();
+        }
+        if (!id_used)
+        {
+            new_job->id = idx;
+            break;
+        }
+    }
+    // checkout if a free id was found or need to add a new one
+    if (new_job->id < 0)
+    {
+        new_job->id = job_list->size() + 1;
+    }
+    // add the new job
     int result = job_list->push_back(new_job);
-    return result;
+    if (result != list_ok)
+    {
+        esp_diag.error(CRON_ADD_JOB_CANNOT_COMPLETE);
+        ERROR("cron_add_job cannot complete");
+        return -1;
+    }
+    return new_job->id;
+}
+
+void cron_del_job(int job_id)
+{
+    struct job *job_itr = job_list->front();
+    while (job_itr)
+    {
+        if (job_itr->id == job_id)
+        {
+            job_list->remove();
+            break;
+        }
+        job_itr = job_list->next();
+    }
+}
+
+void cron_print_jobs(void)
+{
+    struct job *job_itr = job_list->front();
+    while (job_itr)
+    {
+        fs_printf("-----------> current job\n");
+        fs_printf("          id: %d\n", (signed char) job_itr->id);
+        fs_printf("     minutes: %d\n", job_itr->minutes);
+        fs_printf("       hours: %d\n", job_itr->hours);
+        fs_printf("day of month: %d\n", job_itr->day_of_month);
+        fs_printf("       month: %d\n", job_itr->month);
+        fs_printf(" day of week: %d\n", job_itr->day_of_week);
+        fs_printf("     command: %X\n", job_itr->command);
+        job_itr = job_list->next();
+    }
 }
 
 /*
@@ -292,7 +369,14 @@ void enable_cron(void)
 {
     cron_exe_enabled = true;
     cron_sync();
-    esp_diag.info(CRON_STARTED);
+    esp_diag.info(CRON_START);
+    INFO("cron started");
+}
+
+void start_cron(void)
+{
+    cron_sync();
+    esp_diag.info(CRON_START);
     INFO("cron started");
 }
 
@@ -300,7 +384,14 @@ void disable_cron(void)
 {
     os_timer_disarm(&cron_timer);
     cron_exe_enabled = false;
-    esp_diag.info(CRON_STOPPED);
+    esp_diag.info(CRON_STOP);
+    INFO("cron stopped");
+}
+
+void stop_cron(void)
+{
+    os_timer_disarm(&cron_timer);
+    esp_diag.info(CRON_STOP);
     INFO("cron stopped");
 }
 

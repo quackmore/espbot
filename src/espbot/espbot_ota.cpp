@@ -143,7 +143,7 @@ char *Ota_upgrade::get_reboot_on_completion(void)
 // {
 //     ALL("ota_completed_cb");
 //     uint8 u_flag = system_upgrade_flag_check();
-// 
+//
 //     if (u_flag == UPGRADE_FLAG_FINISH)
 //     {
 //         esp_ota._status = OTA_SUCCESS;
@@ -155,7 +155,7 @@ char *Ota_upgrade::get_reboot_on_completion(void)
 //         ERROR("ota_completed_cb cannot complete upgrade");
 //     }
 // }
-// 
+//
 // void Ota_upgrade::ota_timer_function(void *arg)
 // {
 //     char *binary_file;
@@ -163,9 +163,9 @@ char *Ota_upgrade::get_reboot_on_completion(void)
 //     static char *url = NULL;
 //     // static struct espconn *pespconn = NULL;
 //     espmem.stack_mon();
-// 
+//
 //     // os_printf("OTA STATUS: %d\n", esp_ota._status);
-// 
+//
 //     switch (esp_ota._status)
 //     {
 //     case OTA_IDLE:
@@ -480,6 +480,12 @@ static void check_version(void *param)
                 ERROR("check_version bad version format");
                 esp_ota.set_status(OTA_FAILED);
             }
+        }
+        else
+        {
+            esp_diag.error(OTA_CHECK_VERSION_EMPTY_RES);
+            ERROR("check_version empty response");
+            esp_ota.set_status(OTA_FAILED);
         }
         break;
     default:

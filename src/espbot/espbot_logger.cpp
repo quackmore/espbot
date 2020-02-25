@@ -29,32 +29,13 @@ extern "C"
 #include "espbot_list.hpp"
 #include "espbot_logger.hpp"
 #include "espbot_mem_mon.hpp"
-#include "espbot_mem_sections.h"
+#include "espbot_mem_macros.h"
 #include "espbot_utils.hpp"
 #include "spiffs_esp8266.hpp"
 
 /*
  * LOGGER
  */
-
-// global vars for espbot_logger_macros.h
-char logger_buffer[LOGGER_BUF_SIZE];
-
-char logger_msg_fmt[] IROM_TEXT ALIGNED_4 = "%s %s%s";
-char logger_newline[] IROM_TEXT ALIGNED_4 = "\n";
-char logger_fatal_str[] IROM_TEXT ALIGNED_4 = "[FATAL]";
-char logger_fatal_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[FATAL] %s\"}";
-char logger_heap_exhausted[] IROM_TEXT ALIGNED_4 = "[FATAL] heap memory exhausted!";
-char logger_error_str[] IROM_TEXT ALIGNED_4 = "[ERROR]";
-char logger_error_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[ERROR] %s\"}";
-char logger_warn_str[] IROM_TEXT ALIGNED_4 = "[WARNING]";
-char logger_warn_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[WARNING] %s\"}";
-char logger_info_str[] IROM_TEXT ALIGNED_4 = "[INFO]";
-char logger_info_fmt[] IROM_TEXT ALIGNED_4 = "{\"time\":\"%s\",\"msg\":\"[INFO] %s\"}";
-char logger_debug_str[] IROM_TEXT ALIGNED_4 = "[DEBUG]";
-char logger_trace_str[] IROM_TEXT ALIGNED_4 = "[TRACE]";
-char logger_all_str[] IROM_TEXT ALIGNED_4 = "[ALL]";
-// end of global vars for espbot_logger_macros.h
 
 int Logger::restore_cfg(void)
 {

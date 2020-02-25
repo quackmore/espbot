@@ -74,10 +74,6 @@ public:
   void set_status(Ota_status_type);
   int get_rel_cmp_result(void);
   void set_rel_cmp_result(int);
-
-  // debug
-  void new_start_upgrade(void);
-
 };
 
 #endif

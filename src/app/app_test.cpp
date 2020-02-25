@@ -30,7 +30,7 @@ extern "C"
 #include "espbot_json.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_mem_mon.hpp"
-#include "espbot_mem_sections.h"
+#include "espbot_mem_macros.h"
 #include "espbot_profiler.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
@@ -979,6 +979,41 @@ void run_test(int idx)
         esp_ota.set_status(OTA_FAILED);
         // extern void ota_engine(void);
         // subsequent_function(ota_engine);
+    }
+    break;
+    case 93:
+    {
+        fs_printf("printing cron jobs...\n");
+        cron_print_jobs();
+    }
+    break;
+    case 94:
+    {
+        static int job_id = 0;
+        fs_printf("adding new job...\n");
+        int result = cron_add_job(job_id,0,0,0,0,NULL);
+        if (result > 0)
+            fs_printf("added job %d", result);
+        else
+            fs_printf("error adding job");
+        cron_print_jobs();
+    }
+    break;
+    case 101:
+    case 102:
+    case 103:
+    case 104:
+    case 105:
+    case 106:
+    case 107:
+    case 108:
+    case 109:
+    case 110:
+    {
+        int job_id = idx - 100;
+        fs_printf("removing job %d ...\n", job_id);
+        cron_del_job(job_id);
+        cron_print_jobs();
     }
     break;
 /*

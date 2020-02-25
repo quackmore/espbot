@@ -20,8 +20,10 @@ extern "C"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
+#include "espbot_timedate.h"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
+#include "espbot_rtc_mem_map.h"
 
 void TimeDate::init(void)
 {
@@ -60,12 +62,6 @@ void TimeDate::stop_sntp(void)
     INFO("Sntp ended");
 }
 
-struct espbot_time
-{
-    uint32 sntp_time;
-    uint32 rtc_time;
-};
-
 uint32 TimeDate::get_timestamp()
 {
     uint32 timestamp = sntp_get_current_timestamp();
@@ -75,14 +71,14 @@ uint32 TimeDate::get_timestamp()
         struct espbot_time time_pair;
         time_pair.rtc_time = system_get_rtc_time();
         time_pair.sntp_time = timestamp;
-        system_rtc_mem_write(64, &time_pair, sizeof(struct espbot_time));
+        system_rtc_mem_write(RTC_TIMEDATE, &time_pair, sizeof(struct espbot_time));
     }
     else
     {
         // get last timestamp and corresponding RTC time from RTC memory
         // and calculate current timestamp
         struct espbot_time old_time, cur_time;
-        system_rtc_mem_read(64, &old_time, sizeof(struct espbot_time));
+        system_rtc_mem_read(RTC_TIMEDATE, &old_time, sizeof(struct espbot_time));
         cur_time.rtc_time = system_get_rtc_time();
         uint32 rtc_cal = system_rtc_clock_cali_proc();
         uint32 rtc_diff_us = (uint32)(((uint64)(cur_time.rtc_time - old_time.rtc_time)) *
@@ -95,7 +91,7 @@ uint32 TimeDate::get_timestamp()
 
         // refresh saved time pair
         cur_time.sntp_time = timestamp;
-        system_rtc_mem_write(64, &cur_time, sizeof(struct espbot_time));
+        system_rtc_mem_write(RTC_TIMEDATE, &cur_time, sizeof(struct espbot_time));
     }
     return timestamp;
 }
@@ -114,7 +110,7 @@ void TimeDate::set_time_manually(uint32 t_time)
     struct espbot_time time_pair;
     time_pair.rtc_time = system_get_rtc_time();
     time_pair.sntp_time = t_time;
-    system_rtc_mem_write(64, &time_pair, sizeof(struct espbot_time));
+    system_rtc_mem_write(RTC_TIMEDATE, &time_pair, sizeof(struct espbot_time));
 }
 
 void TimeDate::set_timezone(signed char tz)

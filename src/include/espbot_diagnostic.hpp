@@ -14,7 +14,7 @@ extern "C"
 #include "c_types.h"
 }
 
-#include "espbot_mem_sections.h"
+#include "espbot_mem_macros.h"
 
 #define DIAG_LED_DISABLED 0x00
 

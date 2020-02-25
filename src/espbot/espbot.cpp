@@ -272,10 +272,13 @@ void Espbot::reset(int t_reset)
     switch (graceful_rst_counter)
     {
     case 0:
+        // waiting for completion of any http com 
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 300, 0);
         break;
     case 1:
+        // stop services over wifi
+        stop_cron();
         espwebsvr.stop();
         esp_mDns.stop();
         esp_time.stop_sntp();
@@ -283,11 +286,13 @@ void Espbot::reset(int t_reset)
         os_timer_arm(&graceful_rst_timer, 200, 0);
         break;
     case 2:
+        // stop wifi
         wifi_set_opmode_current(NULL_MODE);
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
-        os_timer_arm(&graceful_rst_timer, 200, 0);
+        os_timer_arm(&graceful_rst_timer, 100, 0);
         break;
     case 3:
+        // reset
         if (t_reset == ESP_REBOOT)
             system_restart();
         if (t_reset == ESP_OTA_REBOOT)

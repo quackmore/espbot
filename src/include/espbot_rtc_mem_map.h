@@ -6,11 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __MEM_SECTIONS_H__
-#define __MEM_SECTIONS_H__
+#ifndef __RTC_MEM_MAP_H__
+#define __RTC_MEM_MAP_H__
 
-#define IRAM __attribute__((section(".iram.text")))
-#define IROM_TEXT __attribute__((section(".irom.text")))
-#define ALIGNED_4 __attribute__((aligned(4)))
+#include "espbot_timedate.h"
+
+// espbot RTC mem usage
+#define RTC_MEM_START 64
+#define RTC_TIMEDATE (RTC_MEM_START)
+// end of espbot RTC mem usage
+#define RTC_FREE (RTC_TIMEDATE + sizeof(struct espbot_time))
 
 #endif
