@@ -6,6 +6,10 @@ const esp8266 = {
 };
 
 $(document).ready(function () {
+  console.log("loaded");
+  setTimeout(function () {
+    $('.modal').modal('hide');
+  }, 500);
   update_home();
 });
 

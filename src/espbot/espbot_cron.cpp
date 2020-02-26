@@ -37,6 +37,7 @@ static os_timer_t cron_timer;
 static List<struct job> *job_list;
 
 static bool cron_exe_enabled;
+static bool cron_running;
 
 static int get_day_of_week(char *str)
 {
@@ -229,6 +230,7 @@ void cron_init(void)
         INFO("cron stopped");
     }
     os_timer_disarm(&cron_timer);
+    cron_running = false;
     os_timer_setfn(&cron_timer, (os_timer_func_t *)cron_execute, NULL);
     job_list = new List<struct job>(CRON_MAX_JOBS, delete_content);
     os_memset(&current_time, 0, sizeof(struct date));
@@ -257,6 +259,7 @@ void cron_sync(void)
         cron_period = 120000 - timestamp * 1000;
     // TRACE("cron period: %d", cron_period);
     os_timer_arm(&cron_timer, cron_period, 0);
+    cron_running = true;
 }
 
 int cron_add_job(char minutes,
@@ -351,7 +354,7 @@ void cron_print_jobs(void)
     while (job_itr)
     {
         fs_printf("-----------> current job\n");
-        fs_printf("          id: %d\n", (signed char) job_itr->id);
+        fs_printf("          id: %d\n", (signed char)job_itr->id);
         fs_printf("     minutes: %d\n", job_itr->minutes);
         fs_printf("       hours: %d\n", job_itr->hours);
         fs_printf("day of month: %d\n", job_itr->day_of_month);
@@ -367,23 +370,37 @@ void cron_print_jobs(void)
  */
 void enable_cron(void)
 {
-    cron_exe_enabled = true;
-    cron_sync();
-    esp_diag.info(CRON_START);
-    INFO("cron started");
+    if (!cron_exe_enabled)
+    {
+        cron_exe_enabled = true;
+        esp_diag.info(CRON_ENABLED);
+        INFO("cron enabled");
+    }
+    if (!cron_running)
+    {
+        cron_sync();
+        esp_diag.info(CRON_START);
+        INFO("cron started");
+    }
 }
 
 void start_cron(void)
 {
-    cron_sync();
-    esp_diag.info(CRON_START);
-    INFO("cron started");
+    if (!cron_running)
+    {
+        cron_sync();
+        esp_diag.info(CRON_START);
+        INFO("cron started");
+    }
 }
 
 void disable_cron(void)
 {
     os_timer_disarm(&cron_timer);
+    cron_running = false;
     cron_exe_enabled = false;
+    esp_diag.info(CRON_DISABLED);
+    INFO("cron disabled");
     esp_diag.info(CRON_STOP);
     INFO("cron stopped");
 }
@@ -391,6 +408,7 @@ void disable_cron(void)
 void stop_cron(void)
 {
     os_timer_disarm(&cron_timer);
+    cron_running = false;
     esp_diag.info(CRON_STOP);
     INFO("cron stopped");
 }

@@ -15,6 +15,18 @@
       height: 350px;
       overflow: scroll-y;
     }
+
+    .bd-example-modal-lg .modal-dialog {
+      display: table;
+      position: relative;
+      margin: 0 auto;
+      top: calc(50% - 24px);
+    }
+
+    .bd-example-modal-lg .modal-dialog .modal-content {
+      background-color: transparent;
+      border: none;
+    }
   </style>
 </head>
 
@@ -294,6 +306,14 @@
       </div>
     </div>
   </div>
+  <div class="modal fade bd-example-modal-lg" data-backdrop="static" data-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content" style="width: 48px">
+        <span class="spinner-border" role="status"></span>
+        <span class="fa fa-spinner fa-spin fa-3x"></span>
+      </div>
+    </div>
+  </div>
   <!-- JavaScript -->
   <!-- jQuery first, then Popper.js, then Bootstrap JS, then custom script -->
   <!-- don't use slim if you need ajax -->
@@ -305,6 +325,10 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
     integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
     crossorigin="anonymous"></script>
+  <script type="text/javascript">
+    console.log("loading...");
+    $('.modal').modal('show');
+  </script>
   <script src="script.js"></script>
   <script src="event_codes.js"></script>
 </body>

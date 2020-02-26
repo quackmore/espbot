@@ -111,11 +111,18 @@ void TimeDate::set_time_manually(uint32 t_time)
     time_pair.rtc_time = system_get_rtc_time();
     time_pair.sntp_time = t_time;
     system_rtc_mem_write(RTC_TIMEDATE, &time_pair, sizeof(struct espbot_time));
+    esp_diag.info(TIMEDATE_CHANGED, t_time);
+    INFO("timedate changed to %d", t_time);
 }
 
 void TimeDate::set_timezone(signed char tz)
 {
-    _timezone = tz;
+    if (tz != _timezone)
+    {
+        _timezone = tz;
+        esp_diag.info(TIMEZONE_CHANGED, _timezone);
+        INFO("timezone changed to %d", _timezone);
+    }
 }
 
 signed char TimeDate::get_timezone(void)
@@ -125,8 +132,11 @@ signed char TimeDate::get_timezone(void)
 
 void TimeDate::enable_sntp(void)
 {
-    _sntp_enabled = true;
-    this->start_sntp();
+    if (!_sntp_enabled)
+    {
+        _sntp_enabled = true;
+        this->start_sntp();
+    }
 }
 
 void TimeDate::disable_sntp(void)

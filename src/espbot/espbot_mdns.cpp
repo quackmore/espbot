@@ -60,8 +60,11 @@ void Mdns::stop(void)
 
 void Mdns::enable(void)
 {
-    _enabled = true;
-    this->start(espbot.get_name());
+    if (!_enabled)
+    {
+        _enabled = true;
+        this->start(espbot.get_name());
+    }
 }
 
 void Mdns::disable(void)

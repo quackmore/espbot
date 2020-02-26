@@ -19,6 +19,7 @@ extern "C"
 
 #include "app_http_routes.hpp"
 #include "espbot.hpp"
+#include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
@@ -26,6 +27,7 @@ extern "C"
 #include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webserver.hpp"
 
@@ -329,6 +331,79 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     }
     // ok send the header
     http_send_buffer(p_espconn, header_str, os_strlen(header_str));
+}
+
+static void get_api_cron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_cron");
+    // "{"cron_enabled": 0}" 20 chars
+    int msg_len = 20;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"cron_enabled\": %d}",
+                   cron_enabled());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_GET_CRON_HEAP_EXHAUSTED, msg_len);
+        ERROR("get_api_cron heap exhausted %d", msg_len);
+    }
+}
+
+static void post_api_cron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_cron");
+    Json_str cron_cfg(parsed_req->req_content, parsed_req->content_len);
+    if (cron_cfg.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    if (cron_cfg.find_pair(f_str("cron_enabled")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'cron_enabled'"), false);
+        return;
+    }
+    if (cron_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'cron_enabled' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_cron_enabled(cron_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_cron_enabled.ref)
+    {
+        os_strncpy(tmp_cron_enabled.ref, cron_cfg.get_cur_pair_value(), cron_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_CRON_HEAP_EXHAUSTED, cron_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_cron heap exhausted %d", cron_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (atoi(tmp_cron_enabled.ref))
+        enable_cron();
+    else
+        disable_cron();
+    save_cron_cfg();
+
+    int msg_len = 20;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"cron_enabled\": %d}",
+                   cron_enabled());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_CRON_HEAP_EXHAUSTED, msg_len);
+        ERROR("get_api_mdns heap exhausted %d", msg_len);
+    }
+    espmem.stack_mon();
 }
 
 static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -655,7 +730,7 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
     char *str_ptr;
     struct dia_event *event_ptr;
     int idx = 0;
-    uint32 time_zone_shift = sntp_get_timezone() * 3600;
+    uint32 time_zone_shift = esp_time.get_timezone() * 3600;
 
     for (idx = 0; idx < evnt_count; idx++)
     {
@@ -1304,6 +1379,226 @@ static void post_api_gpio_set(struct espconn *ptr_espconn, Http_parsed_req *pars
     espmem.stack_mon();
 }
 
+static void get_api_mdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_mdns");
+    // "{"mdns_enabled": 0}" 20 chars
+    int msg_len = 20;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"mdns_enabled\": %d}",
+                   esp_mDns.is_enabled());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_GET_MDNS_HEAP_EXHAUSTED, msg_len);
+        ERROR("get_api_mdns heap exhausted %d", msg_len);
+    }
+}
+
+static void post_api_mdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_mdns");
+    Json_str mdns_cfg(parsed_req->req_content, parsed_req->content_len);
+    if (mdns_cfg.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    if (mdns_cfg.find_pair(f_str("mdns_enabled")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'mdns_enabled'"), false);
+        return;
+    }
+    if (mdns_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'mdns_enabled' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_mdns_enabled(mdns_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_mdns_enabled.ref)
+    {
+        os_strncpy(tmp_mdns_enabled.ref, mdns_cfg.get_cur_pair_value(), mdns_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_MDNS_HEAP_EXHAUSTED, mdns_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_mdns heap exhausted %d", mdns_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (atoi(tmp_mdns_enabled.ref))
+        esp_mDns.enable();
+    else
+        esp_mDns.disable();
+    esp_mDns.save_cfg();
+
+    int msg_len = 36;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"mdns_enabled\": %d}",
+                   esp_mDns.is_enabled());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_MDNS_HEAP_EXHAUSTED, msg_len);
+        ERROR("get_api_mdns heap exhausted %d", msg_len);
+    }
+    espmem.stack_mon();
+}
+
+static void get_api_sntp(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_sntp");
+    // "{"sntp_enabled": 0,"timezone": -12}" 36 chars
+    int msg_len = 36;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"sntp_enabled\": %d,\"timezone\": %d}",
+                   esp_time.sntp_enabled(),
+                   esp_time.get_timezone());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_GET_SNTP_HEAP_EXHAUSTED, msg_len);
+        ERROR("get_api_sntp heap exhausted %d", msg_len);
+    }
+}
+
+static void post_api_sntp(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_sntp");
+    Json_str time_date_cfg(parsed_req->req_content, parsed_req->content_len);
+    if (time_date_cfg.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    if (time_date_cfg.find_pair(f_str("sntp_enabled")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'sntp_enabled'"), false);
+        return;
+    }
+    if (time_date_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'sntp_enabled' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_sntp_enabled(time_date_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_sntp_enabled.ref)
+    {
+        os_strncpy(tmp_sntp_enabled.ref, time_date_cfg.get_cur_pair_value(), time_date_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_SNTP_HEAP_EXHAUSTED, time_date_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_sntp heap exhausted %d", time_date_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (time_date_cfg.find_pair(f_str("timezone")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'timezone'"), false);
+        return;
+    }
+    if (time_date_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'timezone' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_timezone(time_date_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_timezone.ref)
+    {
+        os_strncpy(tmp_timezone.ref, time_date_cfg.get_cur_pair_value(), time_date_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_SNTP_HEAP_EXHAUSTED, time_date_cfg.get_cur_pair_value_len() + 1);
+        ERROR("post_api_sntp heap exhausted %d", time_date_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (atoi(tmp_sntp_enabled.ref))
+        esp_time.enable_sntp();
+    else
+        esp_time.disable_sntp();
+    esp_time.set_timezone(atoi(tmp_timezone.ref));
+    esp_time.save_cfg();
+
+    int msg_len = 36;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"sntp_enabled\": %d,\"timezone\": %d}",
+                   esp_time.sntp_enabled(),
+                   esp_time.get_timezone());
+        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_SNTP_HEAP_EXHAUSTED, msg_len);
+        ERROR("post_api_sntp heap exhausted %d", msg_len);
+    }
+    espmem.stack_mon();
+}
+
+static void post_api_timedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("post_api_timedate");
+    Json_str timedate_val(parsed_req->req_content, parsed_req->content_len);
+    if (timedate_val.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    if (timedate_val.find_pair(f_str("timedate")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'timedate'"), false);
+        return;
+    }
+    if (timedate_val.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'timedate' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_timedate(timedate_val.get_cur_pair_value_len() + 1);
+    if (tmp_timedate.ref)
+    {
+        os_strncpy(tmp_timedate.ref, timedate_val.get_cur_pair_value(), timedate_val.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_TIMEDATE_HEAP_EXHAUSTED, timedate_val.get_cur_pair_value_len() + 1);
+        ERROR("post_api_timedate heap exhausted %d", timedate_val.get_cur_pair_value_len() + 1);
+        return;
+    }
+    esp_time.set_time_manually(atoi(tmp_timedate.ref));
+    
+    // "{"timedate": 01234567891}"
+    int msg_len = 26;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        fs_sprintf(msg.ref,
+                   "{\"timedate\": %s}",
+                   tmp_timedate.ref);
+        http_response(ptr_espconn, HTTP_CREATED, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_POST_API_TIMEDATE_HEAP_EXHAUSTED, msg_len);
+        ERROR("post_api_timedate heap exhausted %d", msg_len);
+    }
+    espmem.stack_mon();
+}
+
 static void get_api_ota_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("get_api_ota_info");
@@ -1625,6 +1920,16 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
         return_file(ptr_espconn, file_name);
         return;
     }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/cron"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_cron(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/cron"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_cron(ptr_espconn, parsed_req);
+        return;
+    }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/hexmemdump"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_debug_hexmemdump(ptr_espconn, parsed_req);
@@ -1734,6 +2039,31 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     if ((os_strcmp(parsed_req->url, f_str("/api/gpio/set")) == 0) && (parsed_req->req_method == HTTP_POST))
     {
         post_api_gpio_set(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/mdns"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_mdns(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/mdns"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_mdns(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/sntp"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_sntp(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/sntp"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_sntp(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/timedate"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        post_api_timedate(ptr_espconn, parsed_req);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ota/info"))) && (parsed_req->req_method == HTTP_GET))
