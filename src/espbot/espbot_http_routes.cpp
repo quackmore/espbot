@@ -730,7 +730,7 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
     char *str_ptr;
     struct dia_event *event_ptr;
     int idx = 0;
-    uint32 time_zone_shift = esp_time.get_timezone() * 3600;
+    // uint32 time_zone_shift = esp_time.get_timezone() * 3600;
 
     for (idx = 0; idx < evnt_count; idx++)
     {
@@ -738,14 +738,14 @@ static void get_api_diag_events(struct espconn *ptr_espconn, Http_parsed_req *pa
         str_ptr = msg.ref + os_strlen(msg.ref);
         if (idx == 0)
             fs_sprintf(str_ptr, "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
-                       (event_ptr->timestamp - time_zone_shift),
+                       event_ptr->timestamp,
                        event_ptr->ack,
                        event_ptr->type,
                        event_ptr->code,
                        event_ptr->value);
         else
             fs_sprintf(str_ptr, ",{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
-                       (event_ptr->timestamp - time_zone_shift),
+                       event_ptr->timestamp,
                        event_ptr->ack,
                        event_ptr->type,
                        event_ptr->code,
