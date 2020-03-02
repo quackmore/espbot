@@ -99,7 +99,7 @@ uint32 TimeDate::get_timestamp()
 char *TimeDate::get_timestr(uint32 t_time)
 {
     char *time_str = sntp_get_real_time(t_time + _timezone * 3600);
-    char *tmp_ptr = os_strstr(time_str, "\n");
+    char *tmp_ptr = os_strstr(time_str, f_str("\n"));
     if (tmp_ptr)
         *tmp_ptr = '\0';
     return time_str;

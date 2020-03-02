@@ -635,7 +635,7 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
     // this is a standard request with header
 
     // checkout url
-    end_ptr = (char *)os_strstr(tmp_ptr, " HTTP");
+    end_ptr = (char *)os_strstr(tmp_ptr, f_str(" HTTP"));
     if (end_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_HTTP_TOKEN);
@@ -654,16 +654,16 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
 
     // checkout Access-Control-Request-Headers
     tmp_ptr = req;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Access-Control-Request-Headers: ");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("Access-Control-Request-Headers: "));
     if (tmp_ptr == NULL)
     {
         tmp_ptr = req;
-        tmp_ptr = (char *)os_strstr(tmp_ptr, "access-control-request-headers: ");
+        tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("access-control-request-headers: "));
     }
     if (tmp_ptr != NULL)
     {
         tmp_ptr += 32;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_ACC_CTRL_REQ_HEADERS);
@@ -683,16 +683,16 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
 
     // checkout Origin
     tmp_ptr = req;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Origin: ");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("Origin: "));
     if (tmp_ptr == NULL)
     {
         tmp_ptr = req;
-        tmp_ptr = (char *)os_strstr(tmp_ptr, "origin: ");
+        tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("origin: "));
     }
     if (tmp_ptr != NULL)
     {
         tmp_ptr += 8;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_ORIGIN);
@@ -713,7 +713,7 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
     // checkout for request content
     // and calculate the effective content length
     tmp_ptr = req;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "\r\n\r\n");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n\r\n"));
     if (tmp_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_CONTENT_START);
@@ -735,11 +735,11 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
     // checkout Content-Length
     parsed_req->h_content_len = parsed_req->content_len;
     tmp_ptr = req;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Length: ");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("Content-Length: "));
     if (tmp_ptr == NULL)
     {
         tmp_ptr = req;
-        tmp_ptr = (char *)os_strstr(tmp_ptr, "content-length: ");
+        tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("content-length: "));
         if (tmp_ptr == NULL)
         {
             TRACE("http_parse_request didn't find any Content-Length");
@@ -748,7 +748,7 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
     if (tmp_ptr != NULL)
     {
         tmp_ptr += 16;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_REQUEST_CANNOT_FIND_CONTENT_LEN);
@@ -1060,7 +1060,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
 
     // looking for HTTP CODE
     tmp_ptr = response;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "HTTP");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("HTTP"));
     if (tmp_ptr == NULL)
     {
         tmp_ptr = response;
@@ -1069,7 +1069,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     else
     {
         parsed_response->no_header_message = false;
-        tmp_ptr = (char *)os_strstr(tmp_ptr, " ");
+        tmp_ptr = (char *)os_strstr(tmp_ptr, f_str(" "));
         do
         {
             tmp_ptr++;
@@ -1089,7 +1089,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         return;
     }
 
-    end_ptr = (char *)os_strstr(tmp_ptr, " ");
+    end_ptr = (char *)os_strstr(tmp_ptr, f_str(" "));
     if (end_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_HTTP_TOKEN);
@@ -1111,7 +1111,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
 
     // now the content-length
     tmp_ptr = response;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Length: ");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("Content-Length: "));
     if (tmp_ptr == NULL)
     {
         TRACE("http_parse_response didn't find any Content-Length");
@@ -1119,7 +1119,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     else
     {
         tmp_ptr += 16;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_CONTENT_LEN);
@@ -1139,14 +1139,14 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     }
     // now Content-Range (if any)
     tmp_ptr = response;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "Content-Range: ");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("Content-Range: "));
     if (tmp_ptr == NULL)
     {
         TRACE("http_parse_response didn't find any Content-Range");
     }
     else
     {
-        tmp_ptr = (char *)os_strstr(tmp_ptr, "bytes");
+        tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("bytes"));
         if (tmp_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_CONTENT_RANGE);
@@ -1154,8 +1154,8 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
             return;
         }
         // range start
-        tmp_ptr += os_strlen("bytes ");
-        end_ptr = (char *)os_strstr(tmp_ptr, "-");
+        tmp_ptr += os_strlen(f_str("bytes "));
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("-"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_RANGE_START);
@@ -1176,7 +1176,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         }
         // range end
         tmp_ptr = end_ptr + 1;
-        end_ptr = (char *)os_strstr(tmp_ptr, "/");
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("/"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_RANGE_END);
@@ -1197,7 +1197,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         }
         // range size
         tmp_ptr = end_ptr + 1;
-        end_ptr = (char *)os_strstr(tmp_ptr, "\r\n");
+        end_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n"));
         if (end_ptr == NULL)
         {
             esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_RANGE_SIZE);
@@ -1219,7 +1219,7 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     }
     // finally the body
     tmp_ptr = response;
-    tmp_ptr = (char *)os_strstr(tmp_ptr, "\r\n\r\n");
+    tmp_ptr = (char *)os_strstr(tmp_ptr, f_str("\r\n\r\n"));
     if (tmp_ptr == NULL)
     {
         esp_diag.error(HTTP_PARSE_RESPONSE_CANNOT_FIND_CONTENT_START);

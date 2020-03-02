@@ -137,6 +137,7 @@ code_str[parseInt("00C1", 16)] = "ROUTES_GET_MDNS_HEAP_EXHAUSTED";
 code_str[parseInt("00C2", 16)] = "ROUTES_POST_MDNS_HEAP_EXHAUSTED";
 code_str[parseInt("00C3", 16)] = "ROUTES_GET_CRON_HEAP_EXHAUSTED";
 code_str[parseInt("00C4", 16)] = "ROUTES_POST_CRON_HEAP_EXHAUSTED";
+code_str[parseInt("00C5", 16)] = "ROUTES_GET_API_DEBUG_LAST_RST_HEAP_EXHAUSTED";
 code_str[parseInt("00D0", 16)] = "OTA_INIT_DEFAULT_CFG";
 code_str[parseInt("00D1", 16)] = "OTA_SET_PATH_HEAP_EXHAUSTED";
 code_str[parseInt("00D2", 16)] = "OTA_SET_CHECK_VERSION_UNKNOWN_VALUE";

@@ -85,7 +85,7 @@ void atoipaddr(struct ip_addr *ip, char *str)
     do
     {
         if (cnt < 3)
-            end_ptr = (char *)os_strstr(tmp_ptr, ".");
+            end_ptr = (char *)os_strstr(tmp_ptr, f_str("."));
         else
             end_ptr = str + os_strlen(str);
         if (end_ptr == NULL)

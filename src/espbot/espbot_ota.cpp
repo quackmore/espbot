@@ -35,7 +35,7 @@ void Ota_upgrade::init(void)
         set_host("0.0.0.0");
         _port = 0;
         _path = new char[2];
-        os_strncpy(_path, "/", 1);
+        os_strncpy(_path, f_str("/"), 1);
         _check_version = false;
         _reboot_on_completion = false;
         esp_diag.warn(OTA_INIT_DEFAULT_CFG);
@@ -412,11 +412,11 @@ static int release_cmp(char *cur_rel, char *avail_rel)
         switch (idx)
         {
         case 0:
-            tmp_sep = ".";
+            tmp_sep = (char *)f_str(".");
             break;
         case 1:
         case 2:
-            tmp_sep = "-";
+            tmp_sep = (char *)f_str("-");
             break;
         default:
             break;

@@ -2,23 +2,33 @@
 
 ## Summary
 
-Empty structure for esp8266 apps (NON-OS SDK and C++).
+Library built on Espressif NON-OS SDK with common functions for esp8266 apps.
 
-Features:
+## Features
 
 + configuration persistency
-+ GPIO
-+ logger
++ cron (linux style)
++ customizable logger over serial interface
++ customizable diagnostic events logger (in memory, available through http)
++ digital I/O provisioning and management
++ json
++ linked lists
 + mDns
++ macros for storing strings into flash and save on RAM memory
 + memory monitor (stack and heap)
 + OTA
-+ SNTP
++ queues
++ customizable profiler over serial interface
 + SPIFFS
++ time and date with or without SNTP
 + wifi management (chromecast style)
-+ WEBSERVER (APIs listed below)
 + WEBCLIENT
++ customizable WEBSERVER
 
-more to come ... (OTA with periodic check of new version available)
+## Memory usage
+
++ about 30 kB of RAM are available to user application (while idle more than 43 kB are available but under stress conditions, for both SDK and ESPBOT, available memory got reduced by 10 kB and a little more)
++ ESPBOT uses 8 bytes of RTC memory, leaving 504 bytes available to user application
 
 ## Webserver APIs
 
@@ -26,35 +36,36 @@ checkout postman API documentation:
 
 espbot_2.0_apis
 
-https://documenter.getpostman.com/view/4220776/RznCsKph
+<https://documenter.getpostman.com/view/4220776/RznCsKph>
 
 espbot_2.0_apis_single_commands
 (these are just commands that cannot be run in a test sequence)
 
-https://documenter.getpostman.com/view/4220776/RznCsKpj
+<https://documenter.getpostman.com/view/4220776/RznCsKpj>
 
 espbot_2.0_gpio
 (for managing ESP8266 digital I/O)
 
-https://documenter.getpostman.com/view/4220776/RzthSXGC
+<https://documenter.getpostman.com/view/4220776/RzthSXGC>
 
 ## Using ESPBOT
 
 ### Building the binaries and flashing ESP8266
 
-Needed:
-+[Espressif NON-OS SDK](https://github.com/espressif/ESP8266_NONOS_SDK) in a separate repository.
-+[esp-open-sdk toolchain](https://github.com/pfalcon/esp-open-sdk) in a separate repository; build the bare Xtensa toolchain and leave ESP8266 SDK separate using:
+Required:
 
-      $ make STANDALONE=n
- 
++ [Espressif NON-OS SDK] (<https://github.com/espressif/ESP8266_NONOS_SDK)> in a separate repository.
++ [esp-open-sdk toolchain] (<https://github.com/pfalcon/esp-open-sdk)> in a separate repository; build the bare Xtensa toolchain and leave ESP8266 SDK separate using:
+
+      make STANDALONE=n
 
 Build steps (linux)
-+Clone the repository.
-+Customize build variables according to your ESP8266 module: 
-      
-      $ cd <your path>/espbot
-      $ ./gen_env.sh
+
++ Clone the repository.
++ Customize build variables according to your ESP8266 module and environment:
+
+      cd <your path>/espbot_2.0
+      ./gen_env.sh
 
       this will generate a env.sh file
       for instance a WEMOS D1 mini file will look like this:
@@ -66,54 +77,81 @@ Build steps (linux)
       export SPI_SPEED=40
       export SPI_MODE=DIO
       export SPI_SIZE_MAP=4
+      export COMPILE=gcc
+      export COMPORT=<your COM port>
+      export CC_DIR=<your path to compiler>
+      export PATH=$PATH:<your path to compiler>
+      export SDK_DIR=<your path to ESP8266_NONOS_SDK>
+      export BOOT=new
+      export APP=1
+      export SPI_SPEED=40
+      export FREQDIV=0
+      export SPI_MODE=dio
+      export MODE=2
+      export SPI_SIZE_MAP=6
+      export FLASH_SIZE=4096
+      export LD_REF=2048
+      export FLASH_OPTIONS=" write_flash -fm dio -fs 32m-c1 -ff 40m "
+      export FLASH_INIT="0x3FB000 <your path to ESP8266_NONOS_SDK>/bin/blank.bin 0x3FC000 <your path to ESP8266_NONOS_SDK>/bin/esp_init_data_default_v08.bin 0x3FE000 <your path to ESP8266_NONOS_SDK>/blank.bin"
 
-+Build with
++ Building (commands available as tasks in case you are using Visual Studio)
   
-      $ . env.sh
-      $ make
+  Clean project
+  
+      source ${workspaceFolder}/env.sh && make clean
 
-+Flash ESP8266 using esptool.py (checkout you distribution packages or [github repository](https://github.com/espressif/esptool))
+  Building current user#.bin
+
+      source ${workspaceFolder}/env.sh && make all
+
+  Building user1.bin
   
-      this is an example that works for WEMOS D1 mini, customize memory addresses according to your flash size
-      
-      Obtaining a clean starting point
-      $ esptool.py erase_flash
-      
-      Initizalizing flash for ESP SDK
-      $ esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x00000 <your path to ESP NONOS SDK>/bin/boot_v1.7.bin 
-      $ esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x3FB000 <your path to ESP NONOS SDK>/bin/blank.bin
-      $ esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x3FC000 <your path to ESP NONOS SDK>/bin/esp_init_data_default_v08.bin
-      $ esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x3FE000 <your path to ESP NONOS SDK>/bin/blank.bin
-      
-      Flashing espbot code
-      $ cd <your path>/espbot
-      $ esptool.py --port /dev/ttyUSB0 write_flash -fm dio -fs 32m -ff 40m 0x01000 bin/upgrade/user1.4096.new.4.bin
+      source ${workspaceFolder}/env.sh && make -e APP=1 all
+
+  Building user2.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=2 all
+
+  Building both user1.bin and user2.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=1 all && make -e APP=2 all
+
++ Flashing ESP8266 using esptool.py (checkout your distribution packages or [github repository](https://github.com/espressif/esptool)) (commands available as tasks in case you are using Visual Studio)
+  
+  Erase flash
+  
+      source ${workspaceFolder}/env.sh && make flash_erase
+
+  Flash the bootloader
+  
+      source ${workspaceFolder}/env.sh && make flash_boot
+
+  Flash init
+  
+      source ${workspaceFolder}/env.sh && make flash_init
+
+  Flash current user#.bin
+  
+      source ${workspaceFolder}/env.sh && make flash
+
+  Flash user1.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=1 flash
+
+  Flash user2.bin
+  
+      source ${workspaceFolder}/env.sh && make -e APP=2 flash
 
 ### FOTA example
 
-Here is an example on how to use espbot FOTA using a [docker](https://www.docker.com/community-edition#/download) container as the http server (thank you docker for existing).
-Consider that binary names change according to your ESP8266 module flash size and map.
-      
-      Generating the binaries:
-      $ cd <your espbot directory>
-      $ mkdir bin/upgrade/www
-      $ . env.sh
-      $ export APP=1
-      $ make clean
-      $ make
-      $ cp bin/upgrade/user1.4096.new.4.bin bin/upgrade/www/user1.bin
-      $ export APP=2
-      $ make clean
-      $ make
-      $ cp bin/upgrade/user2.4096.new.4.bin bin/upgrade/www/user2.bin
-      $ make | grep VERSION: | awk '{print $2}' >bin/upgrade/www/version.txt
+Here is an example on how to use espbot FOTA using a [docker](https://www.docker.com/community-edition#/download) container as http server (thank you docker for existing).
 
       Start an http server using docker:
       $ docker run -d --name espbot-http-upgrade -p 80:80 -v <your espbot directory>/bin/upgrade/www:/usr/share/nginx/html:ro nginx:alpine
 
       Configure espbot:
 
-      curl --location --request POST "http://192.168.1.187/api/ota/cfg" \
+      curl --location --request POST "http://<esp IP address>/api/ota/cfg" \
            --header "Content-Type: application/json" \
            --data "{
                      \"host\": \"yourHostIP\",
@@ -125,11 +163,11 @@ Consider that binary names change according to your ESP8266 module flash size an
       
       Start upgrade:
 
-      curl --location --request POST "http://192.168.1.187/api/ota/upgrade" --data ""
+      curl --location --request POST "http://<esp IP address>/api/ota/upgrade" --data ""
 
 ## Integrating
 
-To integrate espbot in your project as a library use the following files:
+To integrate espbot in your project as a library checkout src/app example source files for how to build your app and use the following files:
 
 + lib/libespbot.a
 + lib/libdriver.a
@@ -148,24 +186,28 @@ Espot include files are:
 + driver_uart.h
 + esp8266_io.h
 + espbot_config.hpp
-+ espbot_debug.hpp
++ espbot_cron.hpp
++ espbot_diagnostic.hpp
++ espbot_event_codes.h
 + espbot_global.hpp
 + espbot_gpio.hpp
-+ espbot_http.hpp
 + espbot_http_routes.hpp
++ espbot_http.hpp
 + espbot_json.hpp
 + espbot_list.hpp
-+ espbot_logger.hpp
 + espbot_mdns.hpp
++ espbot_mem_macros.h
++ espbot_mem_mon.h
 + espbot_ota.hpp
++ espbot_profiler.hpp
 + espbot_queue.hpp
-+ espbot_sntp.hpp
++ espbot_rtc_mem_map.h
++ espbot_timedate.hpp
 + espbot_utils.hpp
 + espbot_webclient.hpp
 + espbot_webserver.hpp
 + espbot_wifi.hpp
 + espbot.hpp
-+ iram.h
 + spiffs_config.h
 + spiffs_esp8266.hpp
 + spiffs_flash_functions.hpp

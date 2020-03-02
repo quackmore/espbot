@@ -210,9 +210,9 @@ void Wifi::set_stationap(void)
     //     TRACE("AP config: Security:    Unknown");
     //     break;
     // }
-    // now start the webserver
-    espwebsvr.stop(); // in case there was a web server listening on esp station interface
-    espwebsvr.start(80);
+    //
+    // now AP is ready
+    system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
 }
 
 void Wifi::connect(void)
@@ -316,14 +316,14 @@ static int saved_cfg_not_updated(void)
 
 void Wifi::init()
 {
-    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32); // uint8 ssid[32];
-    os_strcpy((char *)ap_config.password, "espbot123456");     // uint8 password[64];
-    ap_config.ssid_len = 0;                                    // uint8 ssid_len;
-    ap_config.channel = 1;                                     // uint8 channel;
-    ap_config.authmode = AUTH_WPA2_PSK;                        // uint8 authmode;
-    ap_config.ssid_hidden = 0;                                 // uint8 ssid_hidden;
-    ap_config.max_connection = 4;                              // uint8 max_connection;
-    ap_config.beacon_interval = 100;                           // uint16 beacon_interval;
+    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32);    // uint8 ssid[32];
+    os_strcpy((char *)ap_config.password, f_str("espbot123456")); // uint8 password[64];
+    ap_config.ssid_len = 0;                                       // uint8 ssid_len;
+    ap_config.channel = 1;                                        // uint8 channel;
+    ap_config.authmode = AUTH_WPA2_PSK;                           // uint8 authmode;
+    ap_config.ssid_hidden = 0;                                    // uint8 ssid_hidden;
+    ap_config.max_connection = 4;                                 // uint8 max_connection;
+    ap_config.beacon_interval = 100;                              // uint16 beacon_interval;
 
     if (restore_cfg() != CFG_OK) // something went wrong while loading flash config
     {

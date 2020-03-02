@@ -70,6 +70,11 @@ static void espbot_coordinator_task(os_event_t *e)
     case SIG_SOFTAPMODE_STADISCONNECTED:
         // [wifi station+AP] station disconnected
         break;
+    case SIG_SOFTAPMODE_READY:
+        espwebsvr.stop(); // in case there was a web server listening on esp station interface
+        espwebsvr.start(80);
+        app_init_after_wifi();
+        break;
     case SIG_HTTP_CHECK_PENDING_RESPONSE:
         // getting here from webserver after send callback completed
         http_check_pending_send();
@@ -132,7 +137,6 @@ void Espbot::set_name(char *t_name)
     save_cfg();
 }
 
-
 // make espbot_init available to user_main.c
 extern "C" void espbot_init(void);
 
@@ -147,8 +151,8 @@ void espbot_init(void)
 
     espfs.init();
     esp_diag.init();
-    espbot.init();
     esp_time.init();
+    espbot.init();
     esp_mDns.init();
     esp_ota.init();
     http_init();
@@ -272,7 +276,7 @@ void Espbot::reset(int t_reset)
     switch (graceful_rst_counter)
     {
     case 0:
-        // waiting for completion of any http com 
+        // waiting for completion of any http com
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 300, 0);
         break;
@@ -307,8 +311,6 @@ void Espbot::init(void)
 {
     // set default name
     fs_sprintf(_name, "ESPBOT-%d", system_get_chip_id());
-    _mdns_enabled = false;
-
     if (restore_cfg())
     {
         esp_diag.warn(ESPBOT_INIT_DEFAULT_CFG);
@@ -318,7 +320,7 @@ void Espbot::init(void)
 
     // REPLACED BY A CRON JOB (2020-02-17)
     //
-    // start an heartbeat timer 
+    // start an heartbeat timer
     // os_timer_disarm(&_heartbeat);
     // os_timer_setfn(&_heartbeat, (os_timer_func_t *)heartbeat_cb, NULL);
     // os_timer_arm(&_heartbeat, HEARTBEAT_PERIOD, 1);
@@ -326,6 +328,13 @@ void Espbot::init(void)
     // setup the task
     _queue = new os_event_t[QUEUE_LEN];
     system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, _queue, QUEUE_LEN);
+    // keep trace of the reboot time
+    _lastRebootTime = esp_time.get_timestamp();
+}
+
+uint32 Espbot::get_last_reboot_time(void)
+{
+    return _lastRebootTime;
 }
 
 // execute a function from a task

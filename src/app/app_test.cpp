@@ -736,7 +736,7 @@ void run_test(int idx)
         TRACE("string mapped in flash: %s", str);
         TRACE("string mapped in ram: %s", tmp_str);
         TRACE("now comparing a string mapped in flash");
-        int res = os_strcmp(str, "example 1");
+        int res = os_strcmp(str, f_str("example 1"));
         TRACE("result: %d", res);
         res = os_strcmp(str, f_str("example 1"));
         TRACE("result: %d", res);

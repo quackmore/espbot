@@ -217,7 +217,6 @@ CCFLAGS += 			                       \
 	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
-#	-DUSE_OPTIMIZE_PRINTF=1                \
 
 CCPPFLAGS += 			                   \
 	-g			                           \
@@ -239,7 +238,6 @@ CCPPFLAGS += 			                   \
 	-DAPP_RELEASE=\"$(GIT_VERSION)\"       \
 	-DSPI_FLASH_SIZE_MAP=$(SPI_SIZE_MAP)
 #	-Wall			
-#	-DUSE_OPTIMIZE_PRINTF=1                \
 
 
 

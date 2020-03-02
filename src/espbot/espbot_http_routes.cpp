@@ -80,20 +80,20 @@ static const char *get_file_mime_type(char *filename)
 {
     ALL("get_file_mime_type");
     char *ptr;
-    ptr = (char *)os_strstr(filename, ".");
+    ptr = (char *)os_strstr(filename, f_str("."));
     if (ptr == NULL)
         return f_str("text/plain");
     else
     {
-        if (os_strcmp(ptr, ".css") == 0)
+        if (os_strcmp(ptr, f_str(".css")) == 0)
             return f_str("text/css");
-        else if (os_strcmp(ptr, ".txt") == 0)
+        else if (os_strcmp(ptr, f_str(".txt")) == 0)
             return f_str("text/plain");
-        else if (os_strcmp(ptr, ".html") == 0)
+        else if (os_strcmp(ptr, f_str(".html")) == 0)
             return f_str("text/html");
-        else if (os_strcmp(ptr, ".js") == 0)
+        else if (os_strcmp(ptr, f_str(".js")) == 0)
             return f_str("text/javascript");
-        else if (os_strcmp(ptr, ".css") == 0)
+        else if (os_strcmp(ptr, f_str(".css")) == 0)
             return f_str("text/css");
         else
             return f_str("text/plain");
@@ -483,6 +483,61 @@ static void get_api_debug_hexmemdump(struct espconn *ptr_espconn, Http_parsed_re
         ptr = msg.ref + os_strlen(msg.ref);
     }
     fs_sprintf(msg.ref + os_strlen(msg.ref), "\"}");
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void get_api_debug_last_rst(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("get_api_debug_last_rst");
+    // enum rst_reason
+    // {
+    //     REASON_DEFAULT_RST = 0,
+    //     REASON_WDT_RST = 1,
+    //     REASON_EXCEPTION_RST = 2,
+    //     REASON_SOFT_WDT_RST = 3,
+    //     REASON_SOFT_RESTART = 4,
+    //     REASON_DEEP_SLEEP_AWAKE = 5,
+    //     REASON_EXT_SYS_RST = 6
+    // };
+    // struct rst_info
+    // {
+    //     uint32 reason;
+    //     uint32 exccause;
+    //     uint32 epc1;
+    //     uint32 epc2;
+    //     uint32 epc3;
+    //     uint32 excvaddr;
+    //     uint32 depc;
+    // };
+    // {"date":"","reason": ,"exccause": ,"epc1": ,"epc2": ,"epc3": ,"evcvaddr": ,"depc": }
+    int str_len = 84 + 24 + 7 * 10 + 1;
+    Heap_chunk msg(str_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(ROUTES_GET_API_DEBUG_LAST_RST_HEAP_EXHAUSTED, str_len);
+        ERROR("get_api_debug_last_rst heap exhausted %d", str_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap memory exhausted"), false);
+        return;
+    }
+    struct rst_info *last_rst = system_get_rst_info();
+    fs_sprintf(msg.ref,
+               "{\"date\":\"%s\","
+               "\"reason\": %X,"
+               "\"exccause\": %X,"
+               "\"epc1\": %X,",
+               esp_time.get_timestr(espbot.get_last_reboot_time()),
+               last_rst->reason,
+               last_rst->exccause,
+               last_rst->epc1);
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"epc2\": %X,"
+               "\"epc3\": %X,"
+               "\"evcvaddr\": %X,"
+               "\"depc\": %X}",
+               last_rst->epc2,
+               last_rst->epc3,
+               last_rst->excvaddr,
+               last_rst->depc);
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
@@ -1933,6 +1988,11 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/hexmemdump"))) && (parsed_req->req_method == HTTP_GET))
     {
         get_api_debug_hexmemdump(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/last_rst"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        get_api_debug_last_rst(ptr_espconn, parsed_req);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/debug/memdump"))) && (parsed_req->req_method == HTTP_GET))

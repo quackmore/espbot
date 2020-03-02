@@ -116,25 +116,25 @@ static void state_current_time(struct date *time)
     // get day of month
     init_ptr += 4;
     os_memset(tmp_str, 0, 5);
-    end_ptr = os_strstr(init_ptr, " ");
+    end_ptr = os_strstr(init_ptr, f_str(" "));
     os_strncpy(tmp_str, init_ptr, (end_ptr - init_ptr));
     time->day_of_month = atoi(tmp_str);
     // get hours
     init_ptr = end_ptr + 1;
     os_memset(tmp_str, 0, 5);
-    end_ptr = os_strstr(init_ptr, ":");
+    end_ptr = os_strstr(init_ptr, f_str(":"));
     os_strncpy(tmp_str, init_ptr, (end_ptr - init_ptr));
     time->hours = atoi(tmp_str);
     // get minutes
     init_ptr = end_ptr + 1;
     os_memset(tmp_str, 0, 5);
-    end_ptr = os_strstr(init_ptr, ":");
+    end_ptr = os_strstr(init_ptr, f_str(":"));
     os_strncpy(tmp_str, init_ptr, (end_ptr - init_ptr));
     time->minutes = atoi(tmp_str);
     // get seconds
     init_ptr = end_ptr + 1;
     os_memset(tmp_str, 0, 5);
-    end_ptr = os_strstr(init_ptr, " ");
+    end_ptr = os_strstr(init_ptr, f_str(" "));
     os_strncpy(tmp_str, init_ptr, (end_ptr - init_ptr));
     time->seconds = atoi(tmp_str);
     // get year

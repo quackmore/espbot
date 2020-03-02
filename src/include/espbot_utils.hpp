@@ -59,23 +59,4 @@ public:
   //        }
 };
 
-// using fs_sprintf keep fmt len under 70 chars
-// otherwise a read exception will occurr
-
-#define fs_sprintf(buf, fmt, ...)                             \
-  do                                                          \
-  {                                                           \
-    static const char flash_str[] IROM_TEXT STORE_ATTR = fmt; \
-    os_sprintf_plus(buf, flash_str, ##__VA_ARGS__);           \
-  } while (0)
-
-#define fs_printf(fmt, ...)                                   \
-  do                                                          \
-  {                                                           \
-    static const char flash_str[] IROM_TEXT STORE_ATTR = fmt; \
-    os_printf_plus(flash_str, ##__VA_ARGS__);                 \
-  } while (0)
-
-#define f_str(str) ({ static const char flash_str[] IROM_TEXT STORE_ATTR = str; &flash_str[0]; })
-
 #endif
