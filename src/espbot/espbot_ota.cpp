@@ -509,7 +509,7 @@ static void ota_ask_version(void *param)
         Heap_chunk req(req_len);
         if (req.ref == NULL)
         {
-            ERROR("%s - heap exausted [%d]", __FUNCTION__, req_len);
+            ERROR("ota_ask_version - heap exausted [%d]", req_len);
             esp_ota.set_status(OTA_FAILED);
             ota_client->disconnect(check_for_new_release_cleanup, NULL);
             break;
