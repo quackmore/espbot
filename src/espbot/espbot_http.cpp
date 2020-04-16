@@ -488,11 +488,11 @@ char *http_format_header(class Http_header *p_header)
     {
         header_length += 37; // Access-Control-Request-Headers string format
         header_length += os_strlen(p_header->m_acrh);
-        header_length += os_strlen(f_str("Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n"));
     }
 
     if (p_header->m_origin)
     {
+        header_length += os_strlen(f_str("Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n"));
         header_length += 34; // Origin string format
         header_length += os_strlen(p_header->m_origin);
     }
@@ -520,11 +520,11 @@ char *http_format_header(class Http_header *p_header)
         {
             fs_sprintf(ptr, "Access-Control-Allow-Origin: %s\r\n", p_header->m_origin);
             ptr = ptr + os_strlen(ptr);
+            fs_sprintf(ptr, "Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
+            ptr = ptr + os_strlen(ptr);
         }
         if (p_header->m_acrh)
         {
-            fs_sprintf(ptr, "Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n");
-            ptr = ptr + os_strlen(ptr);
             fs_sprintf(ptr, "Access-Control-Allow-Headers: Content-Type,%s\r\n", p_header->m_acrh);
             ptr = ptr + os_strlen(ptr);
         }

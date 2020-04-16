@@ -302,22 +302,36 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     Http_header header;
     header.m_code = HTTP_OK;
     header.m_content_type = (char *)get_file_mime_type(HTTP_CONTENT_TEXT);
-    header.m_origin = new char[os_strlen(parsed_req->origin) + 1];
-    if (header.m_origin == NULL)
+    if (parsed_req->origin)
     {
-        esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
-        return;
+        header.m_origin = new char[os_strlen(parsed_req->origin) + 1];
+        if (header.m_origin == NULL)
+        {
+            esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
+            return;
+        }
+        os_strcpy(header.m_origin, parsed_req->origin);
     }
-    os_strcpy(header.m_origin, parsed_req->origin);
-    header.m_acrh = new char[os_strlen(parsed_req->acrh) + 1];
-    if (header.m_acrh == NULL)
+    else
     {
-        esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->acrh) + 1));
-        http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
-        return;
+        header.m_origin = NULL;
     }
-    os_strcpy(header.m_acrh, parsed_req->acrh);
+    if(parsed_req->acrh)
+    {
+        header.m_acrh = new char[os_strlen(parsed_req->acrh) + 1];
+        if (header.m_acrh == NULL)
+        {
+            esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->acrh) + 1));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Not enough heap memory"), false);
+            return;
+        }
+        os_strcpy(header.m_acrh, parsed_req->acrh);
+    }
+    else
+    {
+        header.m_acrh = NULL;
+    }
     header.m_content_length = 0;
     header.m_content_range_start = 0;
     header.m_content_range_end = 0;
@@ -1635,7 +1649,7 @@ static void post_api_timedate(struct espconn *ptr_espconn, Http_parsed_req *pars
         return;
     }
     esp_time.set_time_manually(atoi(tmp_timedate.ref));
-    
+
     // "{"timedate": 01234567891}"
     int msg_len = 26;
     Heap_chunk msg(msg_len, dont_free);
@@ -1965,7 +1979,7 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/"))) && (parsed_req->req_method == HTTP_GET))
     {
-        return_file(ptr_espconn, (char *) f_str("index.html"));
+        return_file(ptr_espconn, (char *)f_str("index.html"));
         return;
     }
     if ((os_strncmp(parsed_req->url, f_str("/api/"), 5)) && (parsed_req->req_method == HTTP_GET))
