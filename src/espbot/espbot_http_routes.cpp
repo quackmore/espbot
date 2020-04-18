@@ -317,7 +317,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     {
         header.m_origin = NULL;
     }
-    if(parsed_req->acrh)
+    if (parsed_req->acrh)
     {
         header.m_acrh = new char[os_strlen(parsed_req->acrh) + 1];
         if (header.m_acrh == NULL)
@@ -1882,6 +1882,8 @@ static void get_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     }
 }
 
+static os_timer_t wifi_connect_timer;
+
 static void post_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("post_api_wifi_cfg");
@@ -1915,7 +1917,11 @@ static void post_api_wifi_cfg(struct espconn *ptr_espconn, Http_parsed_req *pars
     }
     Wifi::station_set_ssid(tmp_ssid, tmp_ssid_len);
     Wifi::station_set_pwd(wifi_cfg.get_cur_pair_value(), wifi_cfg.get_cur_pair_value_len());
-    Wifi::connect();
+    // wait before connecting to the AP so that the client could get the response
+    os_timer_disarm(&wifi_connect_timer);
+    os_timer_setfn(&wifi_connect_timer, (os_timer_func_t *)Wifi::connect, NULL);
+    os_timer_arm(&wifi_connect_timer, 1000, 0);
+    // Wifi::connect();
     espmem.stack_mon();
 
     Heap_chunk msg(140, dont_free);
