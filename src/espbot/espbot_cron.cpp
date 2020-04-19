@@ -41,7 +41,6 @@ static bool cron_running;
 
 static int get_day_of_week(char *str)
 {
-    // 0 - Sun      Sunday
     // 1 - Mon      Monday
     // 2 - Tue      Tuesday
     // 3 - Wed      Wednesday
@@ -49,8 +48,6 @@ static int get_day_of_week(char *str)
     // 5 - Fri      Friday
     // 6 - Sat      Saturday
     // 7 - Sun      Sunday
-    if (0 == os_strncmp(str, f_str("Sun"), 3))
-        return 0;
     if (0 == os_strncmp(str, f_str("Mon"), 3))
         return 1;
     if (0 == os_strncmp(str, f_str("Tue"), 3))
@@ -63,6 +60,8 @@ static int get_day_of_week(char *str)
         return 5;
     if (0 == os_strncmp(str, f_str("Sat"), 3))
         return 6;
+    if (0 == os_strncmp(str, f_str("Sun"), 3))
+        return 7;
     return -1;
 }
 
