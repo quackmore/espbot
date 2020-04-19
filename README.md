@@ -151,19 +151,20 @@ Here is an example on how to use espbot FOTA using a [docker](https://www.docker
 
       Configure espbot:
 
-      curl --location --request POST "http://<esp IP address>/api/ota/cfg" \
-           --header "Content-Type: application/json" \
-           --data "{
-                     \"host\": \"yourHostIP\",
-                     \"port\": 80,
-                     \"path\": \"/\",
-                     \"check_version\": \"false\",
-                     \"reboot_on_completion\": \"true\"
-                   }"
+      curl --location --request POST 'http://{{host}}/api/ota/cfg' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+          "host": "192.168.1.201",
+          "port": 80,
+          "path": "/",
+          "check_version": "false",
+          "reboot_on_completion": "true"
+      }'
       
       Start upgrade:
 
-      curl --location --request POST "http://<esp IP address>/api/ota/upgrade" --data ""
+      curl --location --request POST 'http://{{host}}/api/ota/upgrade' \
+      --data-raw ''
 
 ## Integrating
 
