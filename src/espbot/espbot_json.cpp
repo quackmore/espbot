@@ -73,7 +73,7 @@ static char *find_array_end(char *t_str)
 int Json_str::syntax_check(void)
 {
     char *ptr = _cursor;
-    bool another_pair_found;
+    bool another_pair_found = false;
     espmem.stack_mon();
 
     _pair_value_type = JSON_TYPE_ERR;
@@ -94,6 +94,8 @@ int Json_str::syntax_check(void)
         {
             if (*ptr == '"')
                 break;
+            if ((*ptr == '}') && (!another_pair_found))
+                return -1; // fine, this is an empty object
             if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
                 return (ptr - _str + 1);
             ptr++;
@@ -280,7 +282,7 @@ Json_pair_type Json_str::find_next_pair(void)
         _cursor++;
     }
     if ((_cursor - _str) == _str_len)
-        return JSON_ERR;
+        return JSON_NO_NEW_PAIR_FOUND;
     _cursor++;
     if ((_cursor - _str) < _str_len) // check that after a '"' actually a string start
     {
@@ -485,7 +487,7 @@ Json_array_str::Json_array_str(char *t_str, int t_len)
 int Json_array_str::syntax_check(void)
 {
     char *ptr = _cursor;
-    bool another_pair_found;
+    bool another_pair_found = false;
     int tmp_elem_count = 1;
     espmem.stack_mon();
 
@@ -505,6 +507,11 @@ int Json_array_str::syntax_check(void)
     {
         while ((ptr - _str) < _str_len) // looking for starting '"' or number or object
         {
+            if ((*ptr == ']') && (!another_pair_found)) // found an empty array
+            {
+                _el_count = 0;
+                return -1; // the syntax is fine
+            }
             if (*ptr == '"') // found a string
             {
                 _el_type = JSON_STRING;
@@ -536,7 +543,7 @@ int Json_array_str::syntax_check(void)
             ptr++;
             while ((ptr - _str) < _str_len) // looking for number end
             {
-                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == '\n'))
+                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ']') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == '\n'))
                     break;
                 if (((*ptr >= '0') && (*ptr <= '9')) || (*ptr == '.'))
                 {
@@ -547,7 +554,7 @@ int Json_array_str::syntax_check(void)
             }
             if ((ptr - _str) == _str_len)
                 return (ptr - _str + 1);
-            if ((*ptr == ',') || (*ptr == '}'))
+            if ((*ptr == ',') || (*ptr == '}') || (*ptr == ']'))
                 ptr--; // to make it like string end
         }
         else if (_el_type == JSON_OBJECT)
@@ -637,7 +644,7 @@ int Json_array_str::size(void)
 int Json_array_str::find_elem(int idx)
 {
     char *ptr = _cursor;
-    bool another_elem_found;
+    bool another_elem_found = false;
     int tmp_elem_count = 0;
     espmem.stack_mon();
 
@@ -647,16 +654,20 @@ int Json_array_str::find_elem(int idx)
         if (*ptr == '[')
             break;
         if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
-            return (ptr - _str);
+            return -1;
         ptr++;
     }
     if ((ptr - _str) == _str_len)
-        return (ptr - _str);
+        return -1;
     ptr++;
     do
     {
         while ((ptr - _str) < _str_len) // looking for starting '"' or number or object
         {
+            if ((*ptr == ']') && (!another_elem_found)) // found an empty array
+            {
+                return -1;
+            }
             if (*ptr == '"') // found a string
             {
                 // mark the element start
@@ -686,30 +697,30 @@ int Json_array_str::find_elem(int idx)
                 break;
             }
             if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
-                return (ptr - _str + 1);
+                return -1;
             ptr++;
         }
         if ((ptr - _str) == _str_len)
-            return (ptr - _str + 1);
+            return -1;
         if (_el_type == JSON_INTEGER)
         {
             ptr++;
             while ((ptr - _str) < _str_len) // looking for number end
             {
-                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == '\n'))
+                if ((*ptr == ',') || (*ptr == '}') || (*ptr == ']') || (*ptr == ' ') || (*ptr == '\r') || (*ptr == '\n'))
                     break;
                 if (((*ptr >= '0') && (*ptr <= '9')) || (*ptr == '.'))
                 {
                     ptr++;
                     continue;
                 }
-                return (ptr - _str + 1);
+                return -1;
             }
             // calculate the element len
             _el_len = (ptr - _el);
             if ((ptr - _str) == _str_len)
-                return (ptr - _str + 1);
-            if ((*ptr == ',') || (*ptr == '}'))
+                return -1;
+            if ((*ptr == ',') || (*ptr == '}') || (*ptr == ']'))
                 ptr--; // to make it like string end
         }
         else if (_el_type == JSON_OBJECT)
@@ -732,10 +743,10 @@ int Json_array_str::find_elem(int idx)
             if ((ptr - _str) < _str_len) // check that after a '"' actually a string start
             {
                 if ((*ptr == '"') || (*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
-                    return (ptr - _str + 1);
+                    return -1;
             }
             else
-                return (ptr - _str + 1);
+                return -1;
             ptr++;
             while ((ptr - _str) < _str_len) // looking for ending '"'
             {
@@ -746,11 +757,11 @@ int Json_array_str::find_elem(int idx)
                     break;
                 }
                 if ((*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
-                    return (ptr - _str + 1);
+                    return -1;
                 ptr++;
             }
             if ((ptr - _str) == _str_len)
-                return (ptr - _str + 1);
+                return -1;
         }
         // check if this is the idx elem
         if (tmp_elem_count == idx)
@@ -768,11 +779,11 @@ int Json_array_str::find_elem(int idx)
                 break;
             }
             if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
-                return (ptr - _str + 1);
+                return -1;
             ptr++;
         }
         if ((ptr - _str) == _str_len)
-            return (ptr - _str + 1);
+            return -1;
         if (another_elem_found)
             ptr++;
     } while (another_elem_found);
@@ -780,10 +791,10 @@ int Json_array_str::find_elem(int idx)
     while ((ptr - _str) < _str_len) // looking for end of string
     {
         if ((*ptr != ' ') && (*ptr != '\r') && (*ptr != '\n'))
-            return (ptr - _str + 1);
+            return -1;
         ptr++;
     }
-    return -1; // the syntax is fine
+    return -1; // couldn't find the element idx
 }
 
 char *Json_array_str::get_elem(int idx)
