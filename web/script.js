@@ -1,8 +1,8 @@
 const esp8266 = {
-  "url": "",
-  "cors": false
-  // "url": "http://192.168.1.229",
-  // "cors": true
+  // "url": "",
+  // "cors": false
+  "url": "http://192.168.1.187",
+  "cors": true
 };
 
 $(document).ready(function () {

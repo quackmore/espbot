@@ -252,7 +252,7 @@ void http_send_buffer(struct espconn *p_espconn, char *msg, int len)
         // set a timeout timer for clearing the esp_busy_sending_data in case something goes wrong
         os_timer_disarm(&clear_busy_sending_data_timer);
         os_timer_setfn(&clear_busy_sending_data_timer, (os_timer_func_t *)clear_busy_sending_data, NULL);
-        os_timer_arm(&clear_busy_sending_data_timer, 1000, 0);
+        os_timer_arm(&clear_busy_sending_data_timer, 2000, 0);
 
         send_buffer = msg;
         sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, len);
@@ -994,8 +994,8 @@ void http_init(void)
     // http_msg_max_size = 1024;
     http_msg_max_size = 1460;
 
-    pending_send = new Queue<struct http_send>(8);
-    pending_split_send = new Queue<struct http_split_send>(8);
+    pending_send = new Queue<struct http_send>(16);
+    pending_split_send = new Queue<struct http_split_send>(16);
     pending_requests = new List<Http_pending_req>(4, delete_content);
     pending_responses = new List<Http_pending_res>(4, delete_content);
 }

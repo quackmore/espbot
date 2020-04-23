@@ -67,21 +67,28 @@ static void switch_to_stationap(void)
 
 void wifi_event_handler(System_Event_t *evt)
 {
+    static bool stamode_connected = false;
     switch (evt->event)
     {
     case EVENT_STAMODE_CONNECTED:
+        stamode_connected = true;
         esp_diag.info(WIFI_CONNECTED);
         INFO("connected to %s ch %d",
              evt->event_info.connected.ssid,
              evt->event_info.connected.channel);
         break;
     case EVENT_STAMODE_DISCONNECTED:
-        esp_diag.info(WIFI_DISCONNECTED);
-        INFO("disconnected from %s rsn %d",
-             evt->event_info.disconnected.ssid,
-             evt->event_info.disconnected.reason);
-        system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
-                                                                         // disconnection from AP
+        if (stamode_connected)
+        {
+            // just signal one disconnection, avoid errors flood...
+            esp_diag.error(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
+            INFO("disconnected from %s rsn %d",
+                 evt->event_info.disconnected.ssid,
+                 evt->event_info.disconnected.reason);
+            system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
+                                                                             // disconnection from AP
+            stamode_connected = false;
+        }
         if (is_timeout_timer_active())
             stop_connect_timeout_timer();
         switch_to_stationap();
