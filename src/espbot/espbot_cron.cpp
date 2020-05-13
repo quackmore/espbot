@@ -396,20 +396,29 @@ void start_cron(void)
 void disable_cron(void)
 {
     os_timer_disarm(&cron_timer);
-    cron_running = false;
-    cron_exe_enabled = false;
-    esp_diag.info(CRON_DISABLED);
-    INFO("cron disabled");
-    esp_diag.info(CRON_STOP);
-    INFO("cron stopped");
+    if (cron_exe_enabled)
+    {
+        cron_exe_enabled = false;
+        esp_diag.info(CRON_DISABLED);
+        INFO("cron disabled");
+    }
+    if (cron_running)
+    {
+        cron_running = false;
+        esp_diag.info(CRON_STOP);
+        INFO("cron stopped");
+    }
 }
 
 void stop_cron(void)
 {
     os_timer_disarm(&cron_timer);
-    cron_running = false;
-    esp_diag.info(CRON_STOP);
-    INFO("cron stopped");
+    if (cron_running)
+    {
+        cron_running = false;
+        esp_diag.info(CRON_STOP);
+        INFO("cron stopped");
+    }
 }
 
 bool cron_enabled(void)

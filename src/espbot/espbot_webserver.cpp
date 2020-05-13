@@ -106,39 +106,45 @@ static void webserver_listen(void *arg)
 
 void Websvr::init(void)
 {
-    // setup specific controllers timer
+    // setup specific controllers timer 'espbot_http_routes.cpp'
     init_controllers();
+    _status = down;
 }
 
 void Websvr::start(uint32 port)
 {
-    // setup sdk TCP variables
-    m_esp_conn.type = ESPCONN_TCP;
-    m_esp_conn.state = ESPCONN_NONE;
-    m_esp_conn.proto.tcp = &m_esptcp;
-    m_esp_conn.proto.tcp->local_port = port;
-    espconn_regist_connectcb(&m_esp_conn, webserver_listen);
-    espconn_accept(&m_esp_conn);
+    if (_status == down)
+    { // setup sdk TCP variables
+        _esp_conn.type = ESPCONN_TCP;
+        _esp_conn.state = ESPCONN_NONE;
+        _esp_conn.proto.tcp = &_esptcp;
+        _esp_conn.proto.tcp->local_port = port;
+        espconn_regist_connectcb(&_esp_conn, webserver_listen);
+        espconn_accept(&_esp_conn);
 
-    // now the server is up
-    m_status = up;
-    esp_diag.info(WEB_SERVER_START);
-    INFO("webserver started");
+        // now the server is up
+        _status = up;
+        esp_diag.info(WEB_SERVER_START);
+        INFO("webserver started");
+    }
 }
 
 void Websvr::stop()
 {
-    espconn_disconnect(&m_esp_conn);
-    espconn_delete(&m_esp_conn);
-    m_status = down;
+    if (_status == up)
+    {
+        espconn_disconnect(&_esp_conn);
+        espconn_delete(&_esp_conn);
+        _status = down;
 
-    http_queues_clear();
+        http_queues_clear();
 
-    esp_diag.info(WEB_SERVER_STOP);
-    INFO("webserver stopped");
+        esp_diag.info(WEB_SERVER_STOP);
+        INFO("webserver stopped");
+    }
 }
 
 Websvr_status Websvr::get_status(void)
 {
-    return m_status;
+    return _status;
 }

@@ -42,6 +42,9 @@ void Ota_upgrade::init(void)
         WARN("OTA init starting with default configuration");
     }
     _status = OTA_IDLE;
+    _last_result = OTA_IDLE;
+    _cb_on_completion = NULL;
+    _cb_param = NULL;
 }
 
 void Ota_upgrade::set_host(char *t_str)
@@ -50,9 +53,9 @@ void Ota_upgrade::set_host(char *t_str)
     atoipaddr(&_host, t_str);
 }
 
-void Ota_upgrade::set_port(char *t_str)
+void Ota_upgrade::set_port(unsigned int val)
 {
-    _port = atoi(t_str);
+    _port = val;
 }
 
 void Ota_upgrade::set_path(char *t_str)
@@ -74,36 +77,20 @@ void Ota_upgrade::set_path(char *t_str)
     }
 }
 
-void Ota_upgrade::set_check_version(char *t_str)
+void Ota_upgrade::set_check_version(bool enabled)
 {
-    if ((os_strncmp(t_str, f_str("true"), 4) == 0) || (os_strncmp(t_str, f_str("True"), 4) == 0))
-    {
+    if (enabled)
         _check_version = true;
-        return;
-    }
-    if ((os_strncmp(t_str, f_str("false"), 5) == 0) || (os_strncmp(t_str, f_str("False"), 5) == 0))
-    {
+    else
         _check_version = false;
-        return;
-    }
-    esp_diag.error(OTA_SET_CHECK_VERSION_UNKNOWN_VALUE);
-    ERROR("set_check_version bad value (%s)", t_str);
 }
 
-void Ota_upgrade::set_reboot_on_completion(char *t_str)
+void Ota_upgrade::set_reboot_on_completion(bool enabled)
 {
-    if ((os_strncmp(t_str, f_str("true"), 4) == 0) || (os_strncmp(t_str, f_str("True"), 4) == 0))
-    {
+    if (enabled)
         _reboot_on_completion = true;
-        return;
-    }
-    if ((os_strncmp(t_str, f_str("false"), 5) == 0) || (os_strncmp(t_str, f_str("False"), 5) == 0))
-    {
+    else
         _reboot_on_completion = false;
-        return;
-    }
-    esp_diag.error(OTA_SET_REBOOT_ON_COMPLETION_UNKNOWN_VALUE);
-    ERROR("set_reboot_on_completion bad value (%s)", t_str);
 }
 
 char *Ota_upgrade::get_host(void)
@@ -121,196 +108,15 @@ char *Ota_upgrade::get_path(void)
     return _path;
 }
 
-char *Ota_upgrade::get_check_version(void)
+bool Ota_upgrade::get_check_version(void)
 {
-    if (_check_version)
-        return (char *)f_str("true");
-    else
-        return (char *)f_str("false");
+    return _check_version;
 }
 
-char *Ota_upgrade::get_reboot_on_completion(void)
+bool Ota_upgrade::get_reboot_on_completion(void)
 {
-    if (_reboot_on_completion)
-        return (char *)f_str("true");
-    else
-        return (char *)f_str("false");
+    return _reboot_on_completion;
 }
-
-// upgrade
-
-// void Ota_upgrade::ota_completed_cb(void *arg)
-// {
-//     ALL("ota_completed_cb");
-//     uint8 u_flag = system_upgrade_flag_check();
-//
-//     if (u_flag == UPGRADE_FLAG_FINISH)
-//     {
-//         esp_ota._status = OTA_SUCCESS;
-//     }
-//     else
-//     {
-//         esp_ota._status = OTA_FAILED;
-//         esp_diag.error(OTA_FAILURE);
-//         ERROR("ota_completed_cb cannot complete upgrade");
-//     }
-// }
-//
-// void Ota_upgrade::ota_timer_function(void *arg)
-// {
-//     char *binary_file;
-//     static struct upgrade_server_info *upgrade_svr = NULL;
-//     static char *url = NULL;
-//     // static struct espconn *pespconn = NULL;
-//     espmem.stack_mon();
-//
-//     // os_printf("OTA STATUS: %d\n", esp_ota._status);
-//
-//     switch (esp_ota._status)
-//     {
-//     case OTA_IDLE:
-//     {
-//         if (esp_ota._check_version)
-//         {
-//             esp_ota._status = OTA_VERSION_CHECKING;
-//             // start web client
-//         }
-//         else
-//             esp_ota._status = OTA_VERSION_CHECKED;
-//         os_timer_arm(&esp_ota._ota_timer, 200, 0);
-//         break;
-//     }
-//     case OTA_VERSION_CHECKING:
-//     {
-//         os_timer_arm(&esp_ota._ota_timer, 200, 0);
-//         break;
-//     }
-//     case OTA_VERSION_CHECKED:
-//     {
-//         uint8_t userBin = system_upgrade_userbin_check();
-//         switch (userBin)
-//         {
-//         case UPGRADE_FW_BIN1:
-//             binary_file = (char *)f_str("user2.bin");
-//             break;
-//         case UPGRADE_FW_BIN2:
-//             binary_file = (char *)f_str("user1.bin");
-//             break;
-//         default:
-//             esp_diag.error(OTA_TIMER_FUNCTION_USERBIN_ID_UNKNOWN);
-//             ERROR("OTA: bad userbin number");
-//             esp_ota._status = OTA_FAILED;
-//             os_timer_arm(&esp_ota._ota_timer, 200, 0);
-//             return;
-//         }
-//         upgrade_svr = new struct upgrade_server_info;
-//         url = new char[56 + 15 + 6 + os_strlen(esp_ota._path)];
-//         *((uint32 *)(upgrade_svr->ip)) = esp_ota._host.addr;
-//         upgrade_svr->port = esp_ota._port;
-//         upgrade_svr->check_times = 60000;
-//         upgrade_svr->check_cb = &Ota_upgrade::ota_completed_cb;
-//         // upgrade_svr->pespconn = pespconn;
-//         fs_sprintf(url,
-//                    "GET %s%s HTTP/1.1\r\nHost: %s:%d\r\n"
-//                    "Connection: close\r\n"
-//                    "\r\n",
-//                    esp_ota._path, binary_file, esp_ota._host_str, esp_ota._port);
-//         TRACE("ota_timer_function url %s", url);
-//         upgrade_svr->url = (uint8 *)url;
-//         if (system_upgrade_start(upgrade_svr) == false)
-//         {
-//             esp_diag.error(OTA_CANNOT_START_UPGRADE);
-//             ERROR("OTA cannot start upgrade");
-//             esp_ota._status = OTA_FAILED;
-//         }
-//         else
-//         {
-//             esp_ota._status = OTA_UPGRADING;
-//         }
-//         os_timer_arm(&esp_ota._ota_timer, 500, 0);
-//         break;
-//     }
-//     case OTA_UPGRADING:
-//     {
-//         os_timer_arm(&esp_ota._ota_timer, 500, 0);
-//         break;
-//     }
-//     case OTA_SUCCESS:
-//     {
-//         if (upgrade_svr)
-//         {
-//             delete upgrade_svr;
-//             upgrade_svr = NULL;
-//         }
-//         if (url)
-//         {
-//             delete[] url;
-//             url = NULL;
-//         }
-//         // if (pespconn)
-//         // {
-//         //     esp_free(pespconn);
-//         //     pespconn = NULL;
-//         // }
-//         esp_diag.info(OTA_SUCCESSFULLY_COMPLETED);
-//         INFO("OTA successfully completed");
-//         if (esp_ota._reboot_on_completion)
-//         {
-//             esp_diag.debug(OTA_REBOOTING_AFTER_COMPLETION);
-//             DEBUG("OTA - rebooting after completion");
-//             espbot.reset(ESP_OTA_REBOOT);
-//         }
-//         esp_ota._status = OTA_IDLE;
-//         break;
-//     }
-//     case OTA_FAILED:
-//     {
-//         if (upgrade_svr)
-//         {
-//             delete upgrade_svr;
-//             upgrade_svr = NULL;
-//         }
-//         if (url)
-//         {
-//             delete[] url;
-//             url = NULL;
-//         }
-//         // if (pespconn)
-//         // {
-//         //     esp_free(pespconn);
-//         //     pespconn = NULL;
-//         // }
-//         // ERROR("OTA failed\n");
-//         esp_ota._status = OTA_IDLE;
-//         break;
-//     }
-//     default:
-//         break;
-//     }
-// }
-
-// void Ota_upgrade::start_upgrade(void)
-// {
-//     if ((_status == OTA_IDLE) || (_status == OTA_SUCCESS) || (_status == OTA_FAILED))
-//     {
-//         os_timer_setfn(&_ota_timer, (os_timer_func_t *)&Ota_upgrade::ota_timer_function, NULL);
-//         os_timer_arm(&_ota_timer, 200, 0);
-//     }
-//     else
-//     {
-//         esp_diag.warn(OTA_START_UPGRADE_CALLED_WHILE_OTA_IN_PROGRESS);
-//         WARN("start_upgrade called while OTA in progress");
-//     }
-// }
-
-Ota_status_type Ota_upgrade::get_status(void)
-{
-    return _status;
-}
-
-//
-// NEW OTA
-//
 
 ip_addr *Ota_upgrade::get_host_ip(void)
 {
@@ -327,9 +133,39 @@ bool Ota_upgrade::reboot_on_completion(void)
     return _reboot_on_completion;
 }
 
+Ota_status_type Ota_upgrade::get_status(void)
+{
+    return _status;
+}
+
 void Ota_upgrade::set_status(Ota_status_type val)
 {
     _status = val;
+}
+
+Ota_status_type Ota_upgrade::get_last_result(void)
+{
+    return _last_result;
+}
+
+void Ota_upgrade::set_last_result(Ota_status_type val)
+{
+    _last_result = val;
+}
+
+void Ota_upgrade::cb_on_completion(void)
+{
+    if (_cb_on_completion)
+        _cb_on_completion(_cb_param);
+}
+
+void Ota_upgrade::set_cb_on_completion(void (*fun)(void *))
+{
+    _cb_on_completion = fun;
+}
+void Ota_upgrade::set_cb_param(void *param)
+{
+    _cb_param = param;
 }
 
 void Ota_upgrade::set_rel_cmp_result(int val)
@@ -566,11 +402,12 @@ static void ota_engine(void)
     {
     case OTA_IDLE:
     {
-        if (os_strcmp(esp_ota.get_check_version(), f_str("true")) == 0)
+        esp_ota.set_last_result(OTA_IDLE);
+        if (esp_ota.get_check_version())
         {
             esp_ota.set_status(OTA_VERSION_CHECKING);
             ota_client = new Webclnt;
-            ota_client->connect(*esp_ota.get_host_ip(), esp_ota.get_port(), ota_ask_version, NULL);
+            ota_client->connect(*esp_ota.get_host_ip(), esp_ota.get_port(), ota_ask_version, NULL, 6000);
         }
         else
         {
@@ -638,7 +475,7 @@ static void ota_engine(void)
         }
         *((uint32 *)(upgrade_svr->ip)) = esp_ota.get_host_ip()->addr;
         upgrade_svr->port = esp_ota.get_port();
-        upgrade_svr->check_times = 60000;
+        upgrade_svr->check_times = 7000;
         upgrade_svr->check_cb = ota_completed_cb;
         // upgrade_svr->pespconn = pespconn;
         fs_sprintf(url,
@@ -658,6 +495,8 @@ static void ota_engine(void)
     }
     case OTA_SUCCESS:
     {
+        esp_ota.set_last_result(OTA_SUCCESS);
+        esp_ota.cb_on_completion();
         ota_cleanup();
         esp_diag.info(OTA_SUCCESSFULLY_COMPLETED);
         INFO("OTA successfully completed");
@@ -672,6 +511,8 @@ static void ota_engine(void)
     }
     case OTA_FAILED:
     {
+        esp_ota.set_last_result(OTA_FAILED);
+        esp_ota.cb_on_completion();
         ota_cleanup();
         esp_diag.error(OTA_FAILURE);
         ERROR("OTA failed");
@@ -680,6 +521,8 @@ static void ota_engine(void)
     }
     case OTA_ALREADY_TO_THE_LATEST:
     {
+        esp_ota.set_last_result(OTA_ALREADY_TO_THE_LATEST);
+        esp_ota.cb_on_completion();
         ota_cleanup();
         esp_diag.info(OTA_UP_TO_DATE);
         INFO("OTA everything up to date");
@@ -735,7 +578,7 @@ int Ota_upgrade::restore_cfg(void)
             ERROR("OTA restore_cfg cannot find 'port'");
             return CFG_ERROR;
         }
-        set_port(cfgfile.get_value());
+        set_port(atoi(cfgfile.get_value()));
         if (cfgfile.find_string(f_str("path")))
         {
             esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
@@ -749,14 +592,14 @@ int Ota_upgrade::restore_cfg(void)
             ERROR("OTA restore_cfg cannot find 'check_version'");
             return CFG_ERROR;
         }
-        set_check_version(cfgfile.get_value());
+        set_check_version((bool) atoi(cfgfile.get_value()));
         if (cfgfile.find_string(f_str("reboot_on_completion")))
         {
             esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
             ERROR("OTA restore_cfg cannot find 'reboot_on_completion'");
             return CFG_ERROR;
         }
-        set_reboot_on_completion(cfgfile.get_value());
+        set_reboot_on_completion((bool) atoi(cfgfile.get_value()));
         return CFG_OK;
     }
     else
@@ -810,7 +653,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
             ERROR("OTA saved_cfg_not_updated cannot find 'check_version'");
             return CFG_ERROR;
         }
-        if (os_strcmp(get_check_version(), cfgfile.get_value()))
+        if (get_check_version() != atoi(cfgfile.get_value()))
         {
             return CFG_REQUIRES_UPDATE;
         }
@@ -820,7 +663,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
             ERROR("OTA saved_cfg_not_updated cannot find 'reboot_on_completion'");
             return CFG_ERROR;
         }
-        if (os_strcmp(get_reboot_on_completion(), cfgfile.get_value()))
+        if (get_reboot_on_completion() != atoi(cfgfile.get_value()))
         {
             return CFG_REQUIRES_UPDATE;
         }
@@ -851,11 +694,8 @@ int Ota_upgrade::save_cfg(void)
         return CFG_ERROR;
     }
     cfgfile.clear();
-    int buffer_len = 90 +
-                     16 +
-                     6 +
-                     os_strlen(get_path()) +
-                     10;
+    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
+    int buffer_len = 70 + 15 + 5 + os_strlen(get_path()) + 1 + 1 + 1;
     Heap_chunk buffer(buffer_len);
     espmem.stack_mon();
     if (buffer.ref == NULL)
@@ -871,257 +711,9 @@ int Ota_upgrade::save_cfg(void)
                get_port(),
                get_path());
     fs_sprintf((buffer.ref + os_strlen(buffer.ref)),
-               "\"check_version\":\"%s\",\"reboot_on_completion\":\"%s\"}",
+               "\"check_version\":%d,\"reboot_on_completion\":%d}",
                get_check_version(),
                get_reboot_on_completion());
     cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
     return CFG_OK;
 }
-
-/*
-//
-// binary download
-//
-
-// COMPLETE ME:
-// bin size
-// bin downloaded
-// bin starting
-// bin ending
-// flash partition offset
-static char *bin_name = "user1.bin";
-static int32 remote_bin_start;
-static int32 remote_bin_range = 256;
-static int32 bin_start_addr;
-static int32 bin_size;
-
-static void download_cleanup(void *param)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    if (ota_client)
-        delete ota_client;
-    if (ota_request)
-        delete[] ota_request;
-    subsequent_function(ota_engine);
-}
-
-static os_timer_t wait_and_reconnect_timer;
-
-static void ota_wait_and_reconnect(void *param)
-{
-    system_os_post(USER_TASK_PRIO_0, SIG_OTA_RECONNECT_DOWNLOAD, '0');
-}
-
-static void check_bin(void *param)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    switch (ota_client->get_status())
-    {
-    case WEBCLNT_RESPONSE_READY:
-        if (ota_client->parsed_response->content_range_start == remote_bin_start)
-        {
-            os_printf("     bin range: %d-%d\n", remote_bin_start, (remote_bin_start + remote_bin_range - 1));
-            os_printf("min stack addr: %X\n", espmem.get_min_stack_addr());
-            os_printf("     free heap: %X\n", system_get_free_heap_size());
-            // os_printf("bin range: ");
-            // int idx;
-            // for (int idx = 0; idx < remote_bin_range; idx++)
-            //     os_printf(" %X", ota_client->parsed_response->body[idx]);
-            // os_printf("\n");
-            // check if download was completed
-            if ((remote_bin_start + remote_bin_range) >= bin_size)
-            {
-                os_printf("%s: OTA download completed\n", __FUNCTION__);
-                ota_client->disconnect(download_cleanup, NULL);
-                // verify checksum and set OTA status
-                esp_ota.set_status(OTA_SUCCESS);
-                subsequent_function(ota_engine);
-            }
-            else
-            {
-                // DEBUG
-                // static bool only_one_time = false;
-                // if ((remote_bin_start > 1000) && only_one_time)
-                // {
-                //     ota_client->disconnect(NULL, NULL);
-                //     os_printf("-------- Debug disconnection --------\n");
-                //     os_printf("-------- Debug disconnection --------\n");
-                //     os_printf("-------- Debug disconnection --------\n");
-                //     os_printf("-------- Debug disconnection --------\n");
-                //     os_printf("-------- Debug disconnection --------\n");
-                //     os_printf("-------- Debug disconnection --------\n");
-                //     only_one_time = true;
-                //     system_os_post(USER_TASK_PRIO_0, SIG_OTA_CONTINUE_DOWNLOAD, '0');
-                //     return;
-                // }
-
-                remote_bin_start += remote_bin_range;
-                if ((remote_bin_start + remote_bin_range) >= bin_size)
-                    remote_bin_range = bin_size - remote_bin_start;
-                system_os_post(USER_TASK_PRIO_0, SIG_OTA_CONTINUE_DOWNLOAD, '0');
-            }
-        }
-        else
-        {
-            esplog.error("%s: received unexpected binary range [%d]\n",
-                         __FUNCTION__,
-                         ota_client->parsed_response->content_range_start);
-            esp_ota.set_status(OTA_FAILED);
-            ota_client->disconnect(download_cleanup, NULL);
-        }
-        break;
-    case WEBCLNT_DISCONNECTED:
-        esplog.error("%s: Client disconnected while downloading, retrying connection\n", __FUNCTION__);
-        os_timer_setfn(&wait_and_reconnect_timer, (os_timer_func_t *)ota_wait_and_reconnect, NULL);
-        os_timer_arm(&wait_and_reconnect_timer, 1000, 0);
-
-        // ota_client->connect(esp_ota._host, esp_ota._port, ota_continue_download, NULL);
-        break;
-    case WEBCLNT_RESPONSE_TIMEOUT:
-        esplog.error("%s: Response timeout while downloading, resending request\n", __FUNCTION__);
-        system_os_post(USER_TASK_PRIO_0, SIG_OTA_CONTINUE_DOWNLOAD, '0');
-        break;
-    default:
-        esplog.error("%s: OTA failed downloading binary: webclient status is %d\n",
-                     __FUNCTION__,
-                     ota_client->get_status());
-        esp_ota.set_status(OTA_FAILED);
-        ota_client->disconnect(download_cleanup, NULL);
-        break;
-    }
-}
-
-static void ota_request_bin(void *param)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    switch (ota_client->get_status())
-    {
-    case WEBCLNT_CONNECTED:
-    case WEBCLNT_RESPONSE_READY:
-    case WEBCLNT_RESPONSE_TIMEOUT:
-    {
-        // COMPLETE ME: integrate with additional fields
-        // int ota_request_len = 76 +
-        //                       os_strlen(esp_ota.get_path()) +
-        //                       os_strlen(bin_name) +
-        //                       7 + 7 + 15 + 1;
-        // delete[] ota_request;
-        // ota_request = new char[ota_request_len];
-        // if (ota_request == NULL)
-        // {
-        //     esplog.error("%s - heap exausted [%d]\n", __FUNCTION__, ota_request_len);
-        //     esp_ota.set_status(OTA_FAILED);
-        //     ota_client->disconnect(download_cleanup, NULL);
-        //     break;
-        // }
-        os_sprintf(ota_request,
-                   "GET %s%s HTTP/1.1\r\n"
-                   "Range: bytes=%d-%d\r\n"
-                   "Host: %s\r\n"
-                   "Connection: keep-alive\r\n\r\n",
-                   esp_ota.get_path(),
-                   bin_name,
-                   remote_bin_start,
-                   (remote_bin_start + remote_bin_range - 1),
-                   esp_ota.get_host());
-        ota_client->send_req(ota_request, check_bin, NULL);
-        break;
-    }
-    case WEBCLNT_DISCONNECTED:
-        esplog.error("%s: Client disconnected while downloading\n", __FUNCTION__);
-        // system_os_post(USER_TASK_PRIO_0, SIG_OTA_RECONNECT_DOWNLOAD, '0');
-        // ota_client->connect(esp_ota._host, esp_ota._port, ota_continue_download, NULL);
-        break;
-    default:
-        esplog.error("%s: OTA requesting binary failed: webclient status is %d\n",
-                     __FUNCTION__,
-                     ota_client->get_status());
-        esp_ota.set_status(OTA_FAILED);
-        ota_client->disconnect(download_cleanup, NULL);
-        break;
-    }
-}
-
-void ota_continue_download(void *param)
-{
-    // system_soft_wdt_feed();
-    // delete[] ota_request;
-    ota_request_bin(NULL);
-}
-
-void ota_reconnect_download(void *param)
-{
-    static int counter = 0;
-    counter++;
-    os_printf("-------> reconnect for download [%d]\n", counter);
-    ota_client->connect(esp_ota._host, esp_ota._port, ota_continue_download, NULL);
-}
-
-static void check_bin_length(void *param)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    switch (ota_client->get_status())
-    {
-    case WEBCLNT_RESPONSE_READY:
-        bin_size = ota_client->parsed_response->content_range_size;
-        remote_bin_start = 0;
-        esplog.trace("%s: binary size = %d\n", __FUNCTION__, bin_size);
-        // COMPLETE ME: erase flash
-        delete[] ota_request;
-        system_os_post(USER_TASK_PRIO_0, SIG_OTA_CONTINUE_DOWNLOAD, '0');
-        break;
-    default:
-        esplog.error("%s: OTA failed requesting binary length: webclient status is %d\n",
-                     __FUNCTION__,
-                     ota_client->get_status());
-        esp_ota.set_status(OTA_FAILED);
-        ota_client->disconnect(download_cleanup, NULL);
-        break;
-    }
-}
-
-static void ota_request_bin_length(void *param)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    switch (ota_client->get_status())
-    {
-    case WEBCLNT_CONNECTED:
-    {
-        // int ota_request_len = 75 + os_strlen(esp_ota.get_path()) + os_strlen(bin_name) + 15 + 1;
-        // ota_request = new char[ota_request_len];
-        // if (ota_request == NULL)
-        // {
-        //     esplog.error("%s - heap exausted [%d]\n", __FUNCTION__, ota_request_len);
-        //     esp_ota.set_status(OTA_FAILED);
-        //     ota_client->disconnect(download_cleanup, NULL);
-        //     break;
-        // }
-        // "HEAD %s%s HTTP/1.1\r\nHost: %s\r\n\r\n",
-        os_sprintf(ota_request,
-                   "GET %s%s HTTP/1.1\r\n"
-                   "Range: bytes=0-1\r\n"
-                   "Host: %sr\r\n"
-                   "Connection: keep-alive\r\n\r\n",
-                   esp_ota.get_path(), bin_name, esp_ota.get_host());
-        ota_client->send_req(ota_request, check_bin_length, NULL);
-        break;
-    }
-    default:
-        esplog.error("%s: failed connecting to the server: webclient status is %d\n",
-                     __FUNCTION__,
-                     ota_client->get_status());
-        esp_ota.set_status(OTA_FAILED);
-        ota_client->disconnect(download_cleanup, NULL);
-        break;
-    }
-}
-
-static void ota_cleanup(void)
-{
-    esplog.all("%s\n", __FUNCTION__);
-    os_printf("%s: delete ota_client\n", __FUNCTION__);
-    delete ota_client;
-    if (ota_request)
-        delete[] ota_request;
-}
-*/

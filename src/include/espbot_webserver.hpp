@@ -36,9 +36,9 @@ public:
   Websvr_status get_status(void);
 
 private:
-  Websvr_status m_status;
-  struct espconn m_esp_conn;
-  esp_tcp m_esptcp;
+  Websvr_status _status;
+  struct espconn _esp_conn;
+  esp_tcp _esptcp;
 };
 
 #endif

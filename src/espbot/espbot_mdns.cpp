@@ -26,6 +26,7 @@ extern "C"
 void Mdns::init(void)
 {
     _enabled = false;
+    _running = false;
 
     if (restore_cfg())
     {
@@ -36,7 +37,7 @@ void Mdns::init(void)
 
 void Mdns::start(char *app_alias)
 {
-    if (_enabled)
+    if (_enabled && !_running)
     {
         struct ip_info ipconfig;
         wifi_get_ip_info(STATION_IF, &ipconfig);
@@ -46,6 +47,7 @@ void Mdns::start(char *app_alias)
         _info.server_port = SERVER_PORT;
         _info.txt_data[0] = app_alias;
         espconn_mdns_init(&_info);
+        _running = true;
         esp_diag.info(MDNS_START);
         INFO("mDns started");
     }
@@ -53,9 +55,13 @@ void Mdns::start(char *app_alias)
 
 void Mdns::stop(void)
 {
-    espconn_mdns_close();
-    esp_diag.info(MDNS_STOP);
-    INFO("mDns ended");
+    if (_running)
+    {
+        espconn_mdns_close();
+        _running = false;
+        esp_diag.info(MDNS_STOP);
+        INFO("mDns ended");
+    }
 }
 
 void Mdns::enable(void)

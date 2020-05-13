@@ -71,7 +71,6 @@ void wifi_event_handler(System_Event_t *evt)
     switch (evt->event)
     {
     case EVENT_STAMODE_CONNECTED:
-        stamode_connected = true;
         esp_diag.info(WIFI_CONNECTED);
         INFO("connected to %s ch %d",
              evt->event_info.connected.ssid,
@@ -80,7 +79,7 @@ void wifi_event_handler(System_Event_t *evt)
     case EVENT_STAMODE_DISCONNECTED:
         if (stamode_connected)
         {
-            // just signal one disconnection, avoid errors flood...
+            // just log one disconnection, avoid errors flood...
             esp_diag.error(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
             INFO("disconnected from %s rsn %d",
                  evt->event_info.disconnected.ssid,
@@ -89,8 +88,8 @@ void wifi_event_handler(System_Event_t *evt)
                                                                              // disconnection from AP
             stamode_connected = false;
         }
-        if (is_timeout_timer_active())
-            stop_connect_timeout_timer();
+        // if (is_timeout_timer_active())
+        //    stop_connect_timeout_timer();
         switch_to_stationap();
         os_timer_disarm(&wait_before_reconnect);
         os_timer_arm(&wait_before_reconnect, WIFI_WAIT_BEFORE_RECONNECT, 0);
@@ -110,6 +109,8 @@ void wifi_event_handler(System_Event_t *evt)
         //       IP2STR(&evt->event_info.got_ip.gw));
         break;
     case EVENT_STAMODE_GOT_IP:
+        // now it's really 'connected' to AP
+        stamode_connected = true;
         esp_diag.info(WIFI_GOT_IP);
         INFO("got IP" IPSTR " " IPSTR " " IPSTR,
              IP2STR(&evt->event_info.got_ip.ip),
@@ -239,7 +240,9 @@ void Wifi::connect(void)
         result = wifi_station_set_auto_connect(0);
 
     // disconnect ... just in case
-    wifi_station_disconnect();
+    // wifi_station_disconnect();
+    // better not, it will cause a disconnection for REASON_ASSOC_LEAVE
+    // in case use wifi_station_get_connect_status
     // setup station
     os_memset(&stationConf, 0, sizeof(stationConf));
     os_memcpy(stationConf.ssid, station_ssid, 32);

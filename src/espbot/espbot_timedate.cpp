@@ -28,6 +28,7 @@ extern "C"
 void TimeDate::init(void)
 {
     _sntp_enabled = false;
+    _sntp_running = false;
     _timezone = 0; // UTC
 
     if (restore_cfg())
@@ -39,7 +40,7 @@ void TimeDate::init(void)
 
 void TimeDate::start_sntp(void)
 {
-    if (_sntp_enabled)
+    if (_sntp_enabled && !_sntp_running)
     {
         sntp_setservername(0, (char *)f_str("0.pool.ntp.org"));
         sntp_setservername(1, (char *)f_str("1.pool.ntp.org"));
@@ -50,6 +51,7 @@ void TimeDate::start_sntp(void)
             ERROR("TimeDate::start_sntp cannot set timezone");
         }
         sntp_init();
+        _sntp_running = true;
         esp_diag.info(SNTP_START);
         INFO("Sntp started");
     }
@@ -57,9 +59,13 @@ void TimeDate::start_sntp(void)
 
 void TimeDate::stop_sntp(void)
 {
-    sntp_stop();
-    esp_diag.info(SNTP_STOP);
-    INFO("Sntp ended");
+    if (_sntp_running)
+    {
+        sntp_stop();
+        _sntp_running = false;
+        esp_diag.info(SNTP_STOP);
+        INFO("Sntp ended");
+    }
 }
 
 uint32 TimeDate::get_timestamp()

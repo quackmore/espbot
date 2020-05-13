@@ -45,8 +45,10 @@ void Espbot_diag::init(void)
     // switch off the diag led
     if (_diag_led_mask)
     {
-        PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
-        GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+        esp_gpio.config(DIA_LED, ESPBOT_GPIO_OUTPUT);
+        esp_gpio.set(DIA_LED, ESPBOT_HIGH);
+        // PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
+        // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
     }
 }
 
@@ -64,7 +66,8 @@ inline void Espbot_diag::add_event(char type, int code, uint32 value)
     _last_event = idx;
     // switch on the diag led
     if (_diag_led_mask & type)
-        GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_LOW);
+        esp_gpio.set(DIA_LED, ESPBOT_LOW);
+        // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_LOW);
 }
 
 void Espbot_diag::fatal(int code, uint32 value)
@@ -139,7 +142,8 @@ void Espbot_diag::ack_events(void)
     }
     // switch off the diag led
     if (_diag_led_mask)
-        GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+        esp_gpio.set(DIA_LED, ESPBOT_HIGH);
+        // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
 }
 
 char Espbot_diag::get_led_mask(void)

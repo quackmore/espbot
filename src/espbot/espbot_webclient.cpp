@@ -132,7 +132,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
         ERROR("webclient_recv - cannot get client ref for espconn %X", ptr_espconn);
         return;
     }
-    os_timer_disarm(&client->m_send_req_timeout_timer);
+    os_timer_disarm(&client->_send_req_timeout_timer);
     espmem.stack_mon();
     DEBUG("webclient_recv msg %s", precdata);
     TRACE("webclient_recv msg len %d", length);
@@ -163,7 +163,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
           parsed_response->body);
     if (!parsed_response->no_header_message && (parsed_response->h_content_len > parsed_response->content_len))
     {
-        os_timer_arm(&client->m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        os_timer_arm(&client->_send_req_timeout_timer, client->_comm_timeout, 0);
         TRACE("webclient_recv message has been splitted waiting for completion ...");
         http_save_pending_response(ptr_espconn, precdata, length, parsed_response);
         delete parsed_response;
@@ -172,7 +172,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
     }
     if (parsed_response->no_header_message)
     {
-        os_timer_arm(&client->m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        os_timer_arm(&client->_send_req_timeout_timer, client->_comm_timeout, 0);
         TRACE("webclient_recv no header, checking pending responses ...");
         http_check_pending_responses(ptr_espconn, parsed_response->body, parsed_response->content_len, webclient_recv);
         delete parsed_response;
@@ -244,7 +244,7 @@ static void webclient_connected(void *arg)
         ERROR("webclient_connected cannot get webclient ref for espconn %X", pesp_conn);
         return;
     }
-    os_timer_disarm(&client->m_connect_timeout_timer);
+    os_timer_disarm(&client->_connect_timeout_timer);
     client->update_status(WEBCLNT_CONNECTED);
     client->call_completed_func();
 }
@@ -256,24 +256,24 @@ static void webclient_connected(void *arg)
 Webclnt::Webclnt()
 {
     ALL("Webclnt");
-    m_status = WEBCLNT_DISCONNECTED;
-    m_completed_func = NULL;
-    m_param = NULL;
+    _status = WEBCLNT_DISCONNECTED;
+    _completed_func = NULL;
+    _param = NULL;
     this->parsed_response = NULL;
     this->request = NULL;
-    add_client_espconn_association(this, &m_esp_conn);
+    add_client_espconn_association(this, &_esp_conn);
 }
 
 Webclnt::~Webclnt()
 {
     ALL("~Webclnt");
     del_client_association(this);
-    if ((m_status != WEBCLNT_DISCONNECTED) &&
-        (m_status != WEBCLNT_CONNECT_FAILURE) &&
-        (m_status != WEBCLNT_CONNECT_TIMEOUT) &&
-        (m_status != WEBCLNT_CONNECTING))
+    if ((_status != WEBCLNT_DISCONNECTED) &&
+        (_status != WEBCLNT_CONNECT_FAILURE) &&
+        (_status != WEBCLNT_CONNECT_TIMEOUT) &&
+        (_status != WEBCLNT_CONNECTING))
     {
-        espconn_disconnect(&m_esp_conn);
+        espconn_disconnect(&_esp_conn);
     }
 }
 
@@ -284,36 +284,36 @@ void Webclnt::connect(struct ip_addr t_server,
                       int comm_tout)
 {
     ALL("Webclnt::connect");
-    os_memcpy(&m_host, &t_server, sizeof(struct ip_addr));
-    m_port = t_port;
+    os_memcpy(&_host, &t_server, sizeof(struct ip_addr));
+    _port = t_port;
 
-    m_completed_func = completed_func;
-    m_param = param;
-    m_status = WEBCLNT_CONNECTING;
-    m_esp_conn.type = ESPCONN_TCP;
-    m_esp_conn.state = ESPCONN_NONE;
-    m_esp_conn.proto.tcp = &m_esptcp;
-    m_comm_timeout = comm_tout;
+    _completed_func = completed_func;
+    _param = param;
+    _status = WEBCLNT_CONNECTING;
+    _esp_conn.type = ESPCONN_TCP;
+    _esp_conn.state = ESPCONN_NONE;
+    _esp_conn.proto.tcp = &_esptcp;
+    _comm_timeout = comm_tout;
 
     system_soft_wdt_feed();
-    m_esp_conn.proto.tcp->local_port = espconn_port();
+    _esp_conn.proto.tcp->local_port = espconn_port();
 
-    m_esp_conn.proto.tcp->remote_port = t_port;
-    os_memcpy(m_esp_conn.proto.tcp->remote_ip, &(t_server.addr), sizeof(t_server.addr));
+    _esp_conn.proto.tcp->remote_port = t_port;
+    os_memcpy(_esp_conn.proto.tcp->remote_ip, &(t_server.addr), sizeof(t_server.addr));
 
-    espconn_regist_connectcb(&m_esp_conn, webclient_connected);
+    espconn_regist_connectcb(&_esp_conn, webclient_connected);
     // set timeout for connection
-    os_timer_setfn(&m_connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, (void *)this);
-    os_timer_arm(&m_connect_timeout_timer, m_comm_timeout, 0);
-    sint8 res = espconn_connect(&m_esp_conn);
+    os_timer_setfn(&_connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, (void *)this);
+    os_timer_arm(&_connect_timeout_timer, _comm_timeout, 0);
+    sint8 res = espconn_connect(&_esp_conn);
     espmem.stack_mon();
     if (res)
     {
         // in this case callback will never be called
-        m_status = WEBCLNT_CONNECT_FAILURE;
+        _status = WEBCLNT_CONNECT_FAILURE;
         esp_diag.error(WEB_CLIENT_CONNECT_CONN_FAILURE, res);
         ERROR("Webclnt failed to connect err %d", res);
-        os_timer_disarm(&m_connect_timeout_timer);
+        os_timer_disarm(&_connect_timeout_timer);
         call_completed_func();
     }
 }
@@ -321,15 +321,15 @@ void Webclnt::connect(struct ip_addr t_server,
 void Webclnt::disconnect(void (*completed_func)(void *), void *param)
 {
     ALL("Webclnt::disconnect");
-    m_status = WEBCLNT_DISCONNECTED;
-    m_completed_func = completed_func;
-    m_param = param;
+    _status = WEBCLNT_DISCONNECTED;
+    _completed_func = completed_func;
+    _param = param;
 
     // there is no need to delete this->request, http_send will do it
     // if (this->request)
     //     delete[] this->request;
 
-    espconn_disconnect(&m_esp_conn);
+    espconn_disconnect(&_esp_conn);
     call_completed_func();
 }
 
@@ -337,8 +337,8 @@ void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *),
 {
     ALL("Webclnt::send_req");
     espmem.stack_mon();
-    m_completed_func = completed_func;
-    m_param = param;
+    _completed_func = completed_func;
+    _param = param;
     this->request = new char[msg_len + 1];
     if (this->request == NULL)
     {
@@ -349,21 +349,21 @@ void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *),
     req_len = msg_len;
     os_memcpy(this->request, t_msg, req_len);
 
-    switch (m_status)
+    switch (_status)
     {
     case WEBCLNT_CONNECTED:
     case WEBCLNT_RESPONSE_READY:
         DEBUG("Webclnt::send_req msg %s\n", this->request);
-        http_send(&m_esp_conn, this->request, this->req_len);
-        m_status = WEBCLNT_WAITING_RESPONSE;
-        os_timer_disarm(&m_send_req_timeout_timer);
-        os_timer_setfn(&m_send_req_timeout_timer, (os_timer_func_t *)webclnt_send_req_timeout_function, (void *)this);
-        os_timer_arm(&m_send_req_timeout_timer, WEBCLNT_SEND_REQ_TIMEOUT, 0);
+        http_send(&_esp_conn, this->request, this->req_len);
+        _status = WEBCLNT_WAITING_RESPONSE;
+        os_timer_disarm(&_send_req_timeout_timer);
+        os_timer_setfn(&_send_req_timeout_timer, (os_timer_func_t *)webclnt_send_req_timeout_function, (void *)this);
+        os_timer_arm(&_send_req_timeout_timer, _comm_timeout, 0);
         break;
     default:
-        esp_diag.error(WEB_CLIENT_SEND_REQ_CANNOT_SEND_REQ, m_status);
-        ERROR("Webclnt::send_req - cannot send request status is %s", m_status);
-        m_status = WEBCLNT_CANNOT_SEND_REQUEST;
+        esp_diag.error(WEB_CLIENT_SEND_REQ_CANNOT_SEND_REQ, _status);
+        ERROR("Webclnt::send_req - cannot send request status is %s", _status);
+        _status = WEBCLNT_CANNOT_SEND_REQUEST;
         call_completed_func();
         break;
     }
@@ -371,25 +371,25 @@ void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *),
 
 Webclnt_status_type Webclnt::get_status(void)
 {
-    return m_status;
+    return _status;
 }
 
 void Webclnt::update_status(Webclnt_status_type t_status)
 {
-    m_status = t_status;
+    _status = t_status;
     print_status();
 }
 
 void Webclnt::call_completed_func(void)
 {
-    if (m_completed_func)
-        m_completed_func(m_param);
+    if (_completed_func)
+        _completed_func(_param);
 }
 
 void Webclnt::print_status(void)
 {
     char *status;
-    switch (m_status)
+    switch (_status)
     {
     case WEBCLNT_RESPONSE_READY:
         status = (char *)f_str("RESPONSE_READY");

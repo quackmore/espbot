@@ -71,7 +71,7 @@ static void espbot_coordinator_task(os_event_t *e)
         // [wifi station+AP] station disconnected
         break;
     case SIG_SOFTAPMODE_READY:
-        espwebsvr.stop(); // in case there was a web server listening on esp station interface
+        // espwebsvr.stop(); // in case there was a web server listening on esp station interface
         espwebsvr.start(80);
         app_init_after_wifi();
         break;
@@ -127,13 +127,13 @@ char *Espbot::get_name(void)
 
 void Espbot::set_name(char *t_name)
 {
-    os_memset(_name, 0, 33);
-    if (os_strlen(t_name) > 32)
+    os_memset(_name, 0, 32);
+    if (os_strlen(t_name) > 31)
     {
         esp_diag.warn(ESPOT_SET_NAME_TRUNCATED);
         WARN("Espbot::set_name truncating name to 32 characters");
     }
-    os_strncpy(_name, t_name, 32);
+    os_strncpy(_name, t_name, 31);
     save_cfg();
 }
 
@@ -150,6 +150,7 @@ void espbot_init(void)
     print_greetings();
 
     espfs.init();
+    esp_gpio.init(); // cause it's used by diagnostic
     esp_diag.init();
     esp_time.init();
     espbot.init();
@@ -158,7 +159,6 @@ void espbot_init(void)
     http_init();
     espwebsvr.init();
     init_webclients_data_stuctures();
-    esp_gpio.init();
     cron_init();
     app_init_before_wifi();
 
