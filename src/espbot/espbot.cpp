@@ -32,19 +32,6 @@ extern "C"
 #include "espbot_webclient.hpp"
 #include "spiffs_esp8266.hpp"
 
-static void print_greetings(void)
-{
-    fs_printf("Hello there! Espbot started\n");
-    fs_printf("Chip ID        : %d\n", system_get_chip_id());
-    fs_printf("SDK version    : %s\n", system_get_sdk_version());
-    fs_printf("Boot version   : %d\n", system_get_boot_version());
-    fs_printf("Espbot version : %s\n", espbot_release);
-    fs_printf("---------------------------------------------------\n");
-    fs_printf("Memory map\n");
-    system_print_meminfo();
-    fs_printf("---------------------------------------------------\n");
-}
-
 static void espbot_coordinator_task(os_event_t *e)
 {
     switch (e->sig)
@@ -144,14 +131,18 @@ void espbot_init(void)
 {
     // uart_init(BIT_RATE_74880, BIT_RATE_74880);
     // uart_init(BIT_RATE_115200, BIT_RATE_115200);
-    uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    // uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
     system_set_os_print(1); // enable log print
+    // the previous setting will be overridden in esp_diag.init
+    // according to custom values saved in flash
     espmem.init();
-    print_greetings();
+    // print_greetings();
+    esp_gpio.init(); // cause it's used by diagnostic
+    esp_diag.init_essential(); // FS not available yet
 
     espfs.init();
-    esp_gpio.init(); // cause it's used by diagnostic
-    esp_diag.init();
+    esp_diag.init_custom();
     esp_time.init();
     espbot.init();
     esp_mDns.init();

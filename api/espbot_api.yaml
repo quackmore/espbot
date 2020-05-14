@@ -1247,6 +1247,8 @@ components:
       required:
       - diag_led_mask
       - serial_log_mask
+      - uart_0_bitrate
+      - sdk_print_enabled
       properties:
         diag_led_mask:
           type: integer
@@ -1276,6 +1278,20 @@ components:
           default: 0
           minimum: 0
           maximum: 127
+        uart_0_bitrate:
+          type: integer
+          format: int32
+          description: The UART 0 bitrate
+          default: 74880
+          minimum: 300
+          maximum: 3686400
+        sdk_print_enabled:
+          type: integer
+          format: int32
+          description: If printing to UART 0 is enabled (1) or not (0)
+          default: 1
+          minimum: 0
+          maximum: 1
       additionalProperties: false
     error:
       type: object

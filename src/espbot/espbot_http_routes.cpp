@@ -683,15 +683,19 @@ static void ackDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
 static void getDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getDiagnosticCfg");
-    // "{"diag_led_mask": 256,"serial_log_mask": 256}" 46 chars
-    int msg_len = 46;
+    // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
+    int msg_len = 91;
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref)
     {
         fs_sprintf(msg.ref,
-                   "{\"diag_led_mask\": %d,\"serial_log_mask\": %d}",
+                   "{\"diag_led_mask\":%d,\"serial_log_mask\":%d,",
                    esp_diag.get_led_mask(),
                    esp_diag.get_serial_log_mask());
+        fs_sprintf(msg.ref + os_strlen(msg.ref),
+                   "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
+                   esp_diag.get_uart_0_bitrate(),
+                   esp_diag.get_sdk_print_enabled());
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     }
     else
@@ -752,18 +756,71 @@ static void setDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parse
         ERROR("setDiagnosticCfg heap exhausted %d", diag_cfg.get_cur_pair_value_len() + 1);
         return;
     }
+    if (diag_cfg.find_pair(f_str("uart_0_bitrate")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'uart_0_bitrate'"), false);
+        return;
+    }
+    if (diag_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'uart_0_bitrate' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_uart_0_bitrate(diag_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_uart_0_bitrate.ref)
+    {
+        os_strncpy(tmp_uart_0_bitrate.ref, diag_cfg.get_cur_pair_value(), diag_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_SETDIAGNOSTICCFG_HEAP_EXHAUSTED, diag_cfg.get_cur_pair_value_len() + 1);
+        ERROR("setDiagnosticCfg heap exhausted %d", diag_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (diag_cfg.find_pair(f_str("sdk_print_enabled")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'sdk_print_enabled'"), false);
+        return;
+    }
+    if (diag_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'sdk_print_enabled' does not have a INTEGER value type"), false);
+        return;
+    }
+    Heap_chunk tmp_sdk_print_enabled(diag_cfg.get_cur_pair_value_len() + 1);
+    if (tmp_sdk_print_enabled.ref)
+    {
+        os_strncpy(tmp_sdk_print_enabled.ref, diag_cfg.get_cur_pair_value(), diag_cfg.get_cur_pair_value_len());
+    }
+    else
+    {
+        esp_diag.error(ROUTES_SETDIAGNOSTICCFG_HEAP_EXHAUSTED, diag_cfg.get_cur_pair_value_len() + 1);
+        ERROR("setDiagnosticCfg heap exhausted %d", diag_cfg.get_cur_pair_value_len() + 1);
+        return;
+    }
+    if (!esp_diag.set_uart_0_bitrate(atoi(tmp_uart_0_bitrate.ref)))
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Invalid bitrate value"), false);
+        return;
+    }
     esp_diag.set_led_mask(atoi(tmp_diag_led_mask.ref));
     esp_diag.set_serial_log_mask(atoi(tmp_serial_log_mask.ref));
+    esp_diag.set_sdk_print_enabled(atoi(tmp_sdk_print_enabled.ref));
     esp_diag.save_cfg();
 
-    int msg_len = 46;
+    // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
+    int msg_len = 91;
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref)
     {
         fs_sprintf(msg.ref,
-                   "{\"diag_led_mask\": %d,\"serial_log_mask\": %d}",
+                   "{\"diag_led_mask\":%d,\"serial_log_mask\":%d,",
                    esp_diag.get_led_mask(),
                    esp_diag.get_serial_log_mask());
+        fs_sprintf(msg.ref + os_strlen(msg.ref),
+                   "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
+                   esp_diag.get_uart_0_bitrate(),
+                   esp_diag.get_sdk_print_enabled());
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     }
     else
@@ -1778,7 +1835,7 @@ static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'check_version' does not have a integer value type"), false);
         return;
     }
-    bool tmp_check_version = (bool) atoi(ota_cfg.get_cur_pair_value());
+    bool tmp_check_version = (bool)atoi(ota_cfg.get_cur_pair_value());
     if (ota_cfg.find_pair(f_str("reboot_on_completion")) != JSON_NEW_PAIR_FOUND)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'reboot_on_completion'"), false);
@@ -1789,7 +1846,7 @@ static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'reboot_on_completion' does not have a integer value type"), false);
         return;
     }
-    bool tmp_reboot_on_completion = (bool) atoi(ota_cfg.get_cur_pair_value());
+    bool tmp_reboot_on_completion = (bool)atoi(ota_cfg.get_cur_pair_value());
     esp_ota.set_host(tmp_host.ref);
     esp_ota.set_port(tmp_port);
     esp_ota.set_path(tmp_path.ref);
