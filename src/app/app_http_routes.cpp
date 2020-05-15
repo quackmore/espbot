@@ -120,7 +120,7 @@ static void runTest(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
                "{\"test_number\":%d,\"test_param\":%d}",
                test_number,
                test_param);
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     run_test(test_number, test_param);
 }
 
