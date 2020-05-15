@@ -36,6 +36,7 @@ extern "C"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
 
+#ifdef TEST_FUNCTIONS
 // function for testing purpose
 
 static int test_counter;
@@ -219,10 +220,11 @@ static void IRAM dht_start_completed(void *param)
     free_do_seq(seq);
 }
 */
-void run_test(int idx)
+void run_test(int32 idx, int32 param) 
 {
     struct do_seq *seq;
     static int event_counter = 0;
+    INFO("Running test %d with param %d", idx, param);
     switch (idx)
     {
         /*
@@ -1126,3 +1128,4 @@ void run_test(int idx)
         break;
     }
 }
+#endif

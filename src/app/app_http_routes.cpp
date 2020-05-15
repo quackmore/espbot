@@ -32,170 +32,99 @@ extern "C"
 
 static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
+    // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","library_version":"","sdk_version":"","boot_version":""}
     ALL("get_api_info");
-    int str_len = os_strlen(app_name) +
-                  os_strlen(app_release) +
+    int str_len = 138 +
                   os_strlen(espbot.get_name()) +
+                  10 +
+                  os_strlen(app_name) +
+                  os_strlen(app_release) +
                   os_strlen(espbot.get_version()) +
                   os_strlen(library_release) +
-                  10 +
                   os_strlen(system_get_sdk_version()) +
-                  10;
-    Heap_chunk msg(155 + str_len, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"app_name\":\"%s\",\"app_version\":\"%s\",\"espbot_name\":\"%s\",",
-                   app_name,
-                   app_release,
-                   espbot.get_name());
-        fs_sprintf((msg.ref + os_strlen(msg.ref)),
-                   "\"espbot_version\":\"%s\",\"library_version\":\"%s\",\"chip_id\":\"%d\",",
-                   espbot.get_version(),
-                   library_release,
-                   system_get_chip_id());
-        fs_sprintf(msg.ref + os_strlen(msg.ref),
-                   "\"sdk_version\":\"%s\",\"boot_version\":\"%d\"}",
-                   system_get_sdk_version(),
-                   system_get_boot_version());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-        // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
-    }
-    else
+                  10 +
+                  1;
+    Heap_chunk msg(138 + str_len, dont_free);
+    if (msg.ref == NULL)
     {
         esp_diag.error(APP_GET_API_INFO_HEAP_EXHAUSTED, 155 + str_len);
         ERROR("get_api_info heap exhausted %d", 155 + str_len);
-    }
-}
-
-static void get_api_test(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
-{
-    ALL("get_api_test");
-    int test_number;
-    Json_str test_cfg(parsed_req->req_content, parsed_req->content_len);
-    if (test_cfg.syntax_check() == JSON_SINTAX_OK)
-    {
-        if (test_cfg.find_pair(f_str("test_number")) != JSON_NEW_PAIR_FOUND)
-        {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test_number'"), false);
-            return;
-        }
-        if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-        {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test_number' does not have a INTEGER value type"), false);
-            return;
-        }
-        Heap_chunk tmp_test_number(test_cfg.get_cur_pair_value_len());
-        if (tmp_test_number.ref == NULL)
-        {
-            esp_diag.error(APP_GET_API_TEST_HEAP_EXHAUSTED, test_cfg.get_cur_pair_value_len());
-            ERROR("get_api_test heap exhausted %d", test_cfg.get_cur_pair_value_len() + 1);
-            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-            return;
-        }
-        os_strncpy(tmp_test_number.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-        test_number = atoi(tmp_test_number.ref);
-        espmem.stack_mon();
-    }
-    else
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
     }
-    Heap_chunk msg(36, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref, "{\"test_number\": %d}", test_number);
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
-        // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
-        run_test(test_number);
-    }
-    else
-    {
-        esp_diag.error(APP_GET_API_TEST_HEAP_EXHAUSTED, 36);
-        ERROR("get_api_test heap exhausted %d", 36);
-    }
+    fs_sprintf(msg.ref,
+               "{\"device_name\":\"%s\",\"chip_id\":\"%d\",\"app_name\":\"%s\",",
+               espbot.get_name(),
+               system_get_chip_id(),
+               app_name);
+    fs_sprintf((msg.ref + os_strlen(msg.ref)),
+               "\"app_version\":\"%s\",\"espbot_version\":\"%s\",",
+               app_release,
+               espbot.get_version());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"library_version\":\"%s\",\"sdk_version\":\"%s\",",
+               library_release,
+               system_get_sdk_version());
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"boot_version\":\"%d\"}",
+               system_get_boot_version());
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
-static void get_api_test_webclient(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+#ifdef TEST_FUNCTIONS
+
+static void runTest(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("get_api_test_webclient");
+    ALL("runTest");
+    int32 test_number;
+    int32 test_param;
     Json_str test_cfg(parsed_req->req_content, parsed_req->content_len);
     if (test_cfg.syntax_check() != JSON_SINTAX_OK)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    // host
-    if (test_cfg.find_pair(f_str("host")) != JSON_NEW_PAIR_FOUND)
+    if (test_cfg.find_pair(f_str("test_number")) != JSON_NEW_PAIR_FOUND)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'host'"), false);
-        return;
-    }
-    if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'host' does not have a STRING value type"), false);
-        return;
-    }
-    Heap_chunk host(test_cfg.get_cur_pair_value_len());
-    if (host.ref == NULL)
-    {
-        esp_diag.error(APP_GET_API_TEST_WEBCLIENT_HEAP_EXHAUSTED, test_cfg.get_cur_pair_value_len());
-        ERROR("get_api_test_webclient heap exhausted %d", test_cfg.get_cur_pair_value_len() + 1);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-    os_strncpy(host.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-    struct ip_addr host_ip;
-    atoipaddr(&host_ip, host.ref);
-
-    // port
-    if (test_cfg.find_pair(f_str("port")) != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'port'"), false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test_number'"), false);
         return;
     }
     if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'port' does not have a INTEGER value type"), false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test_number' does not have a INTEGER value type"), false);
         return;
     }
-    Heap_chunk tmp_port(test_cfg.get_cur_pair_value_len());
-    if (tmp_port.ref == NULL)
+    test_number = atoi(test_cfg.get_cur_pair_value());
+    if (test_cfg.find_pair(f_str("test_param")) != JSON_NEW_PAIR_FOUND)
     {
-        esp_diag.error(APP_GET_API_TEST_WEBCLIENT_HEAP_EXHAUSTED, test_cfg.get_cur_pair_value_len());
-        ERROR("get_api_test_webclient heap exhausted %d", test_cfg.get_cur_pair_value_len() + 1);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test_param'"), false);
         return;
     }
-    os_strncpy(tmp_port.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-    int port = atoi(tmp_port.ref);
-
-    // request
-    if (test_cfg.find_pair(f_str("request")) != JSON_NEW_PAIR_FOUND)
+    if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'request'"), false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test_param' does not have a INTEGER value type"), false);
         return;
     }
-    if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
+    test_param = atoi(test_cfg.get_cur_pair_value());
+    espmem.stack_mon();
+    // {"test_number":4294967295,"test_param":4294967295}
+    Heap_chunk msg(64, dont_free);
+    if (msg.ref == NULL)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'request' does not have a STRING value type"), false);
+        esp_diag.error(APP_RUNTEST_HEAP_EXHAUSTED, 36);
+        ERROR("runTest heap exhausted %d", 36);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
     }
-    Heap_chunk request(test_cfg.get_cur_pair_value_len());
-    if (request.ref == NULL)
-    {
-        esp_diag.error(APP_GET_API_TEST_WEBCLIENT_HEAP_EXHAUSTED, test_cfg.get_cur_pair_value_len());
-        ERROR("get_api_test_webclient heap exhausted %d", test_cfg.get_cur_pair_value_len() + 1);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("not enough heap memory"), false);
-        return;
-    }
-    os_strncpy(request.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-
-    http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_TEXT, f_str(""), false);
-    init_test(host_ip, port, request.ref);
-    test_webclient();
+    fs_sprintf(msg.ref,
+               "{\"test_number\":%d,\"test_param\":%d}",
+               test_number,
+               test_param);
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_TEXT, msg.ref, true);
+    run_test(test_number, test_param);
 }
+
+#endif
 
 bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
@@ -206,259 +135,12 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         get_api_info(ptr_espconn, parsed_req);
         return true;
     }
+#ifdef TEST_FUNCTIONS
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/test"))) && (parsed_req->req_method == HTTP_POST))
     {
-        get_api_test(ptr_espconn, parsed_req);
+        runTest(ptr_espconn, parsed_req);
         return true;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/test/webclient"))) && (parsed_req->req_method == HTTP_POST))
-    {
-        get_api_test_webclient(ptr_espconn, parsed_req);
-        return true;
-    }
-    /*
-    if ((0 == os_strcmp(parsed_req->url, "/api/testresponse")) && (parsed_req->req_method == HTTP_GET))
-    {
-        set_http_msg_max_size(1024);
-        Heap_chunk message(512);
-        if (message.ref)
-        {
-            int idx;
-            char *ptr = message.ref;
-            for (idx = 0; idx < 512; idx++)
-            {
-                *ptr++ = '0' + (idx % 10);
-            }
-        }
-        else
-        {
-            ERROR("Websvr::webserver_recv - not enough heap memory %d", 512);
-        }
-        Http_header header;
-        header.m_code = HTTP_OK;
-        header.m_content_type = HTTP_CONTENT_TEXT;
-        header.m_content_length = os_strlen(message.ref);
-        header.m_content_range_start = 0;
-        header.m_content_range_end = 0;
-        header.m_content_range_total = 0;
-        char *header_str = http_format_header(&header);
-
-        Heap_chunk msg(512 + os_strlen(header_str) + 1, dont_free);
-        if (msg.ref)
-        {
-            // copy the header
-            os_strncpy(msg.ref, header_str, os_strlen(header_str));
-            // now the message
-            os_strncpy((msg.ref + os_strlen(header_str)), message.ref, os_strlen(message.ref));
-
-            TRACE("calling send_response: *p_espconn: %X", ptr_espconn);
-            TRACE("        send_response:        msg: %s", msg.ref);
-            http_send(ptr_espconn, msg.ref);
-        }
-        else
-        {
-            ERROR("Websvr::webserver_recv - not enough heap memory %d", 36);
-        }
-        return true;
-    }
-    if ((0 == os_strcmp(parsed_req->url, "/api/testwifiscan")) && (parsed_req->req_method == HTTP_GET))
-    {
-        uint8 ssid[32];
-        uint8 bssid[6];
-        int ch;
-        int show_hidden;   // 1 will show hidden channels
-        int scan_type;     // 0 active
-        int scan_min_time; // min 30 ms (juniper specs)
-        int scan_max_time; // max 1500 ms
-
-        Json_str test_cfg(parsed_req->req_content, parsed_req->content_len);
-        if (test_cfg.syntax_check() == JSON_SINTAX_OK)
-        {
-            // ssid
-            if (test_cfg.find_pair("ssid") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ssid'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ssid' does not have a STRING value type", false);
-                return true;
-            }
-            Heap_chunk tmp_ssid(test_cfg.get_cur_pair_value_len());
-            if (tmp_ssid.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_ssid.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // bssid
-            if (test_cfg.find_pair("bssid") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'bssid'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_STRING)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'bssid' does not have a STRING value type", false);
-                return true;
-            }
-            Heap_chunk tmp_bssid(test_cfg.get_cur_pair_value_len());
-            if (tmp_bssid.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_bssid.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // ch
-            if (test_cfg.find_pair("ch") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'ch'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'ch' does not have a INTEGER value type", false);
-                return true;
-            }
-            Heap_chunk tmp_ch(test_cfg.get_cur_pair_value_len());
-            if (tmp_ch.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_ch.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // show_hidden
-            if (test_cfg.find_pair("show_hidden") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'show_hidden'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'show_hidden' does not have a INTEGER value type", false);
-                return true;
-            }
-            Heap_chunk tmp_show_hidden(test_cfg.get_cur_pair_value_len());
-            if (tmp_show_hidden.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_show_hidden.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // show_hidden
-            if (test_cfg.find_pair("scan_type") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_type'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_type' does not have a INTEGER value type", false);
-                return true;
-            }
-            Heap_chunk tmp_scan_type(test_cfg.get_cur_pair_value_len());
-            if (tmp_scan_type.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_scan_type.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // scan_min_time
-            if (test_cfg.find_pair("scan_min_time") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_min_time'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_min_time' does not have a INTEGER value type", false);
-                return true;
-            }
-            Heap_chunk tmp_scan_min_time(test_cfg.get_cur_pair_value_len());
-            if (tmp_scan_min_time.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_scan_min_time.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // scan_max_time
-            if (test_cfg.find_pair("scan_max_time") != JSON_NEW_PAIR_FOUND)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Cannot find JSON string 'scan_max_time'", false);
-                return true;
-            }
-            if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-            {
-                http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "JSON pair with string 'scan_max_time' does not have a INTEGER value type", false);
-                return true;
-            }
-            Heap_chunk tmp_scan_max_time(test_cfg.get_cur_pair_value_len());
-            if (tmp_scan_max_time.ref == NULL)
-            {
-                ERROR("Websvr::webserver_recv - not enough heap memory %d", test_cfg.get_cur_pair_value_len() + 1);
-                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, "not enough heap memory", false);
-                return true;
-            }
-            os_strncpy(tmp_scan_max_time.ref, test_cfg.get_cur_pair_value(), test_cfg.get_cur_pair_value_len());
-            // ----------------
-            os_strncpy((char *)ssid, tmp_ssid.ref, 32);
-            os_strncpy((char *)bssid, tmp_bssid.ref, 6);
-            ch = atoi(tmp_ch.ref);
-            show_hidden = atoi(tmp_show_hidden.ref);
-            scan_type = atoi(tmp_scan_type.ref);
-            scan_min_time = atoi(tmp_scan_min_time.ref);
-            scan_max_time = atoi(tmp_scan_max_time.ref);
-            espmem.stack_mon();
-        }
-        else
-        {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, "Json bad syntax", false);
-            return true;
-        }
-        Heap_chunk msg(200, dont_free);
-        if (msg.ref)
-        {
-            os_sprintf(msg.ref,
-                       "{\"ssid\": \"%s\",\"bssid\": \"%s\",\"ch\": %d,\"show_hidden\": %d,\"scan_type\": %d,\"scan_min_time\": %d,\"scan_max_time\": %d}",
-                       ssid,
-                       bssid,
-                       ch,
-                       show_hidden,
-                       scan_type,
-                       scan_min_time,
-                       scan_max_time);
-            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-            // esp_free(msg); // dont't free the msg buffer cause it could not have been used yet
-            struct scan_config cfg;
-            cfg.ssid = NULL;
-            cfg.bssid = NULL;
-            cfg.channel = ch;
-            cfg.show_hidden = show_hidden;
-            cfg.scan_type = (wifi_scan_type_t)scan_type;
-            cfg.scan_time.active.min = scan_min_time;
-            cfg.scan_time.active.max = scan_max_time;
-            Wifi::scan_for_ap(&cfg, NULL, NULL);
-        }
-        else
-        {
-            ERROR("Websvr::webserver_recv - not enough heap memory %d", 200);
-        }
-        return true;
-    }
-    if ((0 == os_strcmp(parsed_req->url, "/api/testfastscan")) && (parsed_req->req_method == HTTP_GET))
-    {
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, "", false);
-        static char ch_list[] = {1, 6, 11};
-        Wifi::fast_scan_for_best_ap("FASTWEB-13", ch_list, 3, NULL, NULL);
-        return true;
-    }
-    */
+#endif
     return false;
 }

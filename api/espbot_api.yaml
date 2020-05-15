@@ -801,6 +801,24 @@ paths:
             application/json:      
               schema:
                 $ref: '#/components/schemas/error'
+  /info:
+    get:
+      description: Returns informations about the device (device name, chip id, fw versions)
+      summary: Find device info
+      operationId: getInfo
+      responses:
+        '200':
+          description: The device information
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/deviceInfo'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
   /mdns:
     get:
       description: Returns mDNS status (enabled or disabled)
@@ -943,6 +961,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/success'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+  /test:
+    post:
+      description: Test API, will run a test passing two parameters
+      summary: Test
+      operationId: runTest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/testParams'
+      responses:
+        '200':
+          description: Successful, returns the test parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/testParams'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
         'default':
           description: Unexpected error
           content:
@@ -1177,6 +1225,59 @@ components:
           default: 0
           minimum: 0      
           maximum: 1      
+      additionalProperties: false
+    deviceInfo:
+      type: object
+      required:
+      - device_name
+      - chip_id
+      - app_name
+      - app_version
+      - espbot_version
+      - library_version
+      - sdk_version
+      - boot_version
+      properties:
+        device_name:
+          type: string
+          pattern: '[ -~]{1,31}'
+          minLength: 1
+          maxLength: 31
+        chip_id:
+          type: string
+          pattern: '[0-9]{1,10}'
+          minLength: 1
+          maxLength: 10
+        app_name:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        app_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        espbot_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        library_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        sdk_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
+        boot_version:
+          type: string
+          pattern: '[ -~]{1,63}'
+          minLength: 1
+          maxLength: 64
       additionalProperties: false
     deviceName:
       type: object
@@ -1677,6 +1778,27 @@ components:
           pattern: '.{0,128}'
           minLength: 0
           maxLength: 128
+      additionalProperties: false
+    testParams:
+      type: object
+      required:
+      - test_number
+      - test_param
+      properties:
+        test_number:
+          type: integer
+          format: int32
+          description: First test parameter
+          default: 3
+          minimum: -2147483648
+          maximum: 2147483647
+        test_param:
+          type: integer
+          format: int32
+          description: Second test parameter
+          default: 0
+          minimum: -2147483648
+          maximum: 2147483647
       additionalProperties: false
     timedate:
       type: object
