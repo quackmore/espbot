@@ -55,7 +55,7 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
     if (parsed_req.no_header_message)
     {
         TRACE("webserver_recv no header message");
-        http_check_pending_requests(ptr_espconn, parsed_req.req_content, webserver_recv);
+        http_check_pending_requests(ptr_espconn, parsed_req.req_content, parsed_req.content_len, webserver_recv);
         return;
     }
     if (parsed_req.url == NULL)

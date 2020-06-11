@@ -287,12 +287,12 @@ Ffile::Ffile(Flashfs *t_fs)
 Ffile::Ffile(Flashfs *t_fs, char *t_filename)
 {
     status = FFS_F_UNAVAILABLE;
-    os_strncpy(m_name, t_filename, 30);
-    if (os_strlen(t_filename) > 30)
+    os_memset(m_name, 0, 32);
+    os_strncpy(m_name, t_filename, 31);
+    if (os_strlen(t_filename) > 31)
     {
         esp_diag.warn(SPIFFS_FFILE_NAME_TRUNCATED);
-        WARN("Filename truncated to 30 characters");
-        m_name[30] = '\0';
+        WARN("Filename truncated to 31 characters");
     }
     if (t_fs->is_available())
     {
@@ -363,12 +363,12 @@ void Ffile::open(char *t_filename)
             }
             espmem.stack_mon();
         }
-        os_strncpy(m_name, t_filename, 30);
-        if (os_strlen(t_filename) > 30)
+        os_memset(m_name, 0, 32);
+        os_strncpy(m_name, t_filename, 31);
+        if (os_strlen(t_filename) > 31)
         {
             esp_diag.warn(SPIFFS_OPEN_NAME_TRUNCATED);
-            WARN("Ffile::open filename truncated to 30 characters");
-            m_name[30] = '\0';
+            WARN("Ffile::open filename truncated to 31 characters");
         }
         m_fd = SPIFFS_open(m_fs->get_handler(), m_name, SPIFFS_CREAT | SPIFFS_RDWR | SPIFFS_APPEND, 0);
         if (m_fd < 0)
@@ -615,10 +615,15 @@ bool Ffile::exists(Flashfs *t_fs, char *t_name)
 
     if (t_fs->is_available())
     {
+        // make a copy of filename and trunk it to 31 characters
+        char filename[32];
+        os_memset(filename, 0, 32);
+        os_strncpy(filename, t_name, 31);
+        // search for the file
         SPIFFS_opendir(t_fs->get_handler(), "/", &directory);
         while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
         {
-            if (0 == os_strncmp(t_name, (char *)file_ptr->name, os_strlen(t_name)))
+            if (0 == os_strcmp(filename, (char *)file_ptr->name))
             {
                 return true;
             }

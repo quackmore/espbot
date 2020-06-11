@@ -197,7 +197,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
     }
 }
 
-void return_file(struct espconn *p_espconn, char *filename)
+void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *filename)
 {
     ALL("return_file");
     if (!espfs.is_available())
@@ -225,6 +225,18 @@ void return_file(struct espconn *p_espconn, char *filename)
     header.m_content_range_start = 0;
     header.m_content_range_end = 0;
     header.m_content_range_total = 0;
+    if (parsed_req->origin)
+    {
+        header.m_origin = new char[(os_strlen(parsed_req->origin) + 1)];
+        if (header.m_origin == NULL)
+        {
+            esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            ERROR("return_file heap exhausted %d", (os_strlen(parsed_req->origin) + 1));
+            http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        os_strcpy(header.m_origin, parsed_req->origin);
+    }
     char *header_str = http_format_header(&header);
     if (header_str == NULL)
     {
@@ -541,8 +553,8 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     //     uint32 excvaddr;
     //     uint32 depc;
     // };
-    // {"date":"","reason": ,"exccause": ,"epc1": ,"epc2": ,"epc3": ,"evcvaddr": ,"depc": }
-    int str_len = 84 + 24 + 7 * 10 + 1;
+    // {"date":"","reason":"","exccause":"","epc1":"","epc2":"","epc3":"","evcvaddr":"","depc":""}
+    int str_len = 91 + 24 + 7 * 10 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
@@ -554,18 +566,18 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     struct rst_info *last_rst = system_get_rst_info();
     fs_sprintf(msg.ref,
                "{\"date\":\"%s\","
-               "\"reason\": %X,"
-               "\"exccause\": %X,"
-               "\"epc1\": %X,",
+               "\"reason\":\"%X\","
+               "\"exccause\":\"%X\","
+               "\"epc1\":\"%X\",",
                esp_time.get_timestr(espbot.get_last_reboot_time()),
                last_rst->reason,
                last_rst->exccause,
                last_rst->epc1);
     fs_sprintf(msg.ref + os_strlen(msg.ref),
-               "\"epc2\": %X,"
-               "\"epc3\": %X,"
-               "\"evcvaddr\": %X,"
-               "\"depc\": %X}",
+               "\"epc2\":\"%X\","
+               "\"epc3\":\"%X\","
+               "\"evcvaddr\":\"%X\","
+               "\"depc\":\"%X\"}",
                last_rst->epc2,
                last_rst->epc3,
                last_rst->excvaddr,
@@ -823,6 +835,7 @@ static void setDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     esp_diag.set_led_mask(atoi(tmp_diag_led_mask.ref));
     esp_diag.set_serial_log_mask(atoi(tmp_serial_log_mask.ref));
     esp_diag.set_sdk_print_enabled(atoi(tmp_sdk_print_enabled.ref));
+    esp_diag.set_uart_0_bitrate(atoi(tmp_uart_0_bitrate.ref));
     esp_diag.save_cfg();
 
     // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
@@ -1081,7 +1094,7 @@ static void getFile(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("No file name provided"), false);
         return;
     }
-    return_file(ptr_espconn, file_name);
+    return_file(ptr_espconn, parsed_req, file_name);
 }
 
 static void deleteFile(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -2093,14 +2106,14 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/"))) && (parsed_req->req_method == HTTP_GET))
     {
-        return_file(ptr_espconn, (char *)f_str("index.html"));
+        return_file(ptr_espconn, parsed_req, (char *)f_str("index.html"));
         return;
     }
     if ((os_strncmp(parsed_req->url, f_str("/api/"), 5)) && (parsed_req->req_method == HTTP_GET))
     {
         // not an api: look for specified file
         char *file_name = parsed_req->url + os_strlen("/");
-        return_file(ptr_espconn, file_name);
+        return_file(ptr_espconn, parsed_req, file_name);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/cron"))) && (parsed_req->req_method == HTTP_GET))

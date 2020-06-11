@@ -478,12 +478,12 @@ char *http_format_header(class Http_header *p_header)
     ALL("http_format_header");
     // allocate a buffer
     // HTTP...        ->  37 + 3 + 22 =  62
-    // Content-Type   ->  19 + 17     =  36
+    // Content-Type   ->  17 + 24     =  41
     // Content-Length ->  22 + 5      =  27
     // Content-Range  ->  32 + 15     =  47
     // Pragma         ->  24          =  24
-    //                                = 196
-    int header_length = 196;
+    //                                = 201
+    int header_length = 201;
     if (p_header->m_acrh)
     {
         header_length += 37; // Access-Control-Request-Headers string format
@@ -816,9 +816,12 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
         return;
     }
     pending_req->p_espconn = (struct espconn *)arg;
-    os_strncpy(pending_req->request, precdata, length);
-    pending_req->content_len = parsed_req->h_content_len;
-    pending_req->content_received = parsed_req->content_len;
+    os_memcpy(pending_req->request, precdata, length);
+    // os_strncpy(pending_req->request, precdata, length);
+    // pending_req->content_len = parsed_req->h_content_len;
+    // pending_req->content_received = parsed_req->content_len;
+    pending_req->content_len = msg_len;
+    pending_req->content_received = length;
     List_err err = pending_requests->push_back(pending_req);
     if (err != list_ok)
     {
@@ -829,7 +832,7 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
     }
 }
 
-void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void (*msg_complete)(void *, char *, unsigned short))
+void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, unsigned short length, void (*msg_complete)(void *, char *, unsigned short))
 {
     ALL("http_check_pending_requests");
     // look for a pending request on p_espconn
@@ -847,20 +850,21 @@ void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, void 
         return;
     }
     // add the received message part
-    char *str_ptr = p_p_req->request + os_strlen(p_p_req->request);
-    os_strncpy(str_ptr, new_msg, os_strlen(new_msg));
-    p_p_req->content_received += os_strlen(new_msg);
+    char *str_ptr = p_p_req->request + p_p_req->content_received;
+    os_memcpy(str_ptr, new_msg, length);
+    // os_strncpy(str_ptr, new_msg, os_strlen(new_msg));
+    p_p_req->content_received += length;
     // check if the message is completed
     if (p_p_req->content_len == p_p_req->content_received)
     {
-        msg_complete((void *)p_espconn, p_p_req->request, os_strlen(p_p_req->request));
+        msg_complete((void *)p_espconn, p_p_req->request, p_p_req->content_len);
         pending_requests->remove();
     }
 }
 
 void clean_pending_responses(struct espconn *p_espconn)
 {
-    ALL("http_check_pending_requests");
+    ALL("http_clean_pending_responses");
     // look for a pending request on p_espconn
     Http_pending_req *p_p_req = pending_requests->front();
     while (p_p_req)
@@ -960,7 +964,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
     }
 }
 
-void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, int length, void (*msg_complete)(void *, char *, unsigned short))
+void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, unsigned short length, void (*msg_complete)(void *, char *, unsigned short))
 {
     ALL("http_check_pending_responses");
     // look for a pending request on p_espconn
