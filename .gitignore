@@ -11,3 +11,4 @@ lib/libuser.a
 !.vscode
 .vscode/*
 !.vscode/tasks.json
+web/cdn/*
