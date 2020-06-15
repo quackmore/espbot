@@ -1018,6 +1018,9 @@ void run_test(int32 idx, int32 param)
         cron_print_jobs();
     }
     break;
+    case 200:
+        // espmem.print_heap_objects();
+    break;
 /*
     case 101:
     {

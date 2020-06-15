@@ -40,6 +40,7 @@ void Esp_mem::init(void)
     _heap_objs = 0;
     _max_heap_objs = 0;
 
+    // DEBUG
     // int ii;
     // for (ii = 0; ii < HEAP_ARRAY_SIZE; ii++)
     // {
@@ -73,6 +74,7 @@ void *Esp_mem::espbot_zalloc(size_t size)
         espmem._heap_objs++;
         if (espmem._heap_objs > espmem._max_heap_objs)
             espmem._max_heap_objs = espmem._heap_objs;
+        // DEBUG
         // int idx;
         // for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
         // {
@@ -83,7 +85,7 @@ void *Esp_mem::espbot_zalloc(size_t size)
         //         break;
         //     }
         // }
-        espmem.stack_mon();
+        // espmem.stack_mon();
     }
     else
     {
@@ -98,6 +100,7 @@ void Esp_mem::espbot_free(void *addr)
 {
     espmem._heap_objs--;
     os_free(addr);
+    // DEBUG
     // int idx;
     // for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
     // {
@@ -108,7 +111,7 @@ void Esp_mem::espbot_free(void *addr)
     //         break;
     //     }
     // }
-    espmem.stack_mon();
+    // espmem.stack_mon();
 }
 
 uint32 Esp_mem::get_min_stack_addr(void)
@@ -159,6 +162,23 @@ uint32 Esp_mem::get_max_heap_objs(void)
 {
     return _max_heap_objs;
 }
+
+// DEBUG
+// void Esp_mem::print_heap_objects(void)
+// {
+//     int idx;
+//     int counter = 1;
+//     os_printf("heap objects start\n");
+//     for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
+//     {
+//         if (_heap_array[idx].size >= 0)
+//         {
+//             os_printf("#%d -> %X\n", counter, _heap_array[idx].addr);
+//             counter++;
+//         }
+//     }
+//     os_printf("heap objects end\n");
+// }
 
 // struct heap_item *Esp_mem::get_heap_item(List_item item)
 // {

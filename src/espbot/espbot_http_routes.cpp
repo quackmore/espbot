@@ -113,6 +113,14 @@ static const char *get_file_mime_type(char *filename)
 static void send_remaining_file(struct http_split_send *p_sr)
 {
     ALL("send_remaining_file");
+    if (!http_espconn_in_use(p_sr->p_espconn))
+    {
+        TRACE("send_remaining_file espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
+        delete[] p_sr->content;
+        // there will be no send, so trigger a check of pending send
+        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+        return;
+    }
     if (!espfs.is_available())
     {
         http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("File system is not available"), false);
@@ -244,6 +252,8 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
     char *header_str = http_format_header(&header);
     if (header_str == NULL)
     {
+        esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, (os_strlen(header_str)));
+        ERROR("return_file heap exhausted %d", (os_strlen(header_str)));
         http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
     }

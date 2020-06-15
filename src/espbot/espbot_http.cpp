@@ -123,6 +123,18 @@ Http_header::~Http_header()
 //     }
 //     os_printf("queue end\n");
 // }
+// 
+// static void print_split_queue(Queue<struct http_split_send> *qq)
+// {
+//     os_printf("queue split start\n");
+//     struct http_split_send *ptr = qq->front();
+//     while (ptr)
+//     {
+//         os_printf("e %X, o %d, s %d, t %d\n", ptr->p_espconn, ptr->order, ptr->content_size, ptr->content_transferred);
+//         ptr = qq->next();
+//     }
+//     os_printf("queue split end\n");
+// }
 
 static Queue<struct http_send> *pending_send;
 static char *send_buffer;
@@ -144,6 +156,37 @@ static void clear_busy_sending_data(void *arg)
     }
     esp_busy_sending_data = false;
     system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+}
+
+void clean_pending_send(struct espconn *p_espconn)
+{
+    system_soft_wdt_feed();
+    // clear the pending send queue
+    TRACE("cleaning pending send on esponn %X", p_espconn);
+    struct http_send *p_pending_send = pending_send->front();
+    while (p_pending_send)
+    {
+        if (p_pending_send->p_espconn == p_espconn)
+        {
+            pending_send->pop();
+            delete[] p_pending_send->msg;
+            delete p_pending_send;
+        }
+        p_pending_send = pending_send->front();
+    }
+    system_soft_wdt_feed();
+    // clear the split send queue
+    struct http_split_send *p_pending_response = pending_split_send->front();
+    while (p_pending_response)
+    {
+        if (p_pending_response->p_espconn == p_espconn)
+        {
+            pending_split_send->pop();
+            delete[] p_pending_response->content;
+            delete p_pending_response;
+        }
+        p_pending_response = pending_split_send->front();
+    }
 }
 
 void http_check_pending_send(void)
@@ -178,38 +221,19 @@ void http_check_pending_send(void)
     struct http_send *p_pending_send = pending_send->front();
     if (p_pending_send)
     {
-        // get the first pending_send and
-        // if there is another pending_send on same espconn but with lower order
-        // postpone sending and schedule a http_check_pending_send
-        struct http_send *queue_itr = pending_send->front();
-        queue_itr = pending_send->next();
-        while (queue_itr)
-        {
-            if ((p_pending_send->p_espconn == queue_itr->p_espconn) && (p_pending_send->order > queue_itr->order))
-            {
-                // DEBUG
-                // print_queue(pending_send);
-                pending_send->pop();
-                Queue_err result = pending_send->push(p_pending_send);
-                // DEBUG
-                // print_queue(pending_send);
-                if (result == Queue_full)
-                {
-                    delete queue_itr->msg;
-                    esp_diag.error(HTTP_CHECK_PENDING_SEND_QUEUE_FULL);
-                    ERROR("http_check_pending_send: full pending send queue");
-                }
-                system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
-                return;
-            }
-            queue_itr = pending_send->next();
-        }
         TRACE("http_check_pending_send pending send on espconn: %X, len %d",
               p_pending_send->p_espconn, p_pending_send->msg_len);
-        http_send_buffer(p_pending_send->p_espconn, p_pending_send->order, p_pending_send->msg, p_pending_send->msg_len);
-        // the send procedure will clear the buffer so just delete the http_send
-        delete p_pending_send;
-        pending_send->pop();
+        // call http_send_buffer only if espconn_send is not busy sending data
+        // this will keep the pending send queue properly ordered
+        ETS_INTR_LOCK();
+        if (!esp_busy_sending_data)
+        {
+            http_send_buffer(p_pending_send->p_espconn, p_pending_send->order, p_pending_send->msg, p_pending_send->msg_len);
+            // the send procedure will clear the buffer so just delete the http_send
+            delete p_pending_send;
+            pending_send->pop();
+        } // DEBUG
+        ETS_INTR_UNLOCK();
         // DEBUG
         // print_queue(pending_send);
 
@@ -222,6 +246,8 @@ void http_check_pending_send(void)
     struct http_split_send *p_pending_response = pending_split_send->front();
     if (p_pending_response)
     {
+        // DEBUG
+        // print_split_queue(pending_split_send);
         TRACE("http_check_pending_send pending response on espconn: %X, content_size: %d, content transferred %d, action_function %X",
               p_pending_response->p_espconn,
               p_pending_response->content_size,
@@ -251,6 +277,7 @@ void http_sentcb(void *arg)
     }
     esp_busy_sending_data = false;
     system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+    system_soft_wdt_feed();
 }
 
 static void push_pending_send(struct espconn *p_espconn, int order, char *msg, int len)
@@ -268,6 +295,7 @@ static void push_pending_send(struct espconn *p_espconn, int order, char *msg, i
         // print_queue(pending_send);
         if (result == Queue_full)
         {
+            delete[] msg;
             delete response_data;
             esp_diag.error(HTTP_PUSH_PENDING_SEND_QUEUE_FULL);
             ERROR("push_pending_send: full pending send queue");
@@ -291,65 +319,60 @@ void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int len)
     {
         ETS_INTR_UNLOCK();
         TRACE("http_send_buffer - espconn_send busy");
-        // push a new pending send into queue
-        // unless is is already inside the queue
-        // starting from second position
-        struct http_send *p_pending_send = pending_send->front();
-        p_pending_send = pending_send->next();
-        while (p_pending_send)
-        {
-            if ((p_pending_send->p_espconn == p_espconn) && (p_pending_send->order == order))
-            {
-                TRACE("http_send_buffer: pending send already in queue");
-                return;
-            }
-            p_pending_send = pending_send->next();
-        }
         push_pending_send(p_espconn, order, msg, len);
     }
     else // previous espconn_send completed
     {
         esp_busy_sending_data = true;
         ETS_INTR_UNLOCK();
-        // if there is another pending_send on same espconn but with lower order
-        // postpone sending and schedule a http_check_pending_send
-        struct http_send *p_pending_send = pending_send->front();
-        while (p_pending_send)
-        {
-            if ((p_pending_send->p_espconn == p_espconn) && (p_pending_send->order < order))
-            {
-                push_pending_send(p_espconn, order, msg, len);
-                esp_busy_sending_data = false;
-                system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
-                return;
-            }
-            p_pending_send = pending_send->next();
-        }
-        // send the buffer
-        DEBUG("espconn_send on espconn: %X, msg: %s", p_espconn, msg);
-        // set a timeout timer for clearing the esp_busy_sending_data in case something goes wrong
-        os_timer_disarm(&clear_busy_sending_data_timer);
-        os_timer_setfn(&clear_busy_sending_data_timer, (os_timer_func_t *)clear_busy_sending_data, NULL);
-        os_timer_arm(&clear_busy_sending_data_timer, 2000, 0);
-
+        // check if espconn in use
         send_buffer = msg;
-        sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, len);
-        espmem.stack_mon();
-        if (res != 0)
+        if (!((p_espconn->state == ESPCONN_CONNECT) || (p_espconn->state == ESPCONN_READ)))
         {
-            esp_diag.error(HTTP_SEND_BUFFER_ERROR, res);
-            ERROR("espconn_send error %d", res);
-            esp_busy_sending_data = false;
+            TRACE("espconn unexpected state, won't send any msg");
             if (send_buffer)
             {
                 delete[] send_buffer;
                 send_buffer = NULL;
             }
+            esp_busy_sending_data = false;
+            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+            system_soft_wdt_feed();
+            return;
+        }
+        // send the buffer
+        DEBUG("espconn_send on espconn: %X, state: %d, msg: %s", p_espconn, p_espconn->state, msg);
+        // set a timeout timer for clearing the esp_busy_sending_data in case something goes wrong
+        os_timer_disarm(&clear_busy_sending_data_timer);
+        os_timer_setfn(&clear_busy_sending_data_timer, (os_timer_func_t *)clear_busy_sending_data, NULL);
+        os_timer_arm(&clear_busy_sending_data_timer, 5000, 0);
+
+        sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, len);
+        espmem.stack_mon();
+        if (res != 0)
+        {
+            os_timer_disarm(&clear_busy_sending_data_timer);
+            esp_diag.error(HTTP_SEND_BUFFER_ERROR, res);
+            ERROR("espconn_send error %d", res);
+            if (send_buffer)
+            {
+                delete[] send_buffer;
+                send_buffer = NULL;
+            }
+            esp_busy_sending_data = false;
             system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
         }
         // esp_free(send_buffer); // http_sentcb will free it
     }
     system_soft_wdt_feed();
+}
+
+bool http_espconn_in_use(struct espconn *p_espconn)
+{
+    if ((p_espconn->state == ESPCONN_CONNECT) || (p_espconn->state == ESPCONN_READ) || (p_espconn->state == ESPCONN_WRITE))
+        return true;
+    else
+        return false;
 }
 
 void http_response(struct espconn *p_espconn, int code, char *content_type, const char *msg, bool free_msg)
@@ -427,6 +450,13 @@ Queue<struct http_split_send> *pending_split_send;
 static void send_remaining_msg(struct http_split_send *p_sr)
 {
     ALL("send_remaining_msg");
+    if (!http_espconn_in_use(p_sr->p_espconn))
+    {
+        TRACE("send_remaining_msg espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
+        delete[] p_sr->content;
+        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+        return;
+    }
     if ((p_sr->content_size - p_sr->content_transferred) > http_msg_max_size)
     {
         // the message is bigger than response_max_size
@@ -464,6 +494,8 @@ static void send_remaining_msg(struct http_split_send *p_sr)
                 ERROR("send_remaining_msg heap exhausted %d", sizeof(struct http_split_send));
                 delete[] buffer.ref;
                 delete[] p_sr->content;
+                // there will be no send, so trigger a check of pending send
+                system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
             }
         }
         else
@@ -471,6 +503,8 @@ static void send_remaining_msg(struct http_split_send *p_sr)
             esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, buffer_size + 1);
             ERROR("send_remaining_msg heap exhausted %d", buffer_size + 1);
             delete[] p_sr->content;
+            // there will be no send, so trigger a check of pending send
+            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
         }
     }
     else
@@ -490,6 +524,8 @@ static void send_remaining_msg(struct http_split_send *p_sr)
         {
             esp_diag.error(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, (buffer_size + 1));
             ERROR("send_remaining_msg heap exhausted %d", (buffer_size + 1));
+            // there will be no send, so trigger a check of pending send
+            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
         }
         delete[] p_sr->content;
     }

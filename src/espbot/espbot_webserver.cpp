@@ -34,7 +34,6 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
     Http_parsed_req parsed_req;
     DEBUG("webserver_recv on %X, len %u, msg %s", ptr_espconn, length, precdata);
     http_parse_request(precdata, length, &parsed_req);
-    system_soft_wdt_feed();
     TRACE("webserver_recv parsed req\n"
           "no_header_message: %d\n"
           "           method: %d\n"
@@ -64,6 +63,7 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
         DEBUG("webserver_recv empty url");
         return;
     }
+    system_soft_wdt_feed();
     espbot_http_routes(ptr_espconn, &parsed_req);
     espmem.stack_mon();
 }

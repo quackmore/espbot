@@ -141,6 +141,8 @@ struct http_split_send
 
 extern Queue<struct http_split_send> *pending_split_send;
 
+void clean_pending_send(struct espconn *p_espconn);
+
 // check if there are pending http send
 void http_check_pending_send(void);
 
@@ -161,6 +163,8 @@ void http_send(struct espconn *p_espconn, char *msg, int msg_len);
 
 // http_send_buffer will manage calling espconn_send avoiding new calls before completion
 void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int msg_len);
+
+bool http_espconn_in_use(struct espconn *p_espconn);
 
 //
 // incoming response for a client
