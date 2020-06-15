@@ -32,7 +32,7 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
 {
     struct espconn *ptr_espconn = (struct espconn *)arg;
     Http_parsed_req parsed_req;
-    DEBUG("webserver_recv len %u, msg %s", length, precdata);
+    DEBUG("webserver_recv on %X, len %u, msg %s", ptr_espconn, length, precdata);
     http_parse_request(precdata, length, &parsed_req);
     system_soft_wdt_feed();
     TRACE("webserver_recv parsed req\n"

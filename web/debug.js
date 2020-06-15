@@ -1,10 +1,4 @@
-// device.js
-const esp8266 = {
-  // "url": "",
-  // "cors": false
-  "url": "http://192.168.1.187",
-  "cors": true
-};
+// debug.js
 
 // spinner while awaiting for page load
 $(document).ready(function () {
@@ -22,15 +16,6 @@ function update_page() {
     update_fsinfo();
     update_file_list();
   }, 250);
-}
-
-function ajax_error(xhr, status, msg) {
-  if (status === "timeout") {
-    alert("Ajax timeout!");
-  } else {
-    var answer = JSON.parse(xhr.responseText);
-    alert("" + answer.error.reason);
-  }
 }
 
 // reboot
@@ -318,6 +303,10 @@ $("#file_upload").on("click", function () {
       },
       error: function (jqXHR, textStatus, errorThrown) {
         ajax_error(jqXHR, textStatus, errorThrown);
+        setTimeout(function () {
+          $('#awaiting').modal('hide');
+        }, 1000);
+        update_file_list();
       }
     });
   }
@@ -353,6 +342,10 @@ function upload_remaining(buffer, starting_point) {
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
+      setTimeout(function () {
+        $('#awaiting').modal('hide');
+      }, 1000);
+      update_file_list();
     }
   });
 }
@@ -395,7 +388,7 @@ function format_hex(unformatted_str) {
   $('#sample_text').removeClass('d-none');
   var textarea_width = (document.getElementById("memhexdump_content")).offsetWidth;
   var text_width = (document.getElementById("sample_text")).offsetWidth;
-  var word32_on_a_line = Math.floor((textarea_width - 30 - text_width) / ((text_width*12)/10));
+  var word32_on_a_line = Math.floor((textarea_width - 30 - text_width) / ((text_width * 12) / 10));
   $('#sample_text').addClass('d-none');
   unformatted_str = unformatted_str + " ";
   // start each line with the address
@@ -428,7 +421,7 @@ function format_chars(unformatted_str) {
   $('#sample_text').removeClass('d-none');
   var textarea_width = (document.getElementById("memhexdump_content")).offsetWidth;
   var text_width = (document.getElementById("sample_text")).offsetWidth;
-  var word32_on_a_line = Math.floor((textarea_width - 30 - text_width) / ((text_width*8)/10));
+  var word32_on_a_line = Math.floor((textarea_width - 30 - text_width) / ((text_width * 8) / 10));
   $('#sample_text').addClass('d-none');
   unformatted_str = unformatted_str + " ";
   // start each line with the address

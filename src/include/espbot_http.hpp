@@ -124,6 +124,7 @@ public:
 struct http_send
 {
   struct espconn *p_espconn;
+  int order;
   char *msg;
   int msg_len;
 };
@@ -131,6 +132,7 @@ struct http_send
 struct http_split_send
 {
   struct espconn *p_espconn;
+  int order;
   char *content;
   int content_size;
   int content_transferred;
@@ -158,7 +160,7 @@ char *http_format_header(class Http_header *);
 void http_send(struct espconn *p_espconn, char *msg, int msg_len);
 
 // http_send_buffer will manage calling espconn_send avoiding new calls before completion
-void http_send_buffer(struct espconn *p_espconn, char *msg, int msg_len);
+void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int msg_len);
 
 //
 // incoming response for a client

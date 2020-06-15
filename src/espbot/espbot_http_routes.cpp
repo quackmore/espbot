@@ -156,12 +156,12 @@ static void send_remaining_file(struct http_split_send *p_sr)
             http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             delete[] p_sr->content;
             delete[] buffer.ref;
-            delete[] p_sr->content;
             return;
         }
         sel_file.n_read(buffer.ref, p_sr->content_transferred, buffer_size);
         // setup the remaining message
         p_pending_response->p_espconn = p_sr->p_espconn;
+        p_pending_response->order = p_sr->order + 1;
         p_pending_response->content = p_sr->content;
         p_pending_response->content_size = p_sr->content_size;
         p_pending_response->content_transferred = p_sr->content_transferred + buffer_size;
@@ -169,13 +169,17 @@ static void send_remaining_file(struct http_split_send *p_sr)
         Queue_err result = pending_split_send->push(p_pending_response);
         if (result == Queue_full)
         {
+            delete[] p_sr->content;
+            delete[] buffer.ref;
+            delete p_pending_response;
             esp_diag.error(ROUTES_SEND_REMAINING_MSG_PENDING_RES_QUEUE_FULL);
             ERROR("send_remaining_file full pending res queue");
+            return;
         }
 
         TRACE("send_remaining_file: *p_espconn: %X, msg (splitted) len: %d",
               p_sr->p_espconn, buffer_size);
-        http_send_buffer(p_sr->p_espconn, buffer.ref, buffer_size);
+        http_send_buffer(p_sr->p_espconn, p_sr->order, buffer.ref, buffer_size);
     }
     else
     {
@@ -192,7 +196,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
         sel_file.n_read(buffer.ref, p_sr->content_transferred, remaining_size);
         TRACE("send_remaining_file: *p_espconn: %X, msg (splitted) len: %d",
               p_sr->p_espconn, remaining_size);
-        http_send_buffer(p_sr->p_espconn, buffer.ref, remaining_size);
+        http_send_buffer(p_sr->p_espconn, p_sr->order, buffer.ref, remaining_size);
         delete[] p_sr->content;
     }
 }
@@ -244,7 +248,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
         return;
     }
     // ok send the header
-    http_send_buffer(p_espconn, header_str, os_strlen(header_str));
+    http_send_buffer(p_espconn, 0, header_str, os_strlen(header_str));
     // and now the file
     if (file_size == 0)
         // the file in empty => nothing to do
@@ -286,6 +290,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
         sel_file.n_read(buffer.ref, buffer_size);
         // setup the remaining message
         p_pending_response->p_espconn = p_espconn;
+        p_pending_response->order = 2;
         p_pending_response->content = filename_copy.ref;
         p_pending_response->content_size = file_size;
         p_pending_response->content_transferred = buffer_size;
@@ -293,12 +298,16 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
         Queue_err result = pending_split_send->push(p_pending_response);
         if (result == Queue_full)
         {
+            delete[] buffer.ref;
+            delete[] filename_copy.ref;
+            delete p_pending_response;
             esp_diag.error(ROUTES_RETURN_FILE_PENDING_RES_QUEUE_FULL);
             ERROR("return_file full pending response queue");
+            return;
         }
         // send the file piece
         TRACE("return_file *p_espconn: %X, msg (splitted) len: %d", p_espconn, buffer_size);
-        http_send_buffer(p_espconn, buffer.ref, buffer_size);
+        http_send_buffer(p_espconn, 1, buffer.ref, buffer_size);
         espmem.stack_mon();
     }
     else
@@ -314,7 +323,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
         }
         sel_file.n_read(buffer.ref, file_size);
         TRACE("return_file *p_espconn: %X, msg (full) len: %d", p_espconn, file_size);
-        http_send_buffer(p_espconn, buffer.ref, file_size);
+        http_send_buffer(p_espconn, 1, buffer.ref, file_size);
     }
 }
 
@@ -366,7 +375,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
         return;
     }
     // ok send the header
-    http_send_buffer(p_espconn, header_str, os_strlen(header_str));
+    http_send_buffer(p_espconn, 0, header_str, os_strlen(header_str));
 }
 
 static void getCron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)

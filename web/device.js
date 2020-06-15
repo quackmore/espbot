@@ -1,20 +1,14 @@
 // device.js
-const esp8266 = {
-  // "url": "",
-  // "cors": false
-  "url": "http://192.168.1.187",
-  "cors": true
-};
 
 // spinner while awaiting for page load
 $(document).ready(function () {
   setTimeout(function () {
     $('#awaiting').modal('hide');
   }, 1000);
-  update_device_page();
+  update_page();
 });
 
-function update_device_page() {
+function update_page() {
   update_device_info();
   update_wifi();
   update_cron();
@@ -27,15 +21,6 @@ function update_device_page() {
     periodically_update_datetime();
     update_ota();
   }, 500);
-}
-
-function ajax_error(xhr, status, msg) {
-  if (status === "timeout") {
-    alert("Ajax timeout!");
-  } else {
-    var answer = JSON.parse(xhr.responseText)
-    alert("" + answer.error.reason);
-  }
 }
 
 // device info
