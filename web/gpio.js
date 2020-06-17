@@ -83,7 +83,7 @@ var counter = 1;
 
 function update_gpio_list() {
   update_gpio(counter);
-  counter++
+  counter++;
   if (counter > 8)
     return;
   setTimeout(function () {
