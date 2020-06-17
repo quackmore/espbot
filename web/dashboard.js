@@ -25,7 +25,7 @@ function esp_get_info(success_cb) {
       success_cb(data);
     },
     error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown)
+      ajax_error(jqXHR, textStatus, errorThrown);
     }
   });
 }
@@ -68,11 +68,11 @@ $('#info_save').on('click', function (e) {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("Device name saved.")
+      alert("Device name saved.");
       update_device_info();
     },
     error: function (jqXHR, textStatus, errorThrown) {
-      ajax_error(jqXHR, textStatus, errorThrown)
+      ajax_error(jqXHR, textStatus, errorThrown);
     }
   })
 });

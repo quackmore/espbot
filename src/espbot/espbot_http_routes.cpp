@@ -1339,7 +1339,8 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         }
     }
 
-    Heap_chunk msg(parsed_req->content_len, dont_free);
+    // {"gpio_id": 1,"gpio_type":"unprovisioned"}
+    Heap_chunk msg(48, dont_free);
     if (msg.ref)
     {
         int result = esp_gpio.get_config(gpio_id);

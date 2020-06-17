@@ -30,23 +30,10 @@ Library built on Espressif NON-OS SDK with common functions for esp8266 apps.
 + about 30 kB of RAM are available to user application (while idle more than 43 kB are available but under stress conditions, for both SDK and ESPBOT, available memory got reduced by 10 kB and a little more)
 + ESPBOT uses 8 bytes of RTC memory, leaving 504 bytes available to user application
 
-## Webserver APIs
+## REST APIs
 
-checkout postman API documentation:
-
-espbot_2.0_apis
-
-<https://documenter.getpostman.com/view/4220776/RznCsKph>
-
-espbot_2.0_apis_single_commands
-(these are just commands that cannot be run in a test sequence)
-
-<https://documenter.getpostman.com/view/4220776/RznCsKpj>
-
-espbot_2.0_gpio
-(for managing ESP8266 digital I/O)
-
-<https://documenter.getpostman.com/view/4220776/RzthSXGC>
+Espbot REST apis are detailed by [espbot_api.yaml](api/espbot_api.yaml).  
+Open the file with the [Swagger online editor](https://editor.swagger.io/) or (better) with Visual Studio [Swagger Viewer](https://marketplace.visualstudio.com/items?itemName=Arjun.swagger-viewer) extension for description and use.
 
 ## Using ESPBOT
 
@@ -146,24 +133,26 @@ Build steps (linux)
 
 Here is an example on how to use espbot FOTA using a [docker](https://www.docker.com/community-edition#/download) container as http server (thank you docker for existing).
 
-      Start an http server using docker:
-      $ docker run -d --name espbot-http-upgrade -p 80:80 -v <your espbot directory>/bin/upgrade/www:/usr/share/nginx/html:ro nginx:alpine
+    Start an http server using docker:
+    $ docker run -d --name espbot-http-upgrade -p 80:80 -v <your espbot directory>/bin/upgrade/www:/usr/share/nginx/html:ro nginx:alpine
 
-      Configure espbot:
+    Configure and command espbot with following curl examples or use the REST apis with any swagger viewer.
+      
+    Configure espbot:
 
-      curl --location --request POST 'http://{{host}}/api/ota/cfg' \
+    curl --location --request POST 'http://{{device_host}}/api/ota/cfg' \
       --header 'Content-Type: application/json' \
       --data-raw '{
-          "host": "192.168.1.201",
+          "host": "{{your host IP}}",
           "port": 80,
           "path": "/",
           "check_version": "false",
           "reboot_on_completion": "true"
       }'
       
-      Start upgrade:
+    Start upgrade:
 
-      curl --location --request POST 'http://{{host}}/api/ota/upgrade' \
+    curl --location --request POST 'http://{{device_host}}/api/ota' \
       --data-raw ''
 
 ## Integrating

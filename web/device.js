@@ -84,13 +84,13 @@ $('#info_save').on('click', function (e) {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("Device name saved.")
+      alert("Device name saved.");
       update_device_info();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 // wifi
@@ -186,7 +186,7 @@ $('#wifi_connect').on('click', function (e) {
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 // cron
@@ -242,13 +242,13 @@ $('#cron_save').on('click', function () {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("Cron status saved.")
+      alert("Cron status saved.");
       update_cron();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 // mDNS
@@ -305,13 +305,13 @@ $('#mdns_save').on('click', function () {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("mDNS status saved.")
+      alert("mDNS status saved.");
       update_mdns();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 // time&date
@@ -401,18 +401,19 @@ $('#datetime_save').on('click', function () {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("Time & Date settings saved.")
+      alert("Time & Date settings saved.");
       update_datetime();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 $('#datetime_set').on('click', function () {
   var now = new Date;
-  var now_utc = Math.floor(now.getTime() / 1000); // getTime() is UTC
+  // getTime() is UTC
+  var now_utc = Math.floor(now.getTime() / 1000);
   $.ajax({
     type: 'POST',
     url: esp8266.url + '/api/timedate',
@@ -428,7 +429,7 @@ $('#datetime_set').on('click', function () {
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 // OTA
@@ -524,24 +525,28 @@ $('#ota_save').on('click', function () {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("OTA settings saved.")
+      alert("OTA settings saved.");
       update_ota();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });
 
 $('#ota_start').on('click', function () {
+  $('#awaiting').modal('show');
   device_running = 0;
   $.ajax({
     type: 'POST',
     url: esp8266.url + '/api/ota',
     dataType: 'json',
     crossDomain: esp8266.cors,
-    timeout: 12000,
+    timeout: 15000,
     success: function (data) {
+      setTimeout(function () {
+        $('#awaiting').modal('hide');
+      }, 1000);
       alert("" + data.msg);
       if ((data.msg).includes("ebooting")) {
         device_running = 0;
@@ -550,10 +555,13 @@ $('#ota_start').on('click', function () {
       }
     },
     error: function (jqXHR, textStatus, errorThrown) {
+      setTimeout(function () {
+        $('#awaiting').modal('hide');
+      }, 1000);
       ajax_error(jqXHR, textStatus, errorThrown);
       device_running = 1;
     }
-  })
+  });
 });
 
 // diagnostic
@@ -628,11 +636,11 @@ $('#diag_save').on('click', function () {
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function () {
-      alert("Diagnostic settings saved.")
+      alert("Diagnostic settings saved.");
       update_diag();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
     }
-  })
+  });
 });

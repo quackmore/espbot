@@ -210,6 +210,7 @@ uint32 Espbot_diag::get_uart_0_bitrate(void)
 
 bool Espbot_diag::set_uart_0_bitrate(uint32 val)
 {
+    uint32 old_value;
     switch (val)
     {
     case BIT_RATE_300:
@@ -229,6 +230,8 @@ bool Espbot_diag::set_uart_0_bitrate(uint32 val)
     case BIT_RATE_1843200:
     case BIT_RATE_3686400:
         _uart_0_bitrate = val;
+        if (_uart_0_bitrate != old_value)
+            uart_init((UartBautRate)_uart_0_bitrate, (UartBautRate)_uart_0_bitrate);
         return true;
     default:
         return false;
@@ -243,6 +246,7 @@ bool Espbot_diag::get_sdk_print_enabled(void)
 void Espbot_diag::set_sdk_print_enabled(bool val)
 {
     _sdk_print_enabled = val;
+    system_set_os_print(_sdk_print_enabled);
 }
 
 #define DIAG_FILENAME f_str("diagnostic.cfg")
