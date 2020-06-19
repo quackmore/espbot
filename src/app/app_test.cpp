@@ -220,7 +220,7 @@ static void IRAM dht_start_completed(void *param)
     free_do_seq(seq);
 }
 */
-void run_test(int32 idx, int32 param) 
+void run_test(int32 idx, int32 param)
 {
     struct do_seq *seq;
     static int event_counter = 0;
@@ -993,7 +993,7 @@ void run_test(int32 idx, int32 param)
     {
         static int job_id = 0;
         fs_printf("adding new job...\n");
-        int result = cron_add_job(job_id,0,0,0,0,NULL);
+        int result = cron_add_job(job_id, 0, 0, 0, 0, NULL, NULL);
         if (result > 0)
             fs_printf("added job %d", result);
         else
@@ -1020,8 +1020,8 @@ void run_test(int32 idx, int32 param)
     break;
     case 200:
         // espmem.print_heap_objects();
-    break;
-/*
+        break;
+        /*
     case 101:
     {
         // check json numbers

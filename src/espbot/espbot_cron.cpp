@@ -29,7 +29,8 @@ struct job
     char day_of_month;
     char month;
     char day_of_week;
-    void (*command)(void);
+    void (*command)(void *);
+    void *param;
 };
 
 static os_timer_t cron_timer;
@@ -177,6 +178,7 @@ static void cron_execute(void)
         // os_printf("       month: %d\n", current_job->month);
         // os_printf(" day of week: %d\n", current_job->day_of_week);
         // os_printf("     command: %X\n", current_job->command);
+        // os_printf("       param: %X\n", current_job->param);
         if ((current_job->minutes != CRON_STAR) && (current_job->minutes != current_time.minutes))
         {
             current_job = job_list->next();
@@ -203,7 +205,7 @@ static void cron_execute(void)
             continue;
         }
         if (current_job->command)
-            current_job->command();
+            current_job->command(current_job->param);
         current_job = job_list->next();
     }
 }
@@ -266,7 +268,8 @@ int cron_add_job(char minutes,
                  char day_of_month,
                  char month,
                  char day_of_week,
-                 void (*command)(void))
+                 void (*command)(void *),
+                 void *param)
 {
     ALL("cron_add_job");
     // * # job definition:
@@ -290,6 +293,7 @@ int cron_add_job(char minutes,
     new_job->month = month;
     new_job->day_of_week = day_of_week;
     new_job->command = command;
+    new_job->param = param;
     // assign a fake id
     new_job->id = -1;
     // find a free id
@@ -360,6 +364,7 @@ void cron_print_jobs(void)
         fs_printf("       month: %d\n", job_itr->month);
         fs_printf(" day of week: %d\n", job_itr->day_of_week);
         fs_printf("     command: %X\n", job_itr->command);
+        fs_printf("       param: %X\n", job_itr->param);
         job_itr = job_list->next();
     }
 }
