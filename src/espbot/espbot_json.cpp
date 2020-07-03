@@ -205,12 +205,11 @@ int Json_str::syntax_check(void)
             ptr++;
             if ((ptr - _str) < _str_len) // check that after a '"' actually a string start
             {
-                if ((*ptr == '"') || (*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
+                if ((*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
                     return (ptr - _str + 1);
             }
             else
                 return (ptr - _str + 1);
-            ptr++;
             while ((ptr - _str) < _str_len) // looking for ending '"'
             {
                 if (*ptr == '"')
@@ -387,13 +386,12 @@ Json_pair_type Json_str::find_next_pair(void)
         _cursor++;
         if ((_cursor - _str) < _str_len) // check that after a '"' actually a string start
         {
-            if ((*_cursor == '"') || (*_cursor == '{') || (*_cursor == '}') || (*_cursor == '[') || (*_cursor == ']') || (*_cursor == ':') || (*_cursor == ','))
+            if ((*_cursor == '{') || (*_cursor == '}') || (*_cursor == '[') || (*_cursor == ']') || (*_cursor == ':') || (*_cursor == ','))
                 return JSON_ERR;
         }
         else
             return JSON_ERR;
         _pair_value = _cursor;
-        _cursor++;
         while ((_cursor - _str) < _str_len) // looking for ending '"'
         {
             if (*_cursor == '"')
@@ -582,12 +580,11 @@ int Json_array_str::syntax_check(void)
             ptr++;
             if ((ptr - _str) < _str_len) // check that after a '"' actually a string start
             {
-                if ((*ptr == '"') || (*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
+                if ((*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
                     return (ptr - _str + 1);
             }
             else
                 return (ptr - _str + 1);
-            ptr++;
             while ((ptr - _str) < _str_len) // looking for ending '"'
             {
                 if (*ptr == '"')
@@ -742,12 +739,11 @@ int Json_array_str::find_elem(int idx)
             ptr++;
             if ((ptr - _str) < _str_len) // check that after a '"' actually a string start
             {
-                if ((*ptr == '"') || (*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
+                if ((*ptr == '{') || (*ptr == '}') || (*ptr == '[') || (*ptr == ']') || (*ptr == ':') || (*ptr == ','))
                     return -1;
             }
             else
                 return -1;
-            ptr++;
             while ((ptr - _str) < _str_len) // looking for ending '"'
             {
                 if (*ptr == '"')
