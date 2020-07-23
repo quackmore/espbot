@@ -475,7 +475,7 @@ static void ota_engine(void)
         }
         *((uint32 *)(upgrade_svr->ip)) = esp_ota.get_host_ip()->addr;
         upgrade_svr->port = esp_ota.get_port();
-        upgrade_svr->check_times = 7000;
+        upgrade_svr->check_times = 10000;
         upgrade_svr->check_cb = ota_completed_cb;
         // upgrade_svr->pespconn = pespconn;
         fs_sprintf(url,

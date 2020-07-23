@@ -15,6 +15,7 @@ extern "C"
 #include "osapi.h"
 #include "sntp.h"
 #include "user_interface.h"
+#include "espbot_hal.h"
 }
 
 #include "app_http_routes.hpp"
@@ -572,8 +573,9 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     //     uint32 excvaddr;
     //     uint32 depc;
     // };
-    // {"date":"","reason":"","exccause":"","epc1":"","epc2":"","epc3":"","evcvaddr":"","depc":""}
-    int str_len = 91 + 24 + 7 * 10 + 1;
+    // {"date":"","reason":"","exccause":"","epc1":"","epc2":"","epc3":"","evcvaddr":"","depc":"","sp":"","spDump":[]}
+    // array item "01234567",
+    int str_len = 111 + 24 + 7 * 8 + 11 * 19 + 1;
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
@@ -596,11 +598,23 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
                "\"epc2\":\"%X\","
                "\"epc3\":\"%X\","
                "\"evcvaddr\":\"%X\","
-               "\"depc\":\"%X\"}",
+               "\"depc\":\"%X\",",
                last_rst->epc2,
                last_rst->epc3,
                last_rst->excvaddr,
                last_rst->depc);
+    fs_sprintf(msg.ref + os_strlen(msg.ref),
+               "\"sp\":\"%X\","
+               "\"spDump\":[",
+               get_last_crash_SP());
+    uint32 address;
+    int res = get_last_crash_stack_dump(0, &address);
+    while (res == 0)
+    {
+        fs_sprintf(msg.ref + os_strlen(msg.ref), "\"%X\",", address);
+        res = get_last_crash_stack_dump(1, &address);
+    }
+    fs_sprintf(msg.ref + os_strlen(msg.ref) - 1, "]}");
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 

@@ -25,6 +25,7 @@ extern "C"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
+#include "espbot_hal.h"
 #include "espbot_mem_mon.hpp"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
@@ -38,11 +39,25 @@ static void espbot_coordinator_task(os_event_t *e)
     {
     case SIG_STAMODE_GOT_IP:
         // [wifi station] got IP
-        esp_time.start_sntp();
-        esp_mDns.start(espbot.get_name());
-        espwebsvr.stop(); // in case there was a web server listening on esp AP interface
-        espwebsvr.start(80);
-        app_init_after_wifi();
+        if (e->par == GOT_IP_AFTER_CONNECTION)
+        {
+            // new connection
+            esp_time.start_sntp();
+            esp_mDns.start(espbot.get_name());
+            espwebsvr.stop(); // in case there was a web server listening on esp AP interface
+            espwebsvr.start(80);
+            app_init_after_wifi();
+        }
+        if (e->par == GOT_IP_ALREADY_CONNECTED)
+        {
+            // dhcp lease renewal
+            esp_time.stop_sntp();
+            esp_time.start_sntp();
+            esp_mDns.stop();
+            esp_mDns.start(espbot.get_name());
+            espwebsvr.stop();
+            espwebsvr.start(80);
+        }
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
@@ -129,16 +144,15 @@ extern "C" void espbot_init(void);
 
 void espbot_init(void)
 {
-    // uart_init(BIT_RATE_74880, BIT_RATE_74880);
-    // uart_init(BIT_RATE_115200, BIT_RATE_115200);
-    // uart_init(BIT_RATE_460800, BIT_RATE_460800);
+    // set up custom exception handler (espbot_hal.c)
+    // install_custom_exceptions();
     // uart_init(BIT_RATE_74880, BIT_RATE_74880);
     system_set_os_print(1); // enable log print
     // the previous setting will be overridden in esp_diag.init
     // according to custom values saved in flash
     espmem.init();
     // print_greetings();
-    esp_gpio.init(); // cause it's used by diagnostic
+    esp_gpio.init();           // cause it's used by diagnostic
     esp_diag.init_essential(); // FS not available yet
 
     espfs.init();

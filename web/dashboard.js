@@ -36,6 +36,7 @@ function update_device_info() {
     $("#app_version").val(data.app_version);
     $("#dev_name").val(data.device_name);
     $("#espbot_version").val(data.espbot_version);
+    $("#api_version").val(data.api_version);
     $("#library_version").val(data.library_version);
     $("#chip_id").val(data.chip_id);
     $("#sdk_version").val(data.sdk_version);

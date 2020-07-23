@@ -14,7 +14,7 @@ extern "C"
 #include "ip_addr.h"
 }
 
-#define TEST_FUNCTIONS 1
+// #define TEST_FUNCTIONS 1
 
 void init_test(struct ip_addr, uint32, char *);
 void test_webclient(void);

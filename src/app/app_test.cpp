@@ -26,6 +26,7 @@ extern "C"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
+#include "espbot_hal.h"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mdns.hpp"
@@ -220,6 +221,7 @@ static void IRAM dht_start_completed(void *param)
     free_do_seq(seq);
 }
 */
+
 void run_test(int32 idx, int32 param)
 {
     struct do_seq *seq;
@@ -227,6 +229,151 @@ void run_test(int32 idx, int32 param)
     INFO("Running test %d with param %d", idx, param);
     switch (idx)
     {
+    case 1:
+    {
+        while (1)
+        {
+            ;
+        }
+        break;
+    }
+    case 2:
+    {
+        uint32 *exc_ptr = NULL;
+        uint32 number = *exc_ptr;
+        break;
+    }
+    case 3:
+    {
+        system_soft_wdt_stop();
+        break;
+    }
+    case 4:
+    {
+        int idx;
+        uint32 val;
+        fs_printf("RTC stack dump\n");
+        for (idx = 0; idx < 20; idx++)
+        {
+            system_rtc_mem_read((66 + idx), (void *)&val, 4);
+            fs_printf("%d %X\n", idx, val);
+        }
+        break;
+    }
+    case 5:
+    {
+        int idx;
+        uint32 val = 0;
+        fs_printf("filling RTC stack dump with 0\n");
+        for (idx = 0; idx < 20; idx++)
+        {
+            system_rtc_mem_write((66 + idx), (void *)&val, 4);
+        }
+        break;
+    }
+    case 6:
+    {
+        fs_printf("SP address: %X\n", get_last_crash_SP());
+        break;
+    }
+    case 7:
+    {
+        uint32_t value;
+        if (get_last_crash_stack_dump(0, &value) == 0)
+            fs_printf("value: %X\n", value);
+        else
+            fs_printf("error retrieving value\n");
+        break;
+    }
+    case 8:
+    {
+        uint32_t value;
+        if (get_last_crash_stack_dump(1, &value) == 0)
+            fs_printf("value: %X\n", value);
+        else
+            fs_printf("error retrieving value\n");
+        break;
+    }
+/*
+    case 10:
+    {
+        os_printf("installing EXCCAUSE_ILLEGAL\n");
+        install_exc(0);
+        break;
+    }
+    case 11:
+    {
+        os_printf("installing EXCCAUSE_SYSCALL\n");
+        install_exc(1);
+        break;
+    }
+    case 12:
+    {
+        os_printf("installing EXCCAUSE_INSTR_ERROR\n");
+        install_exc(2);
+        break;
+    }
+    case 13:
+    {
+        os_printf("installing EXCCAUSE_LOAD_STORE_ERROR\n");
+        install_exc(3);
+        break;
+    }
+    case 14:
+    {
+        os_printf("installing EXCCAUSE_DIVIDE_BY_ZERO\n");
+        install_exc(4);
+        break;
+    }
+    case 15:
+    {
+        os_printf("installing EXCCAUSE_UNALIGNED\n");
+        install_exc(5);
+        break;
+    }
+    case 16:
+    {
+        os_printf("installing EXCCAUSE_INSTR_DATA_ERROR\n");
+        install_exc(6);
+        break;
+    }
+    case 17:
+    {
+        os_printf("installing EXCCAUSE_LOAD_STORE_DATA_ERROR\n");
+        install_exc(7);
+        break;
+    }
+    case 18:
+    {
+        os_printf("installing EXCCAUSE_INSTR_ADDR_ERROR\n");
+        install_exc(8);
+        break;
+    }
+    case 19:
+    {
+        os_printf("installing EXCCAUSE_LOAD_STORE_ADDR_ERROR\n");
+        install_exc(9);
+        break;
+    }
+    case 20:
+    {
+        os_printf("installing EXCCAUSE_INSTR_PROHIBITED\n");
+        install_exc(10);
+        break;
+    }
+    case 21:
+    {
+        os_printf("installing EXCCAUSE_LOAD_PROHIBITED\n");
+        install_exc(11);
+        break;
+    }
+    case 22:
+    {
+        os_printf("installing EXCCAUSE_STORE_PROHIBITED\n");
+        install_exc(12);
+        break;
+    }
+*/
         /*
     case 1:
     {
@@ -861,7 +1008,7 @@ void run_test(int32 idx, int32 param)
     }
     break;
 */
-
+        /*
     case 40:
     {
         fs_printf("testing function execution from task\n");
@@ -1021,6 +1168,7 @@ void run_test(int32 idx, int32 param)
     case 200:
         // espmem.print_heap_objects();
         break;
+*/
         /*
     case 101:
     {

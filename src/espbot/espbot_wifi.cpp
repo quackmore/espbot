@@ -68,6 +68,7 @@ static void switch_to_stationap(void)
 void wifi_event_handler(System_Event_t *evt)
 {
     static bool stamode_connected = false;
+    static ip_addr old_ip = {0};
     switch (evt->event)
     {
     case EVENT_STAMODE_CONNECTED:
@@ -109,21 +110,34 @@ void wifi_event_handler(System_Event_t *evt)
         //       IP2STR(&evt->event_info.got_ip.gw));
         break;
     case EVENT_STAMODE_GOT_IP:
-        // now it's really 'connected' to AP
-        stamode_connected = true;
-        esp_diag.info(WIFI_GOT_IP);
-        INFO("got IP" IPSTR " " IPSTR " " IPSTR,
-             IP2STR(&evt->event_info.got_ip.ip),
-             IP2STR(&evt->event_info.got_ip.mask),
-             IP2STR(&evt->event_info.got_ip.gw));
-        // station connected to AP and got an IP address
-        // whichever was wifi mode now AP mode is no longer required
-        stop_connect_timeout_timer();
-        wifi_set_opmode_current(STATION_MODE);
-        system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, '0'); // informing everybody of
-                                                                   // successfully connection to AP
-        // time to update flash configuration for (eventually) saving ssid and password
-        Wifi::save_cfg();
+        if (stamode_connected)
+        {
+            // there was no EVENT_STAMODE_DISCONNECTED
+            // likely a lease renewal or similar
+            // checkout if the IP address changed
+            if (old_ip.addr != evt->event_info.got_ip.ip.addr)
+                // informing everybody that the IP address changed
+                system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, GOT_IP_ALREADY_CONNECTED);
+        }
+        else
+        {
+            // now it's really 'connected' to AP
+            stamode_connected = true;
+            os_memcpy(&old_ip, &evt->event_info.got_ip.ip, sizeof(struct ip_addr));
+            esp_diag.info(WIFI_GOT_IP);
+            INFO("got IP" IPSTR " " IPSTR " " IPSTR,
+                 IP2STR(&evt->event_info.got_ip.ip),
+                 IP2STR(&evt->event_info.got_ip.mask),
+                 IP2STR(&evt->event_info.got_ip.gw));
+            // station connected to AP and got an IP address
+            // whichever was wifi mode now AP mode is no longer required
+            stop_connect_timeout_timer();
+            wifi_set_opmode_current(STATION_MODE);
+            // informing everybody of successfully connection to AP
+            system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, GOT_IP_AFTER_CONNECTION);
+            // time to update flash configuration for (eventually) saving ssid and password
+            Wifi::save_cfg();
+        }
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
         esp_diag.info(WIFI_STA_CONNECTED);

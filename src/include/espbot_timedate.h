@@ -10,10 +10,14 @@
 #ifndef __TIMEDATE_H__
 #define __TIMEDATE_H__
 
+#ifdef __cplusplus
 extern "C"
 {
+#endif
 #include "c_types.h"
+#ifdef __cplusplus
 }
+#endif
 
 // declared public cause it's being stored into RTC memory
 struct espbot_time

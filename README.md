@@ -28,12 +28,13 @@ Library built on Espressif NON-OS SDK with common functions for esp8266 apps.
 ## Memory usage
 
 + about 30 kB of RAM are available to user application (while idle more than 43 kB are available but under stress conditions, for both SDK and ESPBOT, available memory got reduced by 10 kB and a little more)
-+ ESPBOT uses 8 bytes of RTC memory, leaving 504 bytes available to user application
++ ESPBOT uses 88 bytes of RTC memory, leaving 424 bytes available to user application
 
 ## REST APIs
 
 Espbot REST apis are detailed by [espbot_api.yaml](api/espbot_api.yaml).  
-Open the file with the [Swagger online editor](https://editor.swagger.io/) or (better) with Visual Studio [Swagger Viewer](https://marketplace.visualstudio.com/items?itemName=Arjun.swagger-viewer) extension for description and use.
+Open the file with the [Swagger online editor](https://editor.swagger.io/) or (better) with Visual Studio [Swagger Viewer](https://marketplace.visualstudio.com/items?itemName=Arjun.swagger-viewer) extension for description.
+Using a Swagger editor locally or Swagger Viewer allows for using the API and communicate with the host device.
 
 ## Using ESPBOT
 
@@ -181,6 +182,7 @@ Espot include files are:
 + espbot_event_codes.h
 + espbot_global.hpp
 + espbot_gpio.hpp
++ espbot_hal.h
 + espbot_http_routes.hpp
 + espbot_http.hpp
 + espbot_json.hpp

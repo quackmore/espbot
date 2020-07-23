@@ -62,11 +62,12 @@ static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
                app_release,
                espbot.get_version());
     fs_sprintf(msg.ref + os_strlen(msg.ref),
-               "\"library_version\":\"%s\",\"sdk_version\":\"%s\",",
-               library_release,
-               system_get_sdk_version());
+               "\"api_version\":\"%s\",\"library_version\":\"%s\",",
+               f_str(API_RELEASE),
+               library_release);
     fs_sprintf(msg.ref + os_strlen(msg.ref),
-               "\"boot_version\":\"%d\"}",
+               "\"sdk_version\":\"%s\",\"boot_version\":\"%d\"}",
+               system_get_sdk_version(),
                system_get_boot_version());
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
