@@ -32,23 +32,24 @@ extern "C"
 
 static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","library_version":"","sdk_version":"","boot_version":""}
+    // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","api_version":"","library_version":"","sdk_version":"","boot_version":""}
     ALL("get_api_info");
-    int str_len = 138 +
+    int str_len = 155 +
                   os_strlen(espbot.get_name()) +
                   10 +
                   os_strlen(app_name) +
                   os_strlen(app_release) +
                   os_strlen(espbot.get_version()) +
+                  os_strlen(f_str(API_RELEASE)) +
                   os_strlen(library_release) +
                   os_strlen(system_get_sdk_version()) +
                   10 +
                   1;
-    Heap_chunk msg(138 + str_len, dont_free);
+    Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_INFO_HEAP_EXHAUSTED, 155 + str_len);
-        ERROR("get_api_info heap exhausted %d", 155 + str_len);
+        esp_diag.error(APP_GET_API_INFO_HEAP_EXHAUSTED, str_len);
+        ERROR("get_api_info heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
     }
