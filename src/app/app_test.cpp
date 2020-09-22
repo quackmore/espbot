@@ -847,6 +847,7 @@ void run_test(int32 idx, int32 param)
         esp_diag.warn(event_counter, 100 + event_counter);
     }
     break;
+    */
     case 20:
     {
         // Error print
@@ -855,6 +856,7 @@ void run_test(int32 idx, int32 param)
         esp_diag.info(event_counter, 100 + event_counter);
     }
     break;
+    /*
     case 21:
     {
         // Error print

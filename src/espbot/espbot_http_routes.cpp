@@ -896,68 +896,263 @@ static void setDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parse
     espmem.stack_mon();
 }
 
+static void getDiagnosticEvents_next(struct http_split_send *p_sr)
+{
+    ALL("getdiagnosticevents_next");
+    if (!http_espconn_in_use(p_sr->p_espconn))
+    {
+        TRACE("getdiagnosticevents_next espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
+        // there will be no send, so trigger a check of pending send
+        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+        return;
+    }
+    int remaining_size = (p_sr->content_size - p_sr->content_transferred) * (42 + 12 + 1 + 2 + 4 + 12) + 2;
+    if (remaining_size > get_http_msg_max_size())
+    {
+        // the remaining content size is bigger than response_max_size
+        // will split the remaining content over multiple messages
+        int buffer_size = get_http_msg_max_size();
+        Heap_chunk buffer(buffer_size, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, buffer_size);
+            ERROR("getdiagnosticevents_next heap exhausted %d", buffer_size);
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        struct http_split_send *p_pending_response = new struct http_split_send;
+        if (p_pending_response == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, sizeof(struct http_split_send));
+            ERROR("getdiagnosticevents_next not heap exhausted %dn", sizeof(struct http_split_send));
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            delete[] buffer.ref;
+            return;
+        }
+        struct dia_event *event_ptr;
+        int ev_count = (buffer_size - 18) / (42 + 12 + 1 + 2 + 4 + 12) + p_sr->content_transferred;
+        int idx;
+        for (idx = p_sr->content_transferred; idx < ev_count; idx++)
+        {
+            fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            event_ptr = esp_diag.get_event(idx);
+            if (event_ptr)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
+                           event_ptr->timestamp,
+                           event_ptr->ack,
+                           event_ptr->type,
+                           event_ptr->code,
+                           event_ptr->value);
+        }
+        // setup the remaining message
+        p_pending_response->p_espconn = p_sr->p_espconn;
+        p_pending_response->order = p_sr->order + 1;
+        p_pending_response->content = p_sr->content;
+        p_pending_response->content_size = p_sr->content_size;
+        p_pending_response->content_transferred = ev_count;
+        p_pending_response->action_function = getDiagnosticEvents_next;
+        Queue_err result = pending_split_send->push(p_pending_response);
+        if (result == Queue_full)
+        {
+            delete[] buffer.ref;
+            delete p_pending_response;
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_PENDING_RES_QUEUE_FULL);
+            ERROR("getdiagnosticevents_next full pending res queue");
+            return;
+        }
+        TRACE("getdiagnosticevents_next: *p_espconn: %X, msg (splitted) len: %d",
+              p_sr->p_espconn, buffer_size);
+        http_send_buffer(p_sr->p_espconn, p_sr->order, buffer.ref, os_strlen(buffer.ref));
+    }
+    else
+    {
+        // this is the last piece of the message
+        Heap_chunk buffer(remaining_size, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, remaining_size);
+            ERROR("getdiagnosticevents_next heap exhausted %d", remaining_size);
+            http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        struct dia_event *event_ptr;
+        int idx;
+        for (idx = p_sr->content_transferred; idx < p_sr->content_size; idx++)
+        {
+            fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            event_ptr = esp_diag.get_event(idx);
+            if (event_ptr)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
+                           event_ptr->timestamp,
+                           event_ptr->ack,
+                           event_ptr->type,
+                           event_ptr->code,
+                           event_ptr->value);
+        }
+        fs_sprintf(buffer.ref + os_strlen(buffer.ref), "]}");
+        TRACE("getdiagnosticevents_next: *p_espconn: %X, msg (splitted) len: %d",
+              p_sr->p_espconn, remaining_size);
+        http_send_buffer(p_sr->p_espconn, p_sr->order, buffer.ref, os_strlen(buffer.ref));
+    }
+}
+
 static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getDiagnosticEvents");
-    // check how much memory needed for last logs
+    // count the diagnostic events and calculate the message content length
+    // {"diag_events":[
+    // {"ts":,"ack":,"type":"","code":"","val":},
+    // ]}
     int evnt_count = 0;
-    while (esp_diag.get_event(evnt_count))
+    int content_len = 16 + 2 - 1;
     {
-        evnt_count++;
-        if (evnt_count >= esp_diag.get_max_events_count())
-            break;
-    }
-    // format strings
-    // "{"diag_events":["
-    // ",{"ts":,"ack":,"type":"","code":"","val":}"
-    // "]}"
-    int msg_len = 16 +                // formatting string
-                  2 +                 // formatting string
-                  (evnt_count * 12) + // timestamp
-                  (evnt_count * 1) +  // ack
-                  (evnt_count * 2) +  // type
-                  (evnt_count * 4) +  // code
-                  (evnt_count * 12) + // val
-                  (evnt_count * 42) + // errors formatting
-                  1;                  // just in case
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, msg_len);
-        ERROR("getDiagnosticEvents heap exhausted %d", msg_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref, "{\"diag_events\":[");
-    // now add saved errors
-    char *str_ptr;
-    struct dia_event *event_ptr;
-    int idx = 0;
-    // uint32 time_zone_shift = esp_time.get_timezone() * 3600;
-
-    for (idx = 0; idx < evnt_count; idx++)
-    {
-        event_ptr = esp_diag.get_event(idx);
-        str_ptr = msg.ref + os_strlen(msg.ref);
-        if (idx == 0)
-            fs_sprintf(str_ptr, "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
+        char tmp_msg[42 + 12 + 1 + 2 + 4 + 12 + 1];
+        struct dia_event *event_ptr = esp_diag.get_event(evnt_count);
+        while (event_ptr)
+        {
+            evnt_count++;
+            fs_sprintf(tmp_msg, "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d},",
                        event_ptr->timestamp,
                        event_ptr->ack,
                        event_ptr->type,
                        event_ptr->code,
                        event_ptr->value);
+            content_len += os_strlen(tmp_msg);
+            if (evnt_count >= esp_diag.get_max_events_count())
+                break;
+            event_ptr = esp_diag.get_event(evnt_count);
+        }
+    }
+    // let's start with the header
+    Http_header header;
+    header.m_code = HTTP_OK;
+    header.m_content_type = HTTP_CONTENT_JSON;
+    header.m_content_length = content_len;
+    header.m_content_range_start = 0;
+    header.m_content_range_end = 0;
+    header.m_content_range_total = 0;
+    bool heap_exhausted = false;
+    if (parsed_req->origin)
+    {
+        header.m_origin = new char[(os_strlen(parsed_req->origin) + 1)];
+        if (header.m_origin == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            ERROR("getDiagnosticEvents heap exhausted %d", (os_strlen(parsed_req->origin) + 1));
+            heap_exhausted = true;
+        }
         else
-            fs_sprintf(str_ptr, ",{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
-                       event_ptr->timestamp,
-                       event_ptr->ack,
-                       event_ptr->type,
-                       event_ptr->code,
-                       event_ptr->value);
+            os_strcpy(header.m_origin, parsed_req->origin);
     }
-    espmem.stack_mon();
-    str_ptr = msg.ref + os_strlen(msg.ref);
-    fs_sprintf(str_ptr, "]}");
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    char *header_str = http_format_header(&header);
+    if (header_str == NULL)
+    {
+        esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, (os_strlen(header_str)));
+        ERROR("getDiagnosticEvents heap exhausted %d", (os_strlen(header_str)));
+        heap_exhausted = true;
+    }
+    if (heap_exhausted)
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+    else
+        // ok send the header
+        http_send_buffer(ptr_espconn, 0, header_str, os_strlen(header_str));
+
+    // and now the content
+    if (content_len > get_http_msg_max_size())
+    {
+        // will split the content over multiple messages
+        // each the size of http_msg_max_size
+        int buffer_size = get_http_msg_max_size();
+        Heap_chunk buffer(buffer_size, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, buffer_size);
+            ERROR("getDiagnosticEvents heap exhausted %d", buffer_size);
+            return;
+        }
+        struct http_split_send *p_pending_response = new struct http_split_send;
+        if (p_pending_response == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, sizeof(struct http_split_send));
+            ERROR("getDiagnosticEvents heap exhausted %d", sizeof(struct http_split_send));
+            delete[] buffer.ref;
+            return;
+        }
+        fs_sprintf(buffer.ref, "{\"diag_events\":[");
+        bool first_time = true;
+        struct dia_event *event_ptr;
+        int ev_count = (buffer_size - 18) / (42 + 12 + 1 + 2 + 4 + 12);
+        int idx;
+        for (idx = 0; idx < ev_count; idx++)
+        {
+            if (first_time)
+                first_time = false;
+            else
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            event_ptr = esp_diag.get_event(idx);
+            if (event_ptr)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
+                           event_ptr->timestamp,
+                           event_ptr->ack,
+                           event_ptr->type,
+                           event_ptr->code,
+                           event_ptr->value);
+        }
+        // setup the next message
+        p_pending_response->p_espconn = ptr_espconn;
+        p_pending_response->order = 2;
+        p_pending_response->content = "";
+        p_pending_response->content_size = evnt_count;
+        p_pending_response->content_transferred = ev_count;
+        p_pending_response->action_function = getDiagnosticEvents_next;
+        Queue_err result = pending_split_send->push(p_pending_response);
+        if (result == Queue_full)
+        {
+            delete[] buffer.ref;
+            delete p_pending_response;
+            esp_diag.error(ROUTES_GETDIAGEVENTS_PENDING_RES_QUEUE_FULL);
+            ERROR("getDiagnosticEvents full pending response queue");
+            return;
+        }
+        // send the content fragment
+        TRACE("getDiagnosticEvents *p_espconn: %X, msg (splitted) len: %d", ptr_espconn, buffer_size);
+        http_send_buffer(ptr_espconn, 1, buffer.ref, os_strlen(buffer.ref));
+        espmem.stack_mon();
+    }
+    else
+    {
+        // no need to split the content over multiple messages
+        Heap_chunk buffer(content_len, dont_free);
+        if (buffer.ref == NULL)
+        {
+            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, content_len);
+            ERROR("getDiagnosticEvents heap exhausted %d", content_len);
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+            return;
+        }
+        fs_sprintf(buffer.ref, "{\"diag_events\":[");
+        bool first_time = true;
+        struct dia_event *event_ptr;
+        int idx;
+        for (idx = 0; idx < evnt_count; idx++)
+        {
+            if (first_time)
+                first_time = false;
+            else
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
+            event_ptr = esp_diag.get_event(idx);
+            if (event_ptr)
+                fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
+                           event_ptr->timestamp,
+                           event_ptr->ack,
+                           event_ptr->type,
+                           event_ptr->code,
+                           event_ptr->value);
+        }
+        fs_sprintf(buffer.ref + os_strlen(buffer.ref), "]}");
+        TRACE("getDiagnosticEvents *p_espconn: %X, msg (full) len: %d", ptr_espconn, content_len);
+        http_send_buffer(ptr_espconn, 1, buffer.ref, os_strlen(buffer.ref));
+    }
 }
 
 static void getDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
