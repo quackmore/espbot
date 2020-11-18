@@ -11,15 +11,16 @@ $(document).ready(function () {
 function update_page() {
   update_device_info();
   update_wifi();
-  update_cron();
+  update_ap();
   setTimeout(function () {
+    update_cron();
     update_mdns();
     update_datetime();
-    update_diag();
   }, 250);
   setTimeout(function () {
-    periodically_update_datetime();
+    update_diag();
     update_ota();
+    periodically_update_datetime();
   }, 500);
 }
 
@@ -168,6 +169,14 @@ function update_wifi_aps() {
   });
 }
 
+$('#st_pwd_view').on('click', function () {
+  if ($('#wifi_pwd').attr('type') === 'password') {
+    $('#wifi_pwd').attr('type', 'text');
+  } else {
+    $('#wifi_pwd').attr('type', 'password');
+  }
+});
+
 $('#wifi_refresh').on('click', function (e) {
   update_wifi_aps();
 });
@@ -175,14 +184,109 @@ $('#wifi_refresh').on('click', function (e) {
 $('#wifi_connect').on('click', function (e) {
   $.ajax({
     type: 'POST',
-    url: esp8266.url + '/api/wifi/cfg',
+    url: esp8266.url + '/api/wifi/station/cfg',
     dataType: 'json',
     contentType: 'application/json',
     data: JSON.stringify({ station_ssid: $('#wifi_aps option:selected').text(), station_pwd: $('#wifi_pwd').val() }),
     crossDomain: esp8266.cors,
     timeout: 2000,
     success: function (xhr) {
-      alert("Conneting to AP " + $('#wifi_aps option:selected').text() + " ...");
+      alert("Connecting to AP " + $('#wifi_aps option:selected').text() + " ...");
+    },
+    error: function (jqXHR, textStatus, errorThrown) {
+      ajax_error(jqXHR, textStatus, errorThrown);
+    }
+  });
+});
+
+// AP
+
+function esp_get_ap(success_cb) {
+  $.ajax({
+    type: 'GET',
+    url: esp8266.url + '/api/wifi/ap/cfg',
+    dataType: 'json',
+    crossDomain: esp8266.cors,
+    timeout: 2000,
+    success: function (data) {
+      success_cb(data);
+    },
+    error: function (jqXHR, textStatus, errorThrown) {
+      ajax_error(jqXHR, textStatus, errorThrown);
+    }
+  });
+}
+
+function update_ap() {
+  esp_get_ap(function (data) {
+    $('#ap_ch').val(data.ap_channel);
+    $('#ap_pwd').val(data.ap_pwd);
+    if ($('#ap_pwd').val().length < 8)
+      $("#ap_save").prop("disabled", true);
+    else
+      $("#ap_save").prop("disabled", false);
+    if ($('#ap_buttons').hasClass("d-none")) {
+      $("#ap_ch").prop("disabled", true);
+      $("#ap_pwd").prop("disabled", true);
+    }
+  });
+}
+
+$('#ap_edit').on('click', function () {
+  if ($('#ap_buttons').hasClass("d-none")) {
+    $('#ap_buttons').removeClass("d-none");
+    $('#ap_ch').removeClass("border-0");
+    $("#ap_ch").prop("disabled", false);
+    $('#ap_pwd').removeClass("border-0");
+    $("#ap_pwd").prop("disabled", false);
+  } else {
+    $('#ap_buttons').addClass("d-none");
+    $('#ap_ch').addClass("border-0");
+    $("#ap_ch").prop("disabled", true);
+    $('#ap_pwd').addClass("border-0");
+    $("#ap_pwd").prop("disabled", true);
+  }
+});
+
+$('#ap_pwd_view').on('click', function () {
+  if ($('#ap_pwd').attr('type') === 'password') {
+    $('#ap_pwd').attr('type', 'text');
+  } else {
+    $('#ap_pwd').attr('type', 'password');
+  }
+});
+
+$('#ap_refresh').on('click', function () {
+  update_ap();
+});
+
+$('#ap_ch').on('change', function () {
+  $('#ap_ch').val(Math.trunc($('#ap_ch').val()));
+  if ($('#ap_ch').val() < 1)
+    $('#ap_ch').val(1);
+  if ($('#ap_ch').val() > 11)
+    $('#ap_ch').val(11);
+});
+
+$('#ap_pwd').on('change', function () {
+  if ($('#ap_pwd').val().length < 8)
+    $("#ap_save").prop("disabled", true);
+  else
+    $("#ap_save").prop("disabled", false);
+});
+
+$('#ap_save').on('click', function () {
+  $.ajax({
+    type: 'POST',
+    url: esp8266.url + '/api/wifi/ap/cfg',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify({ ap_channel: Number($('#ap_ch').val()), ap_pwd: $('#ap_pwd').val() }),
+    crossDomain: esp8266.cors,
+    timeout: 2000,
+    success: function () {
+      alert("AP cfg saved.\nWarning: modifying the current network configuration may cause temporary disconnections...");
+      update_cron();
     },
     error: function (jqXHR, textStatus, errorThrown) {
       ajax_error(jqXHR, textStatus, errorThrown);
@@ -573,7 +677,7 @@ function esp_get_diag(success_cb) {
     url: esp8266.url + '/api/diagnostic/cfg',
     dataType: 'json',
     crossDomain: esp8266.cors,
-    timeout: 2000,
+    timeout: 3000,
     success: function (data) {
       success_cb(data);
     },

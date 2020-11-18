@@ -201,9 +201,9 @@ function update_file_list() {
     for (var idx = 0; idx < data.files.length; idx++) {
       file_list_str += '<div class="row no-gutters"><span class="my-auto float-left">';
       file_list_str += data.files[idx].name;
-      file_list_str += '</span><div class="btn-group my-auto ml-auto" role="group"><button class="btn" disabled>';
+      file_list_str += '</span><div class="btn-group my-auto ml-auto" role="group"><span class="my-auto">';
       file_list_str += data.files[idx].size;
-      file_list_str += '</button><button class="btn" onclick="file_show(\x27';
+      file_list_str += '</span><button class="btn" onclick="file_show(\x27';
       file_list_str += data.files[idx].name;
       file_list_str += '\x27,';
       file_list_str += data.files[idx].size;

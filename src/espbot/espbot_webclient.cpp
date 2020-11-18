@@ -101,8 +101,8 @@ static void del_client_association(Webclnt *client)
 
 void webclnt_connect_timeout(void *arg)
 {
-    esp_diag.error(WEB_CLIENT_CONNECT_TIMEOUT);
-    ERROR("webclnt_connect_timeout");
+    // esp_diag.info(WEB_CLIENT_CONNECT_TIMEOUT);
+    INFO("webclnt_connect_timeout");
     Webclnt *clnt = (Webclnt *)arg;
     clnt->update_status(WEBCLNT_CONNECT_TIMEOUT);
     clnt->call_completed_func();
@@ -110,8 +110,8 @@ void webclnt_connect_timeout(void *arg)
 
 static void webclnt_send_req_timeout_function(void *arg)
 {
-    esp_diag.error(WEB_CLIENT_SEND_REQ_TIMEOUT);
-    ERROR("webclnt_send_req_timeout_function");
+    // esp_diag.info(WEB_CLIENT_SEND_REQ_TIMEOUT);
+    INFO("webclnt_send_req_timeout_function");
     Webclnt *clnt = (Webclnt *)arg;
     clnt->update_status(WEBCLNT_RESPONSE_TIMEOUT);
     clnt->call_completed_func();
@@ -309,10 +309,10 @@ void Webclnt::connect(struct ip_addr t_server,
     espmem.stack_mon();
     if (res)
     {
-        // in this case callback will never be called
+        // no connection established, have to call the callback 
         _status = WEBCLNT_CONNECT_FAILURE;
-        esp_diag.error(WEB_CLIENT_CONNECT_CONN_FAILURE, res);
-        ERROR("Webclnt failed to connect err %d", res);
+        // esp_diag.info(WEB_CLIENT_CONNECT_CONN_FAILURE, res);
+        INFO("Webclnt failed to connect err %d", res);
         os_timer_disarm(&_connect_timeout_timer);
         call_completed_func();
     }
@@ -361,8 +361,8 @@ void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *),
         os_timer_arm(&_send_req_timeout_timer, _comm_timeout, 0);
         break;
     default:
-        esp_diag.error(WEB_CLIENT_SEND_REQ_CANNOT_SEND_REQ, _status);
-        ERROR("Webclnt::send_req - cannot send request status is %s", _status);
+        // esp_diag.info(WEB_CLIENT_SEND_REQ_CANNOT_SEND_REQ, _status);
+        INFO("Webclnt::send_req - cannot send request status is %s", _status);
         _status = WEBCLNT_CANNOT_SEND_REQUEST;
         call_completed_func();
         break;

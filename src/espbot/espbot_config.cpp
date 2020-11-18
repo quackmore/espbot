@@ -109,8 +109,8 @@ int File_to_json::find_string(const char *t_string)
             }
         }
     }
-    esp_diag.error(FILE_TO_JSON_PAIR_NOT_FOUND);
-    ERROR("File_to_json::find_string pair not found");
+    // esp_diag.error(FILE_TO_JSON_PAIR_NOT_FOUND);
+    DEBUG("File_to_json::find_string %s not found", t_string);
     return FILE_TO_JSON_ERROR;
     espmem.stack_mon();
 }

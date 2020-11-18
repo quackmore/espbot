@@ -2205,12 +2205,93 @@ static void getWifi(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
 }
 
-static void getWifiCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void getWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("getWifiCfg");
-    Heap_chunk msg(64, dont_free);
+    ALL("getWifiApCfg");
+    int msg_len = 29 + 64 + 1;
+    Heap_chunk msg(msg_len, dont_free);
     if (msg.ref)
     {
+        // {"ap_channel":11,"ap_pwd":""}
+        fs_sprintf(msg.ref,
+                   "{\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
+                   Wifi::ap_get_ch(),
+                   Wifi::ap_get_password());
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    }
+    else
+    {
+        esp_diag.error(ROUTES_GETWIFIAPCFG_HEAP_EXHAUSTED, msg_len);
+        ERROR("getWifiApCfg heap exhausted %d", msg_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+    }
+}
+
+static void setWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("setWifiApCfg");
+    Json_str wifi_cfg(parsed_req->req_content, parsed_req->content_len);
+    if (wifi_cfg.syntax_check() != JSON_SINTAX_OK)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
+        return;
+    }
+    if (wifi_cfg.find_pair(f_str("ap_channel")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'ap_channel'"), false);
+        return;
+    }
+    if (wifi_cfg.get_cur_pair_value_type() != JSON_INTEGER)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'ap_channel' does not have a INTEGER value type"), false);
+        return;
+    }
+    int tmp_ap_ch = atoi(wifi_cfg.get_cur_pair_value());
+    if ((tmp_ap_ch < 1) || (tmp_ap_ch > 11))
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Invalid AP channel"), false);
+        return;
+    }
+    if (wifi_cfg.find_pair(f_str("ap_pwd")) != JSON_NEW_PAIR_FOUND)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'ap_pwd'"), false);
+        return;
+    }
+    if (wifi_cfg.get_cur_pair_value_type() != JSON_STRING)
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'ap_pwd' does not have a STRING value type"), false);
+        return;
+    }
+    Wifi::ap_set_ch(tmp_ap_ch);
+    Wifi::ap_set_pwd(wifi_cfg.get_cur_pair_value(), wifi_cfg.get_cur_pair_value_len());
+    Wifi::save_cfg();
+    espmem.stack_mon();
+
+    int msg_len = 29 + 64 + 1;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref == NULL)
+    {
+        esp_diag.error(ROUTES_SETWIFIAPCFG_HEAP_EXHAUSTED, msg_len);
+        ERROR("setWifiApCfg heap exhausted %d", msg_len);
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
+        return;
+    }
+    // {"ap_channel":11,"ap_pwd":""}
+    fs_sprintf(msg.ref,
+               "{\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
+               Wifi::ap_get_ch(),
+               Wifi::ap_get_password());
+    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+}
+
+static void getWifiStationCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+{
+    ALL("getWifiStationCfg");
+    int msg_len = 36 + 32 + 64 + 1;
+    Heap_chunk msg(msg_len, dont_free);
+    if (msg.ref)
+    {
+        // {"station_ssid":"","station_pwd":""}
         fs_sprintf(msg.ref,
                    "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
                    Wifi::station_get_ssid(),
@@ -2219,15 +2300,15 @@ static void getWifiCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     else
     {
-        esp_diag.error(ROUTES_GETWIFICFG_HEAP_EXHAUSTED, 64);
-        ERROR("getWifiCfg heap exhausted %d", 64);
+        esp_diag.error(ROUTES_GETWIFISTATIONCFG_HEAP_EXHAUSTED, msg_len);
+        ERROR("getWifiStationCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
 }
 
-static void setWifiCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
+static void setWifiStationCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
-    ALL("setWifiCfg");
+    ALL("setWifiStationCfg");
     Json_str wifi_cfg(parsed_req->req_content, parsed_req->content_len);
     if (wifi_cfg.syntax_check() != JSON_SINTAX_OK)
     {
@@ -2253,7 +2334,7 @@ static void setWifiCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     if (wifi_cfg.get_cur_pair_value_type() != JSON_STRING)
     {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'station_pwd' does not have an integer value type"), false);
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'station_pwd' does not have a STRING value type"), false);
         return;
     }
     Wifi::station_set_ssid(tmp_ssid, tmp_ssid_len);
@@ -2276,8 +2357,8 @@ static void setWifiCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     else
     {
-        esp_diag.error(ROUTES_SETWIFICFG_HEAP_EXHAUSTED, 140);
-        ERROR("setWifiCfg heap exhausted %d", 140);
+        esp_diag.error(ROUTES_SETWIFISTATIONCFG_HEAP_EXHAUSTED, 140);
+        ERROR("setWifiStationCfg heap exhausted %d", 140);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
 }
@@ -2527,14 +2608,24 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
         Wifi::scan_for_ap(NULL, getAPlist, (void *)ptr_espconn);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/cfg"))) && (parsed_req->req_method == HTTP_GET))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/ap/cfg"))) && (parsed_req->req_method == HTTP_GET))
     {
-        getWifiCfg(ptr_espconn, parsed_req);
+        getWifiApCfg(ptr_espconn, parsed_req);
         return;
     }
-    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/cfg"))) && (parsed_req->req_method == HTTP_POST))
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/ap/cfg"))) && (parsed_req->req_method == HTTP_POST))
     {
-        setWifiCfg(ptr_espconn, parsed_req);
+        setWifiApCfg(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/station/cfg"))) && (parsed_req->req_method == HTTP_GET))
+    {
+        getWifiStationCfg(ptr_espconn, parsed_req);
+        return;
+    }
+    if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/station/cfg"))) && (parsed_req->req_method == HTTP_POST))
+    {
+        setWifiStationCfg(ptr_espconn, parsed_req);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/connect"))) && (parsed_req->req_method == HTTP_POST))
