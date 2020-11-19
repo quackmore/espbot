@@ -1,11 +1,11 @@
 // shared.js
 const esp8266 = {
-  // "url": "",
-  // "cors": false
-  "url": "http://192.168.1.187",
+  "url": "",
+  "cors": false
+  // "url": "http://192.168.1.187",
   // "url": "http://192.168.100.100",
   // "url": "http://192.168.10.1",
-  "cors": true
+  // "cors": true
 };
 
 function update_sidebar() {

@@ -465,14 +465,16 @@ function update_datetime() {
 var device_running = 1;
 
 function periodically_update_datetime() {
+  if ($('#datetime_date').length == 0)
+    device_running = 0;
   if (device_running) {
     esp_get_datetime(function (data) {
       $('#datetime_date').val(data.date);
     });
+    setTimeout(function () {
+      periodically_update_datetime();
+    }, 10000);
   }
-  setTimeout(function () {
-    periodically_update_datetime();
-  }, 10000);
 }
 
 $('#datetime_edit').on('click', function () {
