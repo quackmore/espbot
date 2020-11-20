@@ -222,7 +222,6 @@ $('#file_refresh').on('click', function () {
 function file_show(file, filesize) {
   $('#awaiting').modal('show');
   var timeout_value = filesize / 8 + 3000;
-  console.log(timeout_value);
   $.ajax({
     type: 'GET',
     url: esp8266.url + '/api/file/' + file,
@@ -468,5 +467,7 @@ function update_memhexdump() {
 }
 
 $('#memhexdump_refresh').on('click', function () {
+  if ($('#memhexdump_start_addr').val() == "")
+    return;
   update_memhexdump();
 });
