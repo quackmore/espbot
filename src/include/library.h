@@ -12,8 +12,8 @@
 #include "c_types.h"
 
 
-// these are espbot_2.0 memory management methods
-// https://github.com/quackmore/espbot_2.0
+// these are espbot memory management methods
+// https://github.com/quackmore/espbot
 void *call_espbot_zalloc(size_t size);
 void call_espbot_free(void *addr);
 

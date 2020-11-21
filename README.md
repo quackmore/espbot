@@ -1,4 +1,4 @@
-# espbot_2.0
+# espbot
 
 ## Summary
 
@@ -52,7 +52,7 @@ Build steps (linux)
 + Clone the repository.
 + Customize build variables according to your ESP8266 module and environment:
 
-      cd <your path>/espbot_2.0
+      cd <your path>/espbot
       ./gen_env.sh
 
       this will generate a env.sh file
@@ -208,6 +208,6 @@ Espot include files are:
 
 ## License
 
-Espbot_2.0 comes with a [BEER-WARE] license.
+Espbot comes with a [BEER-WARE] license.
 
 Enjoy.
