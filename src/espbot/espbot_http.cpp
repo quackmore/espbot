@@ -410,7 +410,7 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, cons
         ERROR("http_response heap exhausted %d", header_len);
         return;
     }
-    os_sprintf(msg_header.ref, "HTTP/1.1 %d %s\r\nServer: espbot/2.0\r\n"
+    os_sprintf(msg_header.ref, "HTTP/1.1 %d %s\r\nServer: espbot\r\n"
                                "Content-Type: %s\r\n"
                                "Content-Length: %d\r\n"
                                "Access-Control-Allow-Origin: *\r\n\r\n",
@@ -619,7 +619,7 @@ char *http_format_header(class Http_header *p_header)
     {
         // setup the header
         char *ptr = header_msg.ref;
-        fs_sprintf(ptr, "HTTP/1.1 %d %s\r\nServer: espbot/2.0\r\n",
+        fs_sprintf(ptr, "HTTP/1.1 %d %s\r\nServer: espbot\r\n",
                    p_header->m_code, code_msg(p_header->m_code));
         ptr = ptr + os_strlen(ptr);
         fs_sprintf(ptr, "Content-Type: %s\r\n", p_header->m_content_type);
