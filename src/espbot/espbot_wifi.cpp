@@ -60,10 +60,21 @@ void wifi_event_handler(System_Event_t *evt)
         {
             // just log one disconnection, avoid errors flood...
             // so only if it was connected or never connected to an AP
-            esp_diag.error(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
-            ERROR("disconnected from %s rsn %d",
-                  evt->event_info.disconnected.ssid,
-                  evt->event_info.disconnected.reason);
+            if (evt->event_info.disconnected.reason == REASON_ASSOC_LEAVE)
+            {
+                esp_diag.info(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
+                INFO("disconnected from %s rsn %d",
+                      evt->event_info.disconnected.ssid,
+                      evt->event_info.disconnected.reason);
+                stamode_connecting = 0; // never connected 
+            }
+            else
+            {
+                esp_diag.error(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
+                ERROR("disconnected from %s rsn %d",
+                      evt->event_info.disconnected.ssid,
+                      evt->event_info.disconnected.reason);
+            }          
             system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
                                                                              // disconnection from AP
             stamode_connected = false;
