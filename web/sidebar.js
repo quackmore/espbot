@@ -11,6 +11,8 @@ var esp8266 = {
 };
 
 function goto(page) {
+  if ((window.matchMedia("(max-width: 768px)")).matches)
+    $("#wrapper").removeClass("toggled");
   $('#awaiting').modal('show');
   $("#page-content").load(page + ".html", function (responseText, textStatus, xhr) {
     if (textStatus != "success")
