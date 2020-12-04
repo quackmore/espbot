@@ -31,7 +31,6 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
     integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
     crossorigin="anonymous"></script>
-  <script src="sidebar.js"></script>
 
 </head>
 
@@ -45,16 +44,12 @@
       <div class="sidebar-heading">APP NAME </div>
       <div class="list-group list-group-flush border-right">
         <a href="javascript:goto('home')" class="list-group-item list-group-item-action bg-sidebar">App dashboard</a>
-        <a href="#" class="list-group-item list-group-item-action bg-sidebar" id="app_settings">App settings</a>
         <a href="javascript:goto('events_journal')" class="list-group-item list-group-item-action bg-sidebar">Events journal</a>
         <a href="javascript:goto('device')" class="list-group-item list-group-item-action bg-sidebar">Device settings</a>
         <a href="javascript:goto('gpio')" class="list-group-item list-group-item-action bg-sidebar">Device GPIO</a>
         <a href="javascript:goto('debug')" class="list-group-item list-group-item-action bg-sidebar">Device Debug</a>
         <a href="javascript:goto('info')" class="list-group-item list-group-item-action bg-sidebar">Info & Credits</a>
       </div>
-      <script>
-        update_sidebar();
-      </script>
     </div>
     <!-- End of sidebar -->
 
@@ -105,6 +100,7 @@
 
   </div>
   <!-- End of body content wrapper -->
+  <script src="sidebar.js"></script>
 
 </body>
 

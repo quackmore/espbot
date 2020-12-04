@@ -1,35 +1,78 @@
 // shared.js
-const esp8266 = {
+var esp8266 = {
+  "name": "Espbot",
+  "type": "ESPBOT",
+  "api": "2.2.0",
+  "ip": "192.168.10.1",
   "url": "",
   "cors": false
   // "url": "http://192.168.1.187",
-  // "url": "http://192.168.100.100",
-  // "url": "http://192.168.10.1",
   // "cors": true
 };
 
-function update_sidebar() {
-  $('#app_settings').hide();
+function goto(page) {
+  $('#awaiting').modal('show');
+  $("#page-content").load(page + ".html", function (responseText, textStatus, xhr) {
+    if (textStatus != "success")
+      query_err(textStatus, xhr);
+  });
 }
 
-function ajax_error(xhr, status) {
+// common functions
+
+function show_spinner() {
+  return new Promise(function (resolve) {
+    $('#awaiting').modal('show');
+    resolve("spinner shown");
+  });
+}
+
+function hide_spinner(timeout) {
+  setTimeout(function () {
+    $('#awaiting').modal('hide');
+  }, timeout);
+}
+
+function query_err(status, xhr) {
   if (status === "timeout") {
-    alert("Ajax timeout!");
+    alert("Request timeout!");
+    hide_spinner(500);
   } else {
     if (xhr.responseText !== undefined) {
       var answer = JSON.parse(xhr.responseText);
       alert("" + answer.error.reason);
+      hide_spinner(500);
     }
     else {
-      alert("Ajax error!");
+      alert("Device unreachable!");
+      hide_spinner(500);
     }
   }
-  setTimeout(function () {
-    $('#awaiting').modal('hide');
-  }, 1000);
 }
 
-function goto(page) {
-  $('#awaiting').modal('show');
-  $("#page-content").load(page + ".html");
+function esp_query(query) {
+  if (!query.hasOwnProperty('timeout'))
+    query.timeout = 4000;
+  return new Promise(function (resolve, reject) {
+    $.ajax({
+      type: query.type,
+      url: esp8266.url + query.url,
+      dataType: query.dataType,
+      contentType: query.contentType,
+      data: query.data,
+      processData: query.processData,
+      crossDomain: esp8266.cors,
+      timeout: query.timeout,
+      success: function (data) {
+        if (query.success)
+          query.success(data);
+        resolve(data);
+      },
+      error: function (jqXHR, textStatus) {
+        if (query.error)
+          query.error(jqXHR, textStatus);
+        reject(jqXHR, textStatus);
+      }
+    });
+  });
 }
