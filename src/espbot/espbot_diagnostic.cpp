@@ -191,6 +191,28 @@ char Espbot_diag::get_led_mask(void)
 void Espbot_diag::set_led_mask(char mask)
 {
     _diag_led_mask = mask;
+    if (_diag_led_mask)
+    {
+        esp_gpio.config(DIA_LED, ESPBOT_GPIO_OUTPUT);
+        esp_gpio.set(DIA_LED, ESPBOT_HIGH);
+        // PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
+        // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+        //
+        // check the event journal for events that need to be reported on the LED
+        // but weren't yet
+        int idx;
+        for (idx = 0; idx < EVNT_QUEUE_SIZE; idx++)
+        {
+            if (_evnt_queue[idx].type)
+                if (_diag_led_mask & _evnt_queue[idx].type)
+                    esp_gpio.set(DIA_LED, ESPBOT_LOW);
+        }
+    }
+    else
+    {
+        esp_gpio.unconfig(DIA_LED);
+    }
+    
 }
 
 char Espbot_diag::get_serial_log_mask(void)

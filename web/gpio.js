@@ -46,23 +46,12 @@ function esp_get_gpio_level(ii) {
   });
 }
 
-function update_gpio_level(idx, data, type) {
+function update_gpio_level(idx, data) {
   var gpio_level_id = "#d" + idx + "_value";
   if (data.gpio_level == "low")
     $(gpio_level_id).prop('checked', true);
   else
     $(gpio_level_id).prop('checked', false);
-  switch (type) {
-    case "unprovisioned":
-      $(gpio_level_id).prop('disabled', true);
-      break;
-    case "input":
-      $(gpio_level_id).prop('disabled', true);
-      break;
-    case "output":
-      $(gpio_level_id).prop('disabled', false);
-      break;
-  }
 }
 
 function update_gpio(idx) {
@@ -79,9 +68,10 @@ function update_gpio(idx) {
             break;
           case "input":
             $(gpio_cfg_id).val(1);
+            $(gpio_level_id).prop('disabled', true);
             esp_get_gpio_level(idx)
               .then(function (data) {
-                update_gpio_level(idx, data, data.gpio_type);
+                update_gpio_level(idx, data);
                 resolve("gpio " + idx + " updated");
               })
               .catch(function () {
@@ -90,9 +80,10 @@ function update_gpio(idx) {
             break;
           case "output":
             $(gpio_cfg_id).val(2);
+            $(gpio_level_id).prop('disabled', false);
             esp_get_gpio_level(idx)
               .then(function (data) {
-                update_gpio_level(idx, data, data.gpio_type);
+                update_gpio_level(idx, data);
                 resolve("gpio " + idx + " updated");
               })
               .catch(function () {
@@ -147,7 +138,7 @@ function esp_set_gpio_cfg(ii, value) {
         dataType: 'json',
         contentType: 'application/json',
         data: JSON.stringify({ gpio_type: value }),
-        success: function (data) {
+        success: function () {
           update_gpio(ii)
             .then(function () {
               hide_spinner(500);
