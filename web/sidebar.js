@@ -14,10 +14,7 @@ function goto(page) {
   if ((window.matchMedia("(max-width: 768px)")).matches)
     $("#wrapper").removeClass("toggled");
   $('#awaiting').modal('show');
-  $("#page-content").load(page + ".html", function (responseText, textStatus, xhr) {
-    if (textStatus != "success")
-      query_err(textStatus, xhr);
-  });
+  $("#page-content").load(page + ".html", load_err);
 }
 
 // common functions
@@ -35,20 +32,24 @@ function hide_spinner(timeout) {
   }, timeout);
 }
 
-function query_err(status, xhr) {
-  if (status === "timeout") {
-    alert("Request timeout!");
+// textStatus
+// ("success", "notmodified", "nocontent", "error", "timeout", "abort", or "parsererror")
+
+function load_err(responseText, textStatus, xhr) {
+  if (textStatus != "success") {
+    alert("Request " + textStatus);
     hide_spinner(500);
-  } else {
-    if (xhr.responseText !== undefined) {
-      var answer = JSON.parse(xhr.responseText);
-      alert("" + answer.error.reason);
-      hide_spinner(500);
-    }
-    else {
-      alert("Device unreachable!");
-      hide_spinner(500);
-    }
+  }
+}
+
+function query_err(xhr, status) {
+  if (xhr && xhr.responseJSON) {
+    alert("Request " + status + "\n" + xhr.responseJSON.error.reason);
+    hide_spinner(500);
+  }
+  else {
+    alert("Request " + status);
+    hide_spinner(500);
   }
 }
 

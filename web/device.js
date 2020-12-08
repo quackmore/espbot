@@ -3,10 +3,10 @@
 $(document).ready(function () {
   esp_get_info().then(function () {
     esp_get_wifi_info().then(function () {
-      esp_get_ap().then(function () {
-        esp_get_cron().then(function () {
-          esp_get_mdns().then(function () {
-            esp_get_datetime().then(function () {
+      esp_get_cron().then(function () {
+        esp_get_mdns().then(function () {
+          esp_get_datetime().then(function (data) {
+            update_datetime(data).then(function () {
               esp_get_ota().then(function () {
                 esp_get_diag().then(function () {
                   hide_spinner(500);
@@ -403,31 +403,41 @@ function esp_get_datetime() {
     type: 'GET',
     url: '/api/timedate',
     dataType: 'json',
-    success: update_datetime,
+    success: null,
     error: query_err
   });
 }
 
 function update_datetime(data) {
-  $('#datetime_date').val(data.date);
-  $('#datetime_sntp').val(data.sntp_enabled);
-  $('#datetime_timezone').val(function () {
-    if (data.timezone > 0) {
-      return "+" + data.timezone;
+  return new Promise(function (resolve, reject) {
+    $('#datetime_date').val(data.date);
+    $('#datetime_sntp').val(data.sntp_enabled);
+    $('#datetime_timezone').val(function () {
+      if (data.timezone > 0) {
+        return "+" + data.timezone;
+      }
+      else {
+        return data.timezone;
+      }
+    });
+    if ($('#datetime_buttons').hasClass("d-none")) {
+      $("#datetime_sntp").prop("disabled", true);
+      $("#datetime_timezone").prop("disabled", true);
     }
-    else {
-      return data.timezone;
+    if ($('#datetime_sntp').val() == 1) {
+      $('#datetime_set').prop("disabled", true);
+    } else {
+      $('#datetime_set').prop("disabled", false);
     }
-  });
-  if ($('#datetime_buttons').hasClass("d-none")) {
-    $("#datetime_sntp").prop("disabled", true);
-    $("#datetime_timezone").prop("disabled", true);
-  }
-  if ($('#datetime_sntp').val() == 1) {
-    $('#datetime_set').prop("disabled", true);
-  } else {
-    $('#datetime_set').prop("disabled", false);
-  }
+    resolve(data);
+  })
+}
+
+function update_timevalue(data) {
+  return new Promise(function (resolve, reject) {
+    $('#datetime_date').val(data.date);
+    resolve(data);
+  })
 }
 
 // to stop asking datetime set this to 0
@@ -437,10 +447,13 @@ function periodically_update_datetime() {
   if ($('#datetime_date').length == 0)
     device_running = 0;
   if (device_running) {
-    //    esp_get_datetime(function (data) {
-    //      $('#datetime_date').val(data.date);
-    //    });
-    esp_get_datetime();
+    // just update everything the time value,
+    // periodically updating everything will make it
+    // impossible to change options
+    esp_get_datetime()
+      .then(function (data) {
+        update_timevalue(data);
+      });
     setTimeout(function () {
       periodically_update_datetime();
     }, 10000);
@@ -467,10 +480,13 @@ $('#datetime_edit').on('click', function () {
 $('#datetime_refresh').on('click', function () {
   show_spinner().then(function () {
     esp_get_datetime()
-      .then(function () {
-        hide_spinner(500)
-      });
-  });
+      .then(function (data) {
+        update_datetime(data)
+          .then(function () {
+            hide_spinner(500)
+          })
+      })
+  })
 });
 
 $('#datetime_save').on('click', function () {
@@ -484,9 +500,12 @@ $('#datetime_save').on('click', function () {
     success: function () {
       alert("Time & Date settings saved.");
       esp_get_datetime()
-        .then(function () {
-          hide_spinner(500)
-        });
+        .then(function (data) {
+          update_datetime(data)
+            .then(function () {
+              hide_spinner(500)
+            })
+        })
     },
     error: query_err
   });
@@ -506,9 +525,12 @@ $('#datetime_set').on('click', function () {
     success: function () {
       alert("Device Time & Date set to " + now.toUTCString());
       esp_get_datetime()
-        .then(function () {
-          hide_spinner(500)
-        });
+        .then(function (data) {
+          update_datetime(data)
+            .then(function () {
+              hide_spinner(500)
+            })
+        })
     },
     error: query_err
   });

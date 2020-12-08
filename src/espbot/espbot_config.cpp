@@ -26,7 +26,7 @@ extern "C"
 
 File_to_json::File_to_json(const char *t_filename)
 {
-    m_filename = (char *) t_filename;
+    m_filename = (char *)t_filename;
     m_cache = NULL;
     m_value_str = NULL;
     m_value_len = 0;
@@ -92,6 +92,8 @@ int File_to_json::find_string(const char *t_string)
     }
     while (j_str.find_next_pair() == JSON_NEW_PAIR_FOUND)
     {
+        if (os_strlen(t_string) != j_str.get_cur_pair_string_len())
+            continue;
         if (os_strncmp(t_string, j_str.get_cur_pair_string(), j_str.get_cur_pair_string_len()) == 0)
         {
             m_value_len = j_str.get_cur_pair_value_len();

@@ -87,8 +87,13 @@
         <div id="page-content">
           <script>
             $('#awaiting').modal('show');
-            $(function () {
-              $("#page-content").load("home.html");
+            $("#page-content").load("home.html", function (responseText, textStatus, xhr) {
+              if (textStatus != "success") {
+                alert("Request " + textStatus);
+                setTimeout(function () {
+                  $('#awaiting').modal('hide');
+                }, 1000);
+              }
             });
           </script>
         </div>
