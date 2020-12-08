@@ -31,6 +31,16 @@ void TimeDate::init(void)
     _sntp_running = false;
     _timezone = 0; // UTC
 
+    struct espbot_time rtc_time;
+    system_rtc_mem_read(RTC_TIMEDATE, &rtc_time, sizeof(struct espbot_time));
+    if (rtc_time.magic != ESP_TIMEDATE_MAGIC)
+    {
+        rtc_time.sntp_time = 0;
+        rtc_time.rtc_time = 0;
+        rtc_time.magic = ESP_TIMEDATE_MAGIC;
+        system_rtc_mem_write(RTC_TIMEDATE, &rtc_time, sizeof(struct espbot_time));
+    }
+
     if (restore_cfg())
     {
         esp_diag.warn(TIMEDATE_INIT_DEFAULT_CFG);
@@ -77,14 +87,14 @@ uint32 TimeDate::get_timestamp()
         struct espbot_time time_pair;
         time_pair.rtc_time = system_get_rtc_time();
         time_pair.sntp_time = timestamp;
-        system_rtc_mem_write(RTC_TIMEDATE, &time_pair, sizeof(struct espbot_time));
+        system_rtc_mem_write(RTC_TIMEDATE, &time_pair, (sizeof(struct espbot_time) - 4));
     }
     else
     {
         // get last timestamp and corresponding RTC time from RTC memory
         // and calculate current timestamp
         struct espbot_time old_time, cur_time;
-        system_rtc_mem_read(RTC_TIMEDATE, &old_time, sizeof(struct espbot_time));
+        system_rtc_mem_read(RTC_TIMEDATE, &old_time, (sizeof(struct espbot_time) - 4));
         cur_time.rtc_time = system_get_rtc_time();
         uint32 rtc_cal = system_rtc_clock_cali_proc();
         uint32 rtc_diff_us = (uint32)(((uint64)(cur_time.rtc_time - old_time.rtc_time)) *
@@ -97,7 +107,7 @@ uint32 TimeDate::get_timestamp()
 
         // refresh saved time pair
         cur_time.sntp_time = timestamp;
-        system_rtc_mem_write(RTC_TIMEDATE, &cur_time, sizeof(struct espbot_time));
+        system_rtc_mem_write(RTC_TIMEDATE, &cur_time, (sizeof(struct espbot_time) - 4));
     }
     return timestamp;
 }
@@ -116,7 +126,7 @@ void TimeDate::set_time_manually(uint32 t_time)
     struct espbot_time time_pair;
     time_pair.rtc_time = system_get_rtc_time();
     time_pair.sntp_time = t_time;
-    system_rtc_mem_write(RTC_TIMEDATE, &time_pair, sizeof(struct espbot_time));
+    system_rtc_mem_write(RTC_TIMEDATE, &time_pair, (sizeof(struct espbot_time) - 4));
     esp_diag.info(TIMEDATE_CHANGED, t_time);
     INFO("timedate changed to %d", t_time);
 }
