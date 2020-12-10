@@ -25,7 +25,7 @@ extern "C"
 #include "espbot_utils.hpp"
 #include "espbot_rtc_mem_map.h"
 
-void TimeDate::init(void)
+void TimeDate::init_essential(void)
 {
     _sntp_enabled = false;
     _sntp_running = false;
@@ -40,6 +40,11 @@ void TimeDate::init(void)
         rtc_time.magic = ESP_TIMEDATE_MAGIC;
         system_rtc_mem_write(RTC_TIMEDATE, &rtc_time, sizeof(struct espbot_time));
     }
+}
+
+void TimeDate::init(void)
+{
+    // the default configuration was setup by init_essential
 
     if (restore_cfg())
     {

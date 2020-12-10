@@ -151,13 +151,14 @@ void espbot_init(void)
     // the previous setting will be overridden in esp_diag.init
     // according to custom values saved in flash
     espmem.init();
+    esp_time.init_essential(); // cause diagnostic will use timestamp
     // print_greetings();
     esp_gpio.init();           // cause it's used by diagnostic
     esp_diag.init_essential(); // FS not available yet
 
     espfs.init();
-    esp_diag.init_custom();
-    esp_time.init();
+    esp_diag.init_custom();    // FS is available now
+    esp_time.init();           // FS is available now
     espbot.init();
     esp_mDns.init();
     esp_ota.init();
