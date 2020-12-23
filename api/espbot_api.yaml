@@ -24,6 +24,38 @@ servers:
     description: test device
 
 paths:
+# app APIs
+  /test:
+    post:
+      description: Test API, will run a test passing two parameters
+      summary: Test
+      operationId: runTest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/testParams'
+      responses:
+        '200':
+          description: Successful, returns the test parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/testParams'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        'default':
+          description: Unexpected error
+          content:
+            application/json:      
+              schema:
+                $ref: '#/components/schemas/error'
+# espbot common APIs
   /cron:
     get:
       description: Returns cron settings (enabled or disabled)
@@ -967,36 +999,6 @@ paths:
             application/json:      
               schema:
                 $ref: '#/components/schemas/error'
-  /test:
-    post:
-      description: Test API, will run a test passing two parameters
-      summary: Test
-      operationId: runTest
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/testParams'
-      responses:
-        '200':
-          description: Successful, returns the test parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/testParams'
-        '400':
-          description: Bad request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/error'
-        'default':
-          description: Unexpected error
-          content:
-            application/json:      
-              schema:
-                $ref: '#/components/schemas/error'
   /timedate:
     get:
       description: Returns the device current time and date
@@ -1260,6 +1262,29 @@ paths:
 
 components:
   schemas:
+# app schemas
+    testParams:
+      type: object
+      required:
+      - test_number
+      - test_param
+      properties:
+        test_number:
+          type: integer
+          format: int32
+          description: First test parameter
+          default: 3
+          minimum: -2147483648
+          maximum: 2147483647
+        test_param:
+          type: integer
+          format: int32
+          description: Second test parameter
+          default: 0
+          minimum: -2147483648
+          maximum: 2147483647
+      additionalProperties: false
+# espbot common schemas
     cron_status:
       type: object
       required:
@@ -1846,27 +1871,6 @@ components:
           pattern: '.{0,128}'
           minLength: 0
           maxLength: 128
-      additionalProperties: false
-    testParams:
-      type: object
-      required:
-      - test_number
-      - test_param
-      properties:
-        test_number:
-          type: integer
-          format: int32
-          description: First test parameter
-          default: 3
-          minimum: -2147483648
-          maximum: 2147483647
-        test_param:
-          type: integer
-          format: int32
-          description: Second test parameter
-          default: 0
-          minimum: -2147483648
-          maximum: 2147483647
       additionalProperties: false
     timedate:
       type: object
