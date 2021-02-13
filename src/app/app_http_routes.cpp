@@ -78,36 +78,17 @@ static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
 static void runTest(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("runTest");
-    int32 test_number;
-    int32 test_param;
-    Json_str test_cfg(parsed_req->req_content, parsed_req->content_len);
-    if (test_cfg.syntax_check() != JSON_SINTAX_OK)
+    int test_number;
+    int test_param;
+    JSONP test_cfg(parsed_req->req_content, parsed_req->content_len);
+    test_cfg.getVal((char *)f_str("test_number"), test_number);
+    test_cfg.getVal((char *)f_str("test_param"), test_param);
+    if(test_cfg.getErr()  != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    if (test_cfg.find_pair(f_str("test_number")) != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test_number'"), false);
-        return;
-    }
-    if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test_number' does not have a INTEGER value type"), false);
-        return;
-    }
-    test_number = atoi(test_cfg.get_cur_pair_value());
-    if (test_cfg.find_pair(f_str("test_param")) != JSON_NEW_PAIR_FOUND)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot find JSON string 'test_param'"), false);
-        return;
-    }
-    if (test_cfg.get_cur_pair_value_type() != JSON_INTEGER)
-    {
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("JSON pair with string 'test_param' does not have a INTEGER value type"), false);
-        return;
-    }
-    test_param = atoi(test_cfg.get_cur_pair_value());
+
     espmem.stack_mon();
     // {"test_number":4294967295,"test_param":4294967295}
     Heap_chunk msg(64, dont_free);

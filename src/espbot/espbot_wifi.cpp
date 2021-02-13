@@ -16,7 +16,7 @@ extern "C"
 }
 
 #include "espbot.hpp"
-#include "espbot_config.hpp"
+#include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
@@ -64,9 +64,9 @@ void wifi_event_handler(System_Event_t *evt)
             {
                 esp_diag.info(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
                 INFO("disconnected from %s rsn %d",
-                      evt->event_info.disconnected.ssid,
-                      evt->event_info.disconnected.reason);
-                stamode_connecting = 0; // never connected 
+                     evt->event_info.disconnected.ssid,
+                     evt->event_info.disconnected.reason);
+                stamode_connecting = 0; // never connected
             }
             else
             {
@@ -74,7 +74,7 @@ void wifi_event_handler(System_Event_t *evt)
                 ERROR("disconnected from %s rsn %d",
                       evt->event_info.disconnected.ssid,
                       evt->event_info.disconnected.reason);
-            }          
+            }
             system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
                                                                              // disconnection from AP
             stamode_connected = false;
@@ -150,7 +150,7 @@ void wifi_event_handler(System_Event_t *evt)
         // a station disconnected from ESP8266
         break;
     case EVENT_SOFTAPMODE_PROBEREQRECVED:
-        TRACE("AP probed");
+        // TRACE("AP probed");
         break;
     case EVENT_OPMODE_CHANGED:
         esp_diag.info(WIFI_OPMODE_CHANGED, wifi_get_opmode());
@@ -268,168 +268,153 @@ void Wifi::connect(void)
     espmem.stack_mon();
 }
 
-static int restore_cfg(void)
+#define WIFI_CFG_FILENAME f_str("wifi.cfg")
+
+static int wifi_cfg_restore(void)
 {
-    ALL("Wifi::restore_cfg");
-    File_to_json cfgfile(f_str("wifi.cfg"));
+    ALL("Wifi::wifi_cfg_restore");
+    if (!Espfile::exists(WIFI_CFG_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(WIFI_CFG_FILENAME);
+    if (cfgfile.getErr() != JSON_noerr)
+    {
+        esp_diag.error(WIFI_CFG_RESTORE_ERROR);
+        ERROR("wifi_cfg_restore error");
+        return CFG_error;
+    }
     espmem.stack_mon();
-    if (cfgfile.exists())
+    os_memset(station_ssid, 0, 32);
+    cfgfile.getStr(f_str("station_ssid"), station_ssid, 32);
+    if (cfgfile.getErr() == JSON_notFound)
     {
-        if (cfgfile.find_string(f_str("station_ssid")))
-        {
-            esp_diag.info(WIFI_RESTORE_CFG_NO_SSID_FOUND);
-            INFO("Wifi::restore_cfg no SSID found");
-        }
-        else
-        {
-            os_memset(station_ssid, 0, 32);
-            os_strncpy(station_ssid, cfgfile.get_value(), 31);
-        }
-        if (cfgfile.find_string(f_str("station_pwd")))
-        {
-            esp_diag.info(WIFI_RESTORE_CFG_NO_PWD_FOUND);
-            INFO("Wifi::restore_cfg no PWD found");
-        }
-        else
-        {
-            os_memset(station_pwd, 0, 64);
-            os_strncpy(station_pwd, cfgfile.get_value(), 63);
-        }
-        if (cfgfile.find_string(f_str("ap_pwd")))
-        {
-            esp_diag.info(WIFI_RESTORE_CFG_AP_DEFAULT_PWD);
-            INFO("Wifi::restore_cfg AP default password");
-        }
-        else
-        {
-            os_memset((char *)ap_config.password, 0, 64);
-            os_strncpy((char *)ap_config.password, cfgfile.get_value(), 63);
-            if (0 == os_strcmp((char *)ap_config.password, f_str("espbot123456")))
-            {
-                esp_diag.info(WIFI_RESTORE_CFG_AP_DEFAULT_PWD);
-                INFO("Wifi::restore_cfg AP default password");
-            }
-            else
-            {
-                esp_diag.info(WIFI_RESTORE_CFG_AP_CUSTOM_PWD);
-                INFO("Wifi::restore_cfg AP custom password");
-            }
-        }
-        if (cfgfile.find_string(f_str("ap_channel")))
-        {
-            esp_diag.info(WIFI_RESTORE_CFG_AP_CH, 1);
-            INFO("Wifi::restore_cfg AP channel: %d", 1);
-        }
-        else
-        {
-            int channel = atoi(cfgfile.get_value());
-            if ((channel < 1) || (channel > 11))
-            {
-                esp_diag.error(WIFI_RESTORE_CFG_AP_CH_OOR, channel);
-                ERROR("Wifi::restore_cfg AP channel out of range (%)", channel);
-                channel = 1;
-            }
-            ap_config.channel = channel;
-            esp_diag.info(WIFI_RESTORE_CFG_AP_CH, channel);
-            INFO("Wifi::restore_cfg AP channel: %d", channel);
-        }
-        return CFG_OK;
+        esp_diag.info(WIFI_CFG_RESTORE_NO_SSID_FOUND);
+        INFO("Wifi::wifi_cfg_restore no SSID found");
+        cfgfile.clearErr();
     }
-    else
+    os_memset(station_pwd, 0, 64);
+    cfgfile.getStr(f_str("station_pwd"), station_pwd, 64);
+    if (cfgfile.getErr() == JSON_notFound)
     {
-        esp_diag.info(WIFI_RESTORE_CFG_FILE_NOT_FOUND);
-        INFO("Wifi::restore_cfg file not found");
-        return CFG_ERROR;
+        esp_diag.info(WIFI_CFG_RESTORE_NO_PWD_FOUND);
+        INFO("Wifi::wifi_cfg_restore no PWD found");
+        cfgfile.clearErr();
     }
+    int channel = cfgfile.getInt(f_str("ap_channel"));
+    if (cfgfile.getErr() == JSON_notFound)
+    {
+        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, 1);
+        INFO("Wifi::wifi_cfg_restore AP channel: %d", 1);
+    }
+    if (cfgfile.getErr() == JSON_noerr)
+    {
+        if ((channel < 1) || (channel > 11))
+        {
+            esp_diag.error(WIFI_CFG_RESTORE_AP_CH_OOR, channel);
+            ERROR("Wifi::wifi_cfg_restore AP channel out of range (%)", channel);
+            channel = 1;
+        }
+        ap_config.channel = channel;
+        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, channel);
+        INFO("Wifi::wifi_cfg_restore AP channel: %d", channel);
+    }
+    char ap_password[64];
+    os_memset(ap_password, 0, 64);
+    cfgfile.getStr(f_str("ap_pwd"), ap_password, 64);
+    if (cfgfile.getErr() == JSON_notFound)
+    {
+        esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
+        INFO("Wifi::wifi_cfg_restore AP default password");
+    }
+    if (cfgfile.getErr() == JSON_noerr)
+    {
+        os_memset((char *)ap_config.password, 0, 64);
+        os_strncpy((char *)ap_config.password, ap_password, 63);
+        if (0 == os_strcmp((char *)ap_config.password, f_str("espbot123456")))
+        {
+            esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
+            INFO("Wifi::wifi_cfg_restore AP default password");
+        }
+        else
+        {
+            esp_diag.info(WIFI_CFG_RESTORE_AP_CUSTOM_PWD);
+            INFO("Wifi::wifi_cfg_restore AP custom password: %s", ap_password);
+        }
+    }
+    return CFG_ok;
 }
 
-static int saved_cfg_not_updated(void)
+static int wifi_cfg_uptodate(void)
 {
-    ALL("Wifi::saved_cfg_not_updated");
-    File_to_json cfgfile(f_str("wifi.cfg"));
+    ALL("Wifi::wifi_cfg_uptodate");
+    if (!Espfile::exists(WIFI_CFG_FILENAME))
+    {
+        return CFG_notUpdated;
+    }
+    Cfgfile cfgfile(WIFI_CFG_FILENAME);
     espmem.stack_mon();
-    if (!cfgfile.exists())
+    char st_ssid[32];
+    cfgfile.getStr(f_str("station_ssid"), st_ssid, 32);
+    char st_pwd[64];
+    cfgfile.getStr(f_str("station_pwd"), st_pwd, 64);
+    char ap_pwd[64];
+    cfgfile.getStr(f_str("ap_pwd"), ap_pwd, 64);
+    int ap_channel = cfgfile.getInt(f_str("ap_channel"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        return CFG_REQUIRES_UPDATE;
+        esp_diag.error(WIFI_CFG_UPTODATE_ERROR);
+        ERROR("wifi_cfg_uptodate error");
+        return CFG_error;
     }
-    if (cfgfile.find_string(f_str("station_ssid")))
+    if (os_strcmp(station_ssid, st_ssid) ||
+        os_strcmp(station_pwd, st_pwd) ||
+        os_strcmp(ap_config.password, ap_pwd) ||
+        (ap_channel != ap_config.channel))
     {
-        DEBUG("Wifi::saved_cfg_not_updated incomplete cfg");
-        return CFG_REQUIRES_UPDATE;
+        return CFG_notUpdated;
     }
-    if (os_strcmp(station_ssid, cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("station_pwd")))
-    {
-        DEBUG("Wifi::saved_cfg_not_updated incomplete cfg");
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (os_strcmp(station_pwd, cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("ap_pwd")))
-    {
-        DEBUG("Wifi::saved_cfg_not_updated incomplete cfg");
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (os_strcmp((char *)ap_config.password, cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("ap_channel")))
-    {
-        DEBUG("Wifi::saved_cfg_not_updated incomplete cfg");
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (ap_config.channel != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    return CFG_OK;
+    return CFG_ok;
 }
 
 int Wifi::save_cfg(void)
 {
     ALL("Wifi::saved_cfg");
-    // don't write to flash when no update is required
-    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    // writes update to flash
-    if (!espfs.is_available())
-    {
-        esp_diag.error(WIFI_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("Wifi::save_cfg FS not available");
-        return CFG_ERROR;
-    }
-    Ffile cfgfile(&espfs, (char *)f_str("wifi.cfg"));
-    espmem.stack_mon();
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(WIFI_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("Wifi::save_cfg cannot open file");
-        return CFG_ERROR;
-    }
-    cfgfile.clear();
-    // {"station_ssid":"","station_pwd":"","ap_pwd":"","ap_channel":11}
-    // 64 + 1 + 32 + 64 + 64 + 2 = 137
-    Heap_chunk buffer(227);
-    if (buffer.ref == NULL)
-    {
-        esp_diag.error(WIFI_SAVE_CFG_HEAP_EXHAUSTED, 227);
-        ERROR("Wifi::save_cfg heap exhausted %d", 227);
-        return CFG_ERROR;
-    }
-    fs_sprintf(buffer.ref,
-               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\",\"ap_pwd\":\"%s\",\"ap_channel\":%d}",
-               station_ssid,
-               station_pwd,
-               (char *)ap_config.password,
-               ap_config.channel);
-    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
     return CFG_OK;
+    //    // don't write to flash when no update is required
+    //    if (wifi_cfg_uptodate() != CFG_REQUIRES_UPDATE)
+    //        return CFG_OK;
+    //    // writes update to flash
+    //    if (!espfs.is_available())
+    //    {
+    //        esp_diag.error(WIFI_SAVE_CFG_FS_NOT_AVAILABLE);
+    //        ERROR("Wifi::save_cfg FS not available");
+    //        return CFG_ERROR;
+    //    }
+    //    Ffile cfgfile(&espfs, (char *)WIFI_CFG_FILENAME);
+    //    espmem.stack_mon();
+    //    if (!cfgfile.is_available())
+    //    {
+    //        esp_diag.error(WIFI_SAVE_CFG_CANNOT_OPEN_FILE);
+    //        ERROR("Wifi::save_cfg cannot open file");
+    //        return CFG_ERROR;
+    //    }
+    //    cfgfile.clear();
+    //    // {"station_ssid":"","station_pwd":"","ap_pwd":"","ap_channel":11}
+    //    // 64 + 1 + 32 + 64 + 64 + 2 = 137
+    //    Heap_chunk buffer(227);
+    //    if (buffer.ref == NULL)
+    //    {
+    //        esp_diag.error(WIFI_SAVE_CFG_HEAP_EXHAUSTED, 227);
+    //        ERROR("Wifi::save_cfg heap exhausted %d", 227);
+    //        return CFG_ERROR;
+    //    }
+    //    fs_sprintf(buffer.ref,
+    //               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\",\"ap_pwd\":\"%s\",\"ap_channel\":%d}",
+    //               station_ssid,
+    //               station_pwd,
+    //               (char *)ap_config.password,
+    //               ap_config.channel);
+    //    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
+    //    return CFG_OK;
 }
 
 void Wifi::init()
@@ -463,7 +448,7 @@ void Wifi::init()
     ap_list = NULL;
 
     // overwrite AP and STATION config from file, if any...
-    restore_cfg();
+    wifi_cfg_restore();
 
     // start as SOFTAP and try to switch to STATION
     // this will ensure that softap and station configurations are set by espbot

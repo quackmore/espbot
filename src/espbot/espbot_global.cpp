@@ -21,7 +21,6 @@
 
 char *espbot_release = APP_RELEASE;
 
-Flashfs espfs;
 Espbot_diag esp_diag;
 Esp_mem espmem;
 Espbot espbot;

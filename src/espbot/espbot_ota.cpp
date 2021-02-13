@@ -560,160 +560,168 @@ void Ota_upgrade::start_upgrade(void)
 
 int Ota_upgrade::restore_cfg(void)
 {
-    ALL("Ota_upgrade::restore_cfg");
-    File_to_json cfgfile(f_str("ota.cfg"));
-    espmem.stack_mon();
-    if (cfgfile.exists())
-    {
-        if (cfgfile.find_string(f_str("host")))
-        {
-            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
-            ERROR("OTA restore_cfg cannot find 'host'");
-            return CFG_ERROR;
-        }
-        set_host(cfgfile.get_value());
-        if (cfgfile.find_string(f_str("port")))
-        {
-            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
-            ERROR("OTA restore_cfg cannot find 'port'");
-            return CFG_ERROR;
-        }
-        set_port(atoi(cfgfile.get_value()));
-        if (cfgfile.find_string(f_str("path")))
-        {
-            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
-            ERROR("OTA restore_cfg cannot find 'path'");
-            return CFG_ERROR;
-        }
-        set_path(cfgfile.get_value());
-        if (cfgfile.find_string(f_str("check_version")))
-        {
-            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
-            ERROR("OTA restore_cfg cannot find 'check_version'");
-            return CFG_ERROR;
-        }
-        set_check_version((bool) atoi(cfgfile.get_value()));
-        if (cfgfile.find_string(f_str("reboot_on_completion")))
-        {
-            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
-            ERROR("OTA restore_cfg cannot find 'reboot_on_completion'");
-            return CFG_ERROR;
-        }
-        set_reboot_on_completion((bool) atoi(cfgfile.get_value()));
-        return CFG_OK;
-    }
-    else
-    {
-        esp_diag.warn(OTA_RESTORE_CFG_FILE_NOT_FOUND);
-        WARN("OTA restore_cfg file not found");
-        return CFG_ERROR;
-    }
+    set_host((char *)f_str("192.168.1.201"));
+    set_port(20090);
+    set_path((char *)f_str("/"));
+    set_check_version(false);
+    set_reboot_on_completion(true);
+    return CFG_OK;
+    //    ALL("Ota_upgrade::restore_cfg");
+    //    File_to_json cfgfile(f_str("ota.cfg"));
+    //    espmem.stack_mon();
+    //    if (cfgfile.exists())
+    //    {
+    //        if (cfgfile.find_string(f_str("host")))
+    //        {
+    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            ERROR("OTA restore_cfg cannot find 'host'");
+    //            return CFG_ERROR;
+    //        }
+    //        set_host(cfgfile.get_value());
+    //        if (cfgfile.find_string(f_str("port")))
+    //        {
+    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            ERROR("OTA restore_cfg cannot find 'port'");
+    //            return CFG_ERROR;
+    //        }
+    //        set_port(atoi(cfgfile.get_value()));
+    //        if (cfgfile.find_string(f_str("path")))
+    //        {
+    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            ERROR("OTA restore_cfg cannot find 'path'");
+    //            return CFG_ERROR;
+    //        }
+    //        set_path(cfgfile.get_value());
+    //        if (cfgfile.find_string(f_str("check_version")))
+    //        {
+    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            ERROR("OTA restore_cfg cannot find 'check_version'");
+    //            return CFG_ERROR;
+    //        }
+    //        set_check_version((bool)atoi(cfgfile.get_value()));
+    //        if (cfgfile.find_string(f_str("reboot_on_completion")))
+    //        {
+    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            ERROR("OTA restore_cfg cannot find 'reboot_on_completion'");
+    //            return CFG_ERROR;
+    //        }
+    //        set_reboot_on_completion((bool)atoi(cfgfile.get_value()));
+    //        return CFG_OK;
+    //    }
+    //    else
+    //    {
+    //        esp_diag.warn(OTA_RESTORE_CFG_FILE_NOT_FOUND);
+    //        WARN("OTA restore_cfg file not found");
+    //        return CFG_ERROR;
+    //    }
 }
 
 int Ota_upgrade::saved_cfg_not_updated(void)
 {
     ALL("saved_cfg_not_updated");
-    File_to_json cfgfile(f_str("ota.cfg"));
-    espmem.stack_mon();
-    if (cfgfile.exists())
-    {
-        if (cfgfile.find_string(f_str("host")))
-        {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_updated cannot find 'host'");
-            return CFG_ERROR;
-        }
-        if (os_strcmp(get_host(), cfgfile.get_value()))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        if (cfgfile.find_string(f_str("port")))
-        {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_updated cannot find 'port'");
-            return CFG_ERROR;
-        }
-        if (_port != (atoi(cfgfile.get_value())))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        if (cfgfile.find_string(f_str("path")))
-        {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_updated cannot find 'path'");
-            return CFG_ERROR;
-        }
-        if (os_strcmp(get_path(), cfgfile.get_value()))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        if (cfgfile.find_string(f_str("check_version")))
-        {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_updated cannot find 'check_version'");
-            return CFG_ERROR;
-        }
-        if (get_check_version() != atoi(cfgfile.get_value()))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        if (cfgfile.find_string(f_str("reboot_on_completion")))
-        {
-            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-            ERROR("OTA saved_cfg_not_updated cannot find 'reboot_on_completion'");
-            return CFG_ERROR;
-        }
-        if (get_reboot_on_completion() != atoi(cfgfile.get_value()))
-        {
-            return CFG_REQUIRES_UPDATE;
-        }
-        return CFG_OK;
-    }
-    else
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
+    return CFG_OK;
+    //    File_to_json cfgfile(f_str("ota.cfg"));
+    //    espmem.stack_mon();
+    //    if (cfgfile.exists())
+    //    {
+    //        if (cfgfile.find_string(f_str("host")))
+    //        {
+    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            ERROR("OTA saved_cfg_not_updated cannot find 'host'");
+    //            return CFG_ERROR;
+    //        }
+    //        if (os_strcmp(get_host(), cfgfile.get_value()))
+    //        {
+    //            return CFG_REQUIRES_UPDATE;
+    //        }
+    //        if (cfgfile.find_string(f_str("port")))
+    //        {
+    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            ERROR("OTA saved_cfg_not_updated cannot find 'port'");
+    //            return CFG_ERROR;
+    //        }
+    //        if (_port != (atoi(cfgfile.get_value())))
+    //        {
+    //            return CFG_REQUIRES_UPDATE;
+    //        }
+    //        if (cfgfile.find_string(f_str("path")))
+    //        {
+    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            ERROR("OTA saved_cfg_not_updated cannot find 'path'");
+    //            return CFG_ERROR;
+    //        }
+    //        if (os_strcmp(get_path(), cfgfile.get_value()))
+    //        {
+    //            return CFG_REQUIRES_UPDATE;
+    //        }
+    //        if (cfgfile.find_string(f_str("check_version")))
+    //        {
+    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            ERROR("OTA saved_cfg_not_updated cannot find 'check_version'");
+    //            return CFG_ERROR;
+    //        }
+    //        if (get_check_version() != atoi(cfgfile.get_value()))
+    //        {
+    //            return CFG_REQUIRES_UPDATE;
+    //        }
+    //        if (cfgfile.find_string(f_str("reboot_on_completion")))
+    //        {
+    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            ERROR("OTA saved_cfg_not_updated cannot find 'reboot_on_completion'");
+    //            return CFG_ERROR;
+    //        }
+    //        if (get_reboot_on_completion() != atoi(cfgfile.get_value()))
+    //        {
+    //            return CFG_REQUIRES_UPDATE;
+    //        }
+    //        return CFG_OK;
+    //    }
+    //    else
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
 }
 
 int Ota_upgrade::save_cfg(void)
 {
     ALL("save_cfg");
-    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    if (!espfs.is_available())
-    {
-        esp_diag.error(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("OTA save_cfg file system not available");
-        return CFG_ERROR;
-    }
-    Ffile cfgfile(&espfs, (char *)f_str("ota.cfg"));
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("OTA save_cfg cannot open file");
-        return CFG_ERROR;
-    }
-    cfgfile.clear();
-    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
-    int buffer_len = 70 + 15 + 5 + os_strlen(get_path()) + 1 + 1 + 1;
-    Heap_chunk buffer(buffer_len);
-    espmem.stack_mon();
-    if (buffer.ref == NULL)
-    {
-        esp_diag.error(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
-        ERROR("OTA save_cfg heap exhausted %d", buffer_len);
-        return CFG_ERROR;
-    }
-    // using fs_sprintf twice to keep fmt len lower that 70 chars
-    fs_sprintf(buffer.ref,
-               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
-               get_host(),
-               get_port(),
-               get_path());
-    fs_sprintf((buffer.ref + os_strlen(buffer.ref)),
-               "\"check_version\":%d,\"reboot_on_completion\":%d}",
-               get_check_version(),
-               get_reboot_on_completion());
-    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
     return CFG_OK;
+//    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
+//        return CFG_OK;
+//    if (!espfs.is_available())
+//    {
+//        esp_diag.error(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
+//        ERROR("OTA save_cfg file system not available");
+//        return CFG_ERROR;
+//    }
+//    Ffile cfgfile(&espfs, (char *)f_str("ota.cfg"));
+//    if (!cfgfile.is_available())
+//    {
+//        esp_diag.error(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
+//        ERROR("OTA save_cfg cannot open file");
+//        return CFG_ERROR;
+//    }
+//    cfgfile.clear();
+//    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
+//    int buffer_len = 70 + 15 + 5 + os_strlen(get_path()) + 1 + 1 + 1;
+//    Heap_chunk buffer(buffer_len);
+//    espmem.stack_mon();
+//    if (buffer.ref == NULL)
+//    {
+//        esp_diag.error(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
+//        ERROR("OTA save_cfg heap exhausted %d", buffer_len);
+//        return CFG_ERROR;
+//    }
+//    // using fs_sprintf twice to keep fmt len lower that 70 chars
+//    fs_sprintf(buffer.ref,
+//               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
+//               get_host(),
+//               get_port(),
+//               get_path());
+//    fs_sprintf((buffer.ref + os_strlen(buffer.ref)),
+//               "\"check_version\":%d,\"reboot_on_completion\":%d}",
+//               get_check_version(),
+//               get_reboot_on_completion());
+//    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
+//    return CFG_OK;
 }

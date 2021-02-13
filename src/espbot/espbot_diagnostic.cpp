@@ -212,7 +212,6 @@ void Espbot_diag::set_led_mask(char mask)
     {
         esp_gpio.unconfig(DIA_LED);
     }
-    
 }
 
 char Espbot_diag::get_serial_log_mask(void)
@@ -276,126 +275,129 @@ void Espbot_diag::set_sdk_print_enabled(bool val)
 int Espbot_diag::restore_cfg(void)
 {
     ALL("Espbot_diag::restore_cfg");
-    File_to_json cfgfile(DIAG_FILENAME);
-    espmem.stack_mon();
-    if (!cfgfile.exists())
-    {
-        WARN("Espbot_diag::restore_cfg file not found");
-        return CFG_ERROR;
-    }
-    if (cfgfile.find_string(f_str("diag_led_mask")))
-    {
-        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
-        ERROR("Espbot_diag::restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    _diag_led_mask = atoi(cfgfile.get_value());
-    if (cfgfile.find_string(f_str("serial_log_mask")))
-    {
-        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
-        ERROR("Espbot_diag::restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    _serial_log_mask = atoi(cfgfile.get_value());
-    if (cfgfile.find_string(f_str("uart_0_bitrate")))
-    {
-        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
-        ERROR("Espbot_diag::restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    _uart_0_bitrate = atoi(cfgfile.get_value());
-    if (cfgfile.find_string(f_str("sdk_print_enabled")))
-    {
-        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
-        ERROR("Espbot_diag::restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    _sdk_print_enabled = atoi(cfgfile.get_value());
-    return CFG_OK;
+    return CFG_ERROR;
+    //    File_to_json cfgfile(DIAG_FILENAME);
+    //    espmem.stack_mon();
+    //    if (!cfgfile.exists())
+    //    {
+    //        WARN("Espbot_diag::restore_cfg file not found");
+    //        return CFG_ERROR;
+    //    }
+    //    if (cfgfile.find_string(f_str("diag_led_mask")))
+    //    {
+    //        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
+    //        ERROR("Espbot_diag::restore_cfg incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    _diag_led_mask = atoi(cfgfile.get_value());
+    //    if (cfgfile.find_string(f_str("serial_log_mask")))
+    //    {
+    //        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
+    //        ERROR("Espbot_diag::restore_cfg incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    _serial_log_mask = atoi(cfgfile.get_value());
+    //    if (cfgfile.find_string(f_str("uart_0_bitrate")))
+    //    {
+    //        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
+    //        ERROR("Espbot_diag::restore_cfg incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    _uart_0_bitrate = atoi(cfgfile.get_value());
+    //    if (cfgfile.find_string(f_str("sdk_print_enabled")))
+    //    {
+    //        esp_diag.error(DIAG_RESTORE_CFG_INCOMPLETE);
+    //        ERROR("Espbot_diag::restore_cfg incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    _sdk_print_enabled = atoi(cfgfile.get_value());
+    //    return CFG_OK;
 }
 
 int Espbot_diag::saved_cfg_not_updated(void)
 {
     ALL("Espbot_diag::saved_cfg_not_updated");
-    File_to_json cfgfile(DIAG_FILENAME);
-    espmem.stack_mon();
-    if (!cfgfile.exists())
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("diag_led_mask")))
-    {
-        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
-    }
-    if (_diag_led_mask != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("serial_log_mask")))
-    {
-        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
-    }
-    if (_serial_log_mask != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("uart_0_bitrate")))
-    {
-        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
-    }
-    if (_uart_0_bitrate != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("sdk_print_enabled")))
-    {
-        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
-    }
-    if (_sdk_print_enabled != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
     return CFG_OK;
+    //    File_to_json cfgfile(DIAG_FILENAME);
+    //    espmem.stack_mon();
+    //    if (!cfgfile.exists())
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    if (cfgfile.find_string(f_str("diag_led_mask")))
+    //    {
+    //        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    if (_diag_led_mask != atoi(cfgfile.get_value()))
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    if (cfgfile.find_string(f_str("serial_log_mask")))
+    //    {
+    //        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    if (_serial_log_mask != atoi(cfgfile.get_value()))
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    if (cfgfile.find_string(f_str("uart_0_bitrate")))
+    //    {
+    //        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    if (_uart_0_bitrate != atoi(cfgfile.get_value()))
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    if (cfgfile.find_string(f_str("sdk_print_enabled")))
+    //    {
+    //        esp_diag.error(DIAG_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        ERROR("Espbot_diag::saved_cfg_not_updated incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    if (_sdk_print_enabled != atoi(cfgfile.get_value()))
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    return CFG_OK;
 }
 
 int Espbot_diag::save_cfg(void)
 {
     ALL("Espbot_diag::save_cfg");
-    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    if (!espfs.is_available())
-    {
-        esp_diag.error(DIAG_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("Espbot_diag::save_cfg FS not available");
-        return CFG_ERROR;
-    }
-    Ffile cfgfile(&espfs, (char *)DIAG_FILENAME);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(DIAG_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("Espbot_diag::save_cfg cannot open file");
-        return CFG_ERROR;
-    }
-    cfgfile.clear();
-    // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
-    char buffer[91];
-    espmem.stack_mon();
-    fs_sprintf(buffer,
-               "{\"diag_led_mask\":%d,\"serial_log_mask\":%d,",
-               _diag_led_mask,
-               _serial_log_mask);
-    fs_sprintf(buffer + os_strlen(buffer),
-               "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
-               _uart_0_bitrate,
-               _sdk_print_enabled);
-    cfgfile.n_append(buffer, os_strlen(buffer));
     return CFG_OK;
+//    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
+//        return CFG_OK;
+//    if (!espfs.is_available())
+//    {
+//        esp_diag.error(DIAG_SAVE_CFG_FS_NOT_AVAILABLE);
+//        ERROR("Espbot_diag::save_cfg FS not available");
+//        return CFG_ERROR;
+//    }
+//    Ffile cfgfile(&espfs, (char *)DIAG_FILENAME);
+//    if (!cfgfile.is_available())
+//    {
+//        esp_diag.error(DIAG_SAVE_CFG_CANNOT_OPEN_FILE);
+//        ERROR("Espbot_diag::save_cfg cannot open file");
+//        return CFG_ERROR;
+//    }
+//    cfgfile.clear();
+//    // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
+//    char buffer[91];
+//    espmem.stack_mon();
+//    fs_sprintf(buffer,
+//               "{\"diag_led_mask\":%d,\"serial_log_mask\":%d,",
+//               _diag_led_mask,
+//               _serial_log_mask);
+//    fs_sprintf(buffer + os_strlen(buffer),
+//               "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
+//               _uart_0_bitrate,
+//               _sdk_print_enabled);
+//    cfgfile.n_append(buffer, os_strlen(buffer));
+//    return CFG_OK;
 }

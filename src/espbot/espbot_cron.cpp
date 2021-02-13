@@ -13,7 +13,7 @@ extern "C"
 #include "c_types.h"
 }
 
-#include "espbot_config.hpp"
+#include "espbot_cfgfile.hpp"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
@@ -37,8 +37,11 @@ static os_timer_t cron_timer;
 
 static List<struct job> *job_list;
 
-static bool cron_exe_enabled;
-static bool cron_running;
+static struct
+{
+    bool enabled;
+    bool running;
+} cron_state;
 
 static int get_day_of_week(char *str)
 {
@@ -210,17 +213,18 @@ static void cron_execute(void)
     }
 }
 
-static int cron_restore_cfg(void);
+static int cron_restore_state(void);
 
 void cron_init(void)
 {
-    cron_exe_enabled = false;
-    if (cron_restore_cfg())
+    cron_state.enabled = false;
+    cron_state.running = false;
+    if (cron_restore_state() != CFG_ok)
     {
         esp_diag.warn(CRON_INIT_DEFAULT_CFG);
         WARN("cron_init no cfg available");
     }
-    if (cron_exe_enabled)
+    if (cron_state.enabled)
     {
         esp_diag.info(CRON_START);
         INFO("cron started");
@@ -231,7 +235,6 @@ void cron_init(void)
         INFO("cron stopped");
     }
     os_timer_disarm(&cron_timer);
-    cron_running = false;
     os_timer_setfn(&cron_timer, (os_timer_func_t *)cron_execute, NULL);
     job_list = new List<struct job>(CRON_MAX_JOBS, delete_content);
     os_memset(&current_time, 0, sizeof(struct date));
@@ -245,7 +248,7 @@ void cron_init(void)
 void cron_sync(void)
 {
     ALL("cron_sync");
-    if (!cron_exe_enabled)
+    if (!cron_state.enabled)
         return;
     uint32 cron_period;
     uint32 timestamp = esp_time.get_timestamp();
@@ -260,7 +263,7 @@ void cron_sync(void)
         cron_period = 120000 - timestamp * 1000;
     // TRACE("cron period: %d", cron_period);
     os_timer_arm(&cron_timer, cron_period, 0);
-    cron_running = true;
+    cron_state.running = true;
 }
 
 int cron_add_job(char minutes,
@@ -374,13 +377,13 @@ void cron_print_jobs(void)
  */
 void enable_cron(void)
 {
-    if (!cron_exe_enabled)
+    if (!cron_state.enabled)
     {
-        cron_exe_enabled = true;
+        cron_state.enabled = true;
         esp_diag.info(CRON_ENABLED);
         INFO("cron enabled");
     }
-    if (!cron_running)
+    if (!cron_state.running)
     {
         cron_sync();
         esp_diag.info(CRON_START);
@@ -390,7 +393,7 @@ void enable_cron(void)
 
 void start_cron(void)
 {
-    if (!cron_running)
+    if (!cron_state.running)
     {
         cron_sync();
         esp_diag.info(CRON_START);
@@ -401,15 +404,15 @@ void start_cron(void)
 void disable_cron(void)
 {
     os_timer_disarm(&cron_timer);
-    if (cron_exe_enabled)
+    if (cron_state.enabled)
     {
-        cron_exe_enabled = false;
+        cron_state.enabled = false;
         esp_diag.info(CRON_DISABLED);
         INFO("cron disabled");
     }
-    if (cron_running)
+    if (cron_state.running)
     {
-        cron_running = false;
+        cron_state.running = false;
         esp_diag.info(CRON_STOP);
         INFO("cron stopped");
     }
@@ -418,9 +421,9 @@ void disable_cron(void)
 void stop_cron(void)
 {
     os_timer_disarm(&cron_timer);
-    if (cron_running)
+    if (cron_state.running)
     {
-        cron_running = false;
+        cron_state.running = false;
         esp_diag.info(CRON_STOP);
         INFO("cron stopped");
     }
@@ -428,78 +431,85 @@ void stop_cron(void)
 
 bool cron_enabled(void)
 {
-    return cron_exe_enabled;
+    return cron_state.enabled;
 }
 
-#define CRON_FILENAME f_str("cron.cfg")
+#define CRON_FILENAME ((char *)f_str("cron.cfg"))
 
-static int cron_restore_cfg(void)
+static int cron_restore_state(void)
 {
-    ALL("cron_restore_cfg");
-    File_to_json cfgfile(CRON_FILENAME);
+    ALL("cron_restore_state");
+
+    if (!Espfile::exists(CRON_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(CRON_FILENAME);
     espmem.stack_mon();
-    if (!cfgfile.exists())
+    int enabled = cfgfile.getInt(f_str("cron_enabled"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        WARN("cron_restore_cfg file not found");
-        return CFG_ERROR;
+        esp_diag.error(CRON_RESTORE_STATE_ERROR);
+        ERROR("cron_restore_state error");
+        return CFG_error;
     }
-    if (cfgfile.find_string(f_str("enabled")))
-    {
-        esp_diag.error(CRON_RESTORE_CFG_INCOMPLETE);
-        ERROR("cron_restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    cron_exe_enabled = atoi(cfgfile.get_value());
-    return CFG_OK;
+    cron_state.enabled = (bool)enabled;
+    return CFG_ok;
 }
 
-static int cron_saved_cfg_not_updated(void)
+static int cron_saved_state_updated(void)
 {
-    ALL("cron_saved_cfg_not_updated");
-    File_to_json cfgfile(CRON_FILENAME);
+    ALL("cron_saved_state_updated");
+    if (!Espfile::exists(CRON_FILENAME))
+    {
+        return CFG_notUpdated;
+    }
+    Cfgfile cfgfile(CRON_FILENAME);
     espmem.stack_mon();
-    if (!cfgfile.exists())
+    int enabled = cfgfile.getInt(f_str("cron_enabled"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        return CFG_REQUIRES_UPDATE;
+        esp_diag.error(CRON_SAVED_STATE_UPDATED_ERROR);
+        ERROR("cron_saved_state_updated error");
+        return CFG_error;
     }
-    if (cfgfile.find_string(f_str("enabled")))
+    if (cron_state.enabled != (bool)enabled)
     {
-        esp_diag.error(CRON_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("cron_saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
+        return CFG_notUpdated;
     }
-    if (cron_exe_enabled != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    return CFG_OK;
+    return CFG_ok;
 }
 
-int save_cron_cfg(void)
+char *cron_state_json_stringify(void)
 {
-    ALL("cron_save_cfg");
-    if (cron_saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    if (!espfs.is_available())
+    // {"cron_enabled":0}
+    int msg_len = 18 + 1;
+    char *msg = new char[msg_len];
+    if (msg == NULL)
     {
-        esp_diag.error(CRON_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("cron_save_cfg FS not available");
-        return CFG_ERROR;
+        esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
+        ERROR("cron_state_json_stringify heap exhausted");
+        return NULL;
     }
-    Ffile cfgfile(&espfs, (char *)CRON_FILENAME);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(CRON_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("cron_save_cfg cannot open file");
-        return CFG_ERROR;
-    }
-    cfgfile.clear();
-    // "{"enabled": 0}" // 15 chars
-    char buffer[37];
+    fs_sprintf(msg,
+               "{\"cron_enabled\":%d}",
+               cron_state.enabled);
+    return msg;
+}
+
+int cron_state_save(void)
+{
+    ALL("cron_state_save");
+    if (cron_saved_state_updated() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(CRON_FILENAME);
     espmem.stack_mon();
-    fs_sprintf(buffer,
-               "{\"enabled\": %d}",
-               cron_exe_enabled);
-    cfgfile.n_append(buffer, os_strlen(buffer));
-    return CFG_OK;
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char *str = cron_state_json_stringify();
+    if (str == NULL)
+        return CFG_error;
+    int res = cfgfile.n_append(str, os_strlen(str));
+    delete[] str;
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    return CFG_ok;
 }

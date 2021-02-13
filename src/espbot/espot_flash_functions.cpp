@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
-#include "spiffs_flash_functions.hpp"
+#include "espbot_spiffs.hpp"
 
 // flash read function (checkout SPIFFS documentation)
 s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)

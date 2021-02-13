@@ -100,10 +100,10 @@ $('#meminfo_refresh').on('click', function () {
   show_spinner()
     .then(function () {
       esp_get_meminfo()
-      .then(function () {
-        hide_spinner(500)
-      });
-  });
+        .then(function () {
+          hide_spinner(500)
+        });
+    });
 });
 
 // SPIFFS
@@ -133,18 +133,17 @@ $('#fsinfo_refresh').on('click', function () {
     });
 });
 
-$('#fs_format').on('click', function () {
-  if (confirm("File system content will be lost.\nConfirm format...")) {
-    return esp_query({
-      type: 'POST',
-      url: '/api/fs/format',
-      dataType: 'json',
-      success: function (data) {
-        alert("" + data.msg);
-      },
-      error: query_err
-    });
-  }
+$('#fs_check').on('click', function () {
+  alert("A File System check could take a while...\nCheck the results in the Event Journal.");
+  return esp_query({
+    type: 'POST',
+    url: '/api/fs/check',
+    dataType: 'json',
+    success: function (data) {
+      alert("" + data.msg);
+    },
+    error: query_err
+  });
 });
 
 // Files

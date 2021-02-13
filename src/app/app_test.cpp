@@ -23,6 +23,7 @@ extern "C"
 
 #include "app.hpp"
 #include "app_test.hpp"
+#include "espbot_cfgfile.hpp"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
@@ -33,6 +34,7 @@ extern "C"
 #include "espbot_mem_mon.hpp"
 #include "espbot_mem_macros.h"
 #include "espbot_profiler.hpp"
+#include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
@@ -294,7 +296,7 @@ void run_test(int32 idx, int32 param)
             fs_printf("error retrieving value\n");
         break;
     }
-/*
+        /*
     case 10:
     {
         os_printf("installing EXCCAUSE_ILLEGAL\n");
@@ -856,7 +858,7 @@ void run_test(int32 idx, int32 param)
         esp_diag.info(event_counter, 100 + event_counter);
     }
     break;
-    /*
+        /*
     case 21:
     {
         // Error print
@@ -1277,6 +1279,112 @@ void run_test(int32 idx, int32 param)
     }
     break;
     */
+    // FILE TEST
+    case 200:
+    {
+        Espfile file("newfile.txt");
+        TRACE("created empty newfile.txt");
+    }
+    break;
+    case 201:
+    {
+        if (Espfile::exists("newfile.txt"))
+            TRACE("newfile.txt exists");
+        else
+            TRACE("newfile.txt does not exists");
+    }
+    break;
+    case 202:
+    {
+        int size = Espfile::size("newfile.txt");
+        TRACE("newfile.txt size: %d", size);
+        size = Espfile::size("anotherfile.txt");
+        TRACE("anotherfile.txt size: %d", size);
+    }
+    break;
+    case 203:
+    {
+        Espfile file("newfile.txt");
+        int res = file.remove();
+        if (res == SPIFFS_OK)
+            TRACE("newfile.txt deleted");
+        else
+            TRACE("newfile.txt delete error %d", res);
+    }
+    break;
+    case 204:
+    {
+        Espfile file("newfile.txt");
+        int res = file.n_append("linea\n", 6);
+        if (res >= SPIFFS_OK)
+            TRACE("newfile.txt new line appended");
+        else
+            TRACE("newfile.txt write error %d", res);
+    }
+    break;
+    case 205:
+    {
+        Espfile file("newfile.txt");
+        int res = file.clear();
+        if (res == SPIFFS_OK)
+            TRACE("newfile.txt cleared");
+        else
+            TRACE("newfile.txt clear error %d", res);
+    }
+    break;
+    case 206:
+    {
+        Espfile file("newfile.txt");
+        char buffer[128];
+        os_memset(buffer, 0, 128);
+        int res = file.n_read(buffer, 6);
+        if (res >= SPIFFS_OK)
+            TRACE("newfile.txt content: %s", buffer);
+        else
+            TRACE("newfile.txt read error %d", res);
+    }
+    break;
+    case 207:
+    {
+        Espfile file("newfile.txt");
+        int size = Espfile::size("newfile.txt");
+        char buffer[128];
+        os_memset(buffer, 0, 128);
+        char *ptr = buffer;
+        int offset = 0;
+        int res = SPIFFS_OK;
+        while ((offset < size) && (res >= SPIFFS_OK))
+        {
+            res = file.n_read(ptr, offset, 1);
+            ptr++;
+            offset++;
+        }
+        if (res >= SPIFFS_OK)
+            TRACE("newfile.txt content [%d]: %s", offset, buffer);
+        else
+            TRACE("newfile.txt read error %d", res);
+    }
+    break;
+    case 300:
+    {
+        TRACE("heap: %d", system_get_free_heap_size());
+        {
+            Cfgfile cfg_file("diagnostic.cfg");
+            int diag_led_mask;
+            cfg_file.getVal("diag_led_mask", diag_led_mask);
+            if (cfg_file.getErr() != JSON_noerr)
+                TRACE("uh oh cannot find diag_led_mask");
+            else
+                TRACE("diag_led_mask %d", diag_led_mask);
+            cfg_file.getVal("enabled", diag_led_mask);
+            if (cfg_file.getErr() != JSON_noerr)
+                TRACE("uh oh cannot find enabled");
+            else
+                TRACE("diag_led_mask %d", diag_led_mask);
+        }
+        TRACE("heap: %d", system_get_free_heap_size());
+    }
+    break;
     default:
         break;
     }

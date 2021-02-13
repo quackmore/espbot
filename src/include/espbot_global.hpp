@@ -23,10 +23,8 @@ extern "C"
 #include "espbot_timedate.hpp"
 #include "espbot_webserver.hpp"
 #include "espbot_wifi.hpp"
-#include "spiffs_esp8266.hpp"
 
 extern char *espbot_release;
-extern Flashfs espfs;
 extern Espbot_diag esp_diag;
 extern Esp_mem espmem;
 extern Espbot espbot;

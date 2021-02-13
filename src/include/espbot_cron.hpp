@@ -73,7 +73,9 @@ void start_cron(void);
 void disable_cron(void);
 void stop_cron(void);
 bool cron_enabled(void);
-int save_cron_cfg(void); // return CFG_OK on success, otherwise CFG_ERROR
+
+char *cron_state_json_stringify(void);
+int cron_state_save(void);
 
 /*
  * DEBUG

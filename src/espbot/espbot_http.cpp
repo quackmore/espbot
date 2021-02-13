@@ -345,7 +345,7 @@ void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int len)
         // set a timeout timer for clearing the esp_busy_sending_data in case something goes wrong
         os_timer_disarm(&clear_busy_sending_data_timer);
         os_timer_setfn(&clear_busy_sending_data_timer, (os_timer_func_t *)clear_busy_sending_data, NULL);
-        os_timer_arm(&clear_busy_sending_data_timer, 5000, 0);
+        os_timer_arm(&clear_busy_sending_data_timer, 20000, 0);
 
         sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, len);
         espmem.stack_mon();

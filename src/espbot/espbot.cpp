@@ -29,6 +29,7 @@ extern "C"
 #include "espbot_mem_mon.hpp"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
+#include "espbot_spiffs.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
 #include "spiffs_esp8266.hpp"
@@ -156,9 +157,9 @@ void espbot_init(void)
     esp_gpio.init();           // cause it's used by diagnostic
     esp_diag.init_essential(); // FS not available yet
 
-    espfs.init();
-    esp_diag.init_custom();    // FS is available now
-    esp_time.init();           // FS is available now
+    esp_spiffs_mount();
+    esp_diag.init_custom(); // FS is available now
+    esp_time.init();        // FS is available now
     espbot.init();
     esp_mDns.init();
     esp_ota.init();
@@ -174,6 +175,7 @@ void espbot_init(void)
 int Espbot::restore_cfg(void)
 {
     ALL("Espbot::restore_cfg");
+    return CFG_ERROR;
     File_to_json cfgfile(f_str("espbot.cfg"));
     espmem.stack_mon();
     if (cfgfile.exists())
@@ -222,42 +224,43 @@ int Espbot::saved_cfg_not_updated(void)
 int Espbot::save_cfg(void)
 {
     ALL("Espbot::save_cfg");
-    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    if (espfs.is_available())
-    {
-        Ffile cfgfile(&espfs, (char *)f_str("espbot.cfg"));
-        if (cfgfile.is_available())
-        {
-            cfgfile.clear();
-            Heap_chunk buffer(64);
-            espmem.stack_mon();
-            if (buffer.ref)
-            {
-                fs_sprintf(buffer.ref, "{\"espbot_name\": \"%s\"}", _name);
-                cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
-            }
-            else
-            {
-                esp_diag.error(ESPBOT_SAVE_CFG_HEAP_EXHAUSTED, 64);
-                ERROR("Espbot::save_cfg heap exhausted %d", 64);
-                return CFG_ERROR;
-            }
-        }
-        else
-        {
-            esp_diag.error(ESPBOT_SAVE_CFG_CANNOT_OPEN_FILE);
-            ERROR("Espbot::save_cfg cannot open file");
-            return CFG_ERROR;
-        }
-    }
-    else
-    {
-        esp_diag.error(ESPBOT_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("Espbot::save_cfg FS not available");
-        return CFG_ERROR;
-    }
-    return 0;
+    return CFG_OK;
+    // if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
+    //     return CFG_OK;
+    // if (espfs.is_available())
+    // {
+    //     Ffile cfgfile(&espfs, (char *)f_str("espbot.cfg"));
+    //     if (cfgfile.is_available())
+    //     {
+    //         cfgfile.clear();
+    //         Heap_chunk buffer(64);
+    //         espmem.stack_mon();
+    //         if (buffer.ref)
+    //         {
+    //             fs_sprintf(buffer.ref, "{\"espbot_name\": \"%s\"}", _name);
+    //             cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
+    //         }
+    //         else
+    //         {
+    //             esp_diag.error(ESPBOT_SAVE_CFG_HEAP_EXHAUSTED, 64);
+    //             ERROR("Espbot::save_cfg heap exhausted %d", 64);
+    //             return CFG_ERROR;
+    //         }
+    //     }
+    //     else
+    //     {
+    //         esp_diag.error(ESPBOT_SAVE_CFG_CANNOT_OPEN_FILE);
+    //         ERROR("Espbot::save_cfg cannot open file");
+    //         return CFG_ERROR;
+    //     }
+    // }
+    // else
+    // {
+    //     esp_diag.error(ESPBOT_SAVE_CFG_FS_NOT_AVAILABLE);
+    //     ERROR("Espbot::save_cfg FS not available");
+    //     return CFG_ERROR;
+    // }
+    // return 0;
 }
 
 // GRACEFUL RESET

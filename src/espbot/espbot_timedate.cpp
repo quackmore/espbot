@@ -176,88 +176,91 @@ bool TimeDate::sntp_enabled(void)
 int TimeDate::restore_cfg(void)
 {
     ALL("TimeDate::restore_cfg");
-    File_to_json cfgfile(TIMEDATE_FILENAME);
-    espmem.stack_mon();
-    if (!cfgfile.exists())
-    {
-        WARN("TimeDate::restore_cfg file not found");
-        return CFG_ERROR;
-    }
-    if (cfgfile.find_string(f_str("sntp_enabled")))
-    {
-        esp_diag.error(TIMEDATE_RESTORE_CFG_INCOMPLETE);
-        ERROR("TimeDate::restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    _sntp_enabled = atoi(cfgfile.get_value());
-    if (cfgfile.find_string(f_str("timezone")))
-    {
-        esp_diag.error(TIMEDATE_RESTORE_CFG_INCOMPLETE);
-        ERROR("TimeDate::restore_cfg incomplete cfg");
-        return CFG_ERROR;
-    }
-    _timezone = atoi(cfgfile.get_value());
     return CFG_OK;
+    //    File_to_json cfgfile(TIMEDATE_FILENAME);
+    //    espmem.stack_mon();
+    //    if (!cfgfile.exists())
+    //    {
+    //        WARN("TimeDate::restore_cfg file not found");
+    //        return CFG_ERROR;
+    //    }
+    //    if (cfgfile.find_string(f_str("sntp_enabled")))
+    //    {
+    //        esp_diag.error(TIMEDATE_RESTORE_CFG_INCOMPLETE);
+    //        ERROR("TimeDate::restore_cfg incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    _sntp_enabled = atoi(cfgfile.get_value());
+    //    if (cfgfile.find_string(f_str("timezone")))
+    //    {
+    //        esp_diag.error(TIMEDATE_RESTORE_CFG_INCOMPLETE);
+    //        ERROR("TimeDate::restore_cfg incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    _timezone = atoi(cfgfile.get_value());
+    //    return CFG_OK;
 }
 
 int TimeDate::saved_cfg_not_updated(void)
 {
     ALL("TimeDate::saved_cfg_not_updated");
-    File_to_json cfgfile(TIMEDATE_FILENAME);
-    espmem.stack_mon();
-    if (!cfgfile.exists())
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("sntp_enabled")))
-    {
-        esp_diag.error(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("TimeDate::saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
-    }
-    if (_sntp_enabled != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
-    if (cfgfile.find_string(f_str("timezone")))
-    {
-        esp_diag.error(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-        ERROR("TimeDate::saved_cfg_not_updated incomplete cfg");
-        return CFG_ERROR;
-    }
-    if (_timezone != atoi(cfgfile.get_value()))
-    {
-        return CFG_REQUIRES_UPDATE;
-    }
     return CFG_OK;
+    //    File_to_json cfgfile(TIMEDATE_FILENAME);
+    //    espmem.stack_mon();
+    //    if (!cfgfile.exists())
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    if (cfgfile.find_string(f_str("sntp_enabled")))
+    //    {
+    //        esp_diag.error(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        ERROR("TimeDate::saved_cfg_not_updated incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    if (_sntp_enabled != atoi(cfgfile.get_value()))
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    if (cfgfile.find_string(f_str("timezone")))
+    //    {
+    //        esp_diag.error(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        ERROR("TimeDate::saved_cfg_not_updated incomplete cfg");
+    //        return CFG_ERROR;
+    //    }
+    //    if (_timezone != atoi(cfgfile.get_value()))
+    //    {
+    //        return CFG_REQUIRES_UPDATE;
+    //    }
+    //    return CFG_OK;
 }
 
 int TimeDate::save_cfg(void)
 {
     ALL("TimeDate::save_cfg");
-    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-        return CFG_OK;
-    if (!espfs.is_available())
-    {
-        esp_diag.error(TIMEDATE_SAVE_CFG_FS_NOT_AVAILABLE);
-        ERROR("TimeDate::save_cfg FS not available");
-        return CFG_ERROR;
-    }
-    Ffile cfgfile(&espfs, (char *)TIMEDATE_FILENAME);
-    if (!cfgfile.is_available())
-    {
-        esp_diag.error(TIMEDATE_SAVE_CFG_CANNOT_OPEN_FILE);
-        ERROR("TimeDate::save_cfg cannot open file");
-        return CFG_ERROR;
-    }
-    cfgfile.clear();
-    // "{"sntp_enabled": 0, "timezone": -12}" // 37 chars
-    char buffer[37];
-    espmem.stack_mon();
-    fs_sprintf(buffer,
-               "{\"sntp_enabled\": %d, \"timezone\": %d}",
-               _sntp_enabled,
-               _timezone);
-    cfgfile.n_append(buffer, os_strlen(buffer));
     return CFG_OK;
+//    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
+//        return CFG_OK;
+//    if (!espfs.is_available())
+//    {
+//        esp_diag.error(TIMEDATE_SAVE_CFG_FS_NOT_AVAILABLE);
+//        ERROR("TimeDate::save_cfg FS not available");
+//        return CFG_ERROR;
+//    }
+//    Ffile cfgfile(&espfs, (char *)TIMEDATE_FILENAME);
+//    if (!cfgfile.is_available())
+//    {
+//        esp_diag.error(TIMEDATE_SAVE_CFG_CANNOT_OPEN_FILE);
+//        ERROR("TimeDate::save_cfg cannot open file");
+//        return CFG_ERROR;
+//    }
+//    cfgfile.clear();
+//    // "{"sntp_enabled": 0, "timezone": -12}" // 37 chars
+//    char buffer[37];
+//    espmem.stack_mon();
+//    fs_sprintf(buffer,
+//               "{\"sntp_enabled\": %d, \"timezone\": %d}",
+//               _sntp_enabled,
+//               _timezone);
+//    cfgfile.n_append(buffer, os_strlen(buffer));
+//    return CFG_OK;
 }
