@@ -133,9 +133,9 @@ void Websvr::stop()
 {
     if (_status == up)
     {
+        _status = down;
         espconn_disconnect(&_esp_conn);
         espconn_delete(&_esp_conn);
-        _status = down;
 
         http_queues_clear();
 

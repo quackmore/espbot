@@ -33,8 +33,16 @@ extern "C"
 #include "espbot_webclient.hpp"
 #include "spiffs_esp8266.hpp"
 
+typedef enum
+{
+    not_running = 0,
+    running_on_ap,
+    running_on_sta
+} espbot_http_status_t;
+
 static void espbot_coordinator_task(os_event_t *e)
 {
+    static espbot_http_status_t espbot_http_status = not_running;
     switch (e->sig)
     {
     case SIG_STAMODE_GOT_IP:
@@ -44,8 +52,11 @@ static void espbot_coordinator_task(os_event_t *e)
             // new connection
             esp_time.start_sntp();
             esp_mDns.start(espbot.get_name());
-            espwebsvr.stop(); // in case there was a web server listening on esp AP interface
+            // check if there is a web server listening on esp AP interface
+            if (espbot_http_status != not_running)
+                espwebsvr.stop();
             espwebsvr.start(80);
+            espbot_http_status = running_on_sta;
             app_init_after_wifi();
         }
         if (e->par == GOT_IP_ALREADY_CONNECTED)
@@ -55,15 +66,22 @@ static void espbot_coordinator_task(os_event_t *e)
             esp_time.start_sntp();
             esp_mDns.stop();
             esp_mDns.start(espbot.get_name());
-            espwebsvr.stop();
+            if (espbot_http_status != not_running)
+                espwebsvr.stop();
             espwebsvr.start(80);
+            espbot_http_status = running_on_sta;
         }
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
         esp_time.stop_sntp();
         esp_mDns.stop();
-        espwebsvr.stop();
+        // stop the webserver only if it is running on the WIFI STATION interface
+        if (espbot_http_status == running_on_sta)
+        {
+            espwebsvr.stop();
+            espbot_http_status = not_running;
+        }
         app_deinit_on_wifi_disconnect();
         break;
     case SIG_SOFTAPMODE_STACONNECTED:
@@ -73,8 +91,18 @@ static void espbot_coordinator_task(os_event_t *e)
         // [wifi station+AP] station disconnected
         break;
     case SIG_SOFTAPMODE_READY:
-        // espwebsvr.stop(); // in case there was a web server listening on esp station interface
-        espwebsvr.start(80);
+        // don't stop the web server if it's already listening on WIFI AP interface
+        if (espbot_http_status == running_on_sta)
+        {
+            espwebsvr.stop();
+            espbot_http_status = not_running;
+        }
+        // don't start the web server if it's already listening on WIFI AP interface
+        if (espbot_http_status == not_running)
+        {
+            espwebsvr.start(80);
+            espbot_http_status = running_on_ap;
+        }
         app_init_after_wifi();
         break;
     case SIG_HTTP_CHECK_PENDING_RESPONSE:
@@ -157,8 +185,8 @@ void espbot_init(void)
     esp_diag.init_essential(); // FS not available yet
 
     espfs.init();
-    esp_diag.init_custom();    // FS is available now
-    esp_time.init();           // FS is available now
+    esp_diag.init_custom(); // FS is available now
+    esp_time.init();        // FS is available now
     espbot.init();
     esp_mDns.init();
     esp_ota.init();
