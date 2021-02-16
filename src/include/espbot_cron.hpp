@@ -74,7 +74,7 @@ void disable_cron(void);
 void stop_cron(void);
 bool cron_enabled(void);
 
-char *cron_state_json_stringify(void);
+char *cron_state_json_stringify(char *dest = NULL, int len = 0);
 int cron_state_save(void);
 
 /*

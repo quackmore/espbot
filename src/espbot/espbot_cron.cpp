@@ -478,16 +478,29 @@ static int cron_saved_state_updated(void)
     return CFG_ok;
 }
 
-char *cron_state_json_stringify(void)
+char *cron_state_json_stringify(char *dest, int len)
 {
     // {"cron_enabled":0}
     int msg_len = 18 + 1;
-    char *msg = new char[msg_len];
-    if (msg == NULL)
+    char *msg;
+    if (dest == NULL)
     {
-        esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
-        ERROR("cron_state_json_stringify heap exhausted");
-        return NULL;
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
+            ERROR("cron_state_json_stringify heap exhausted");
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
     }
     fs_sprintf(msg,
                "{\"cron_enabled\":%d}",
@@ -504,11 +517,9 @@ int cron_state_save(void)
     espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
-    char *str = cron_state_json_stringify();
-    if (str == NULL)
-        return CFG_error;
+    char str[19];
+    cron_state_json_stringify(str, 19);
     int res = cfgfile.n_append(str, os_strlen(str));
-    delete[] str;
     if (res < SPIFFS_OK)
         return CFG_error;
     return CFG_ok;

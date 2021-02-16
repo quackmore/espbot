@@ -1747,7 +1747,7 @@ static void setWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
 
     Wifi::ap_set_ch(ap_channel);
     Wifi::ap_set_pwd(ap_pwd, os_strlen(ap_pwd));
-    Wifi::save_cfg();
+    Wifi::cfg_save();
     espmem.stack_mon();
 
     int msg_len = 29 + 64 + 1;

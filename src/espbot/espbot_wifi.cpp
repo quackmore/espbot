@@ -39,9 +39,47 @@ static bool stamode_connected;
 static int ap_count;
 static char *ap_list;
 
-bool Wifi::is_connected(void)
+void espwifi_init()
 {
-    return stamode_connected;
+    // default AP config
+    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32);    // uint8 ssid[32];
+    os_memset((char *)ap_config.password, 0, 64);                 //
+    os_strcpy((char *)ap_config.password, f_str("espbot123456")); // uint8 password[64];
+    ap_config.ssid_len = os_strlen(espbot.get_name());            // uint8 ssid_len;
+    ap_config.channel = 1;                                        // uint8 channel;
+    ap_config.authmode = AUTH_WPA2_PSK;                           // uint8 authmode;
+    ap_config.ssid_hidden = 0;                                    // uint8 ssid_hidden;
+    ap_config.max_connection = 4;                                 // uint8 max_connection;
+    ap_config.beacon_interval = 100;                              // uint16 beacon_interval;
+
+    // default STATION config
+    wifi_station_set_reconnect_policy(false);
+    if (wifi_station_get_auto_connect() != 0)
+        wifi_station_set_auto_connect(0);
+    os_timer_disarm(&wait_before_reconnect);
+    os_timer_setfn(&wait_before_reconnect, (os_timer_func_t *)&espwifi_connect_to_ap, NULL);
+    if (wifi_get_phy_mode() != PHY_MODE_11N)
+        wifi_set_phy_mode(PHY_MODE_11N);
+    wifi_set_event_handler_cb((wifi_event_handler_cb_t)wifi_event_handler);
+    os_memset(station_ssid, 0, 32);
+    os_memset(station_pwd, 0, 64);
+    stamode_connected = false;
+    stamode_connecting = 0; // never connected
+
+    ap_count = 0;
+    ap_list = NULL;
+
+    // overwrite AP and STATION config from file, if any...
+    wifi_cfg_restore();
+
+    // start as SOFTAP and try to switch to STATION
+    // this will ensure that softap and station configurations are set by espbot
+    // otherwise default configurations by NON OS SDK are used
+    espwifi_work_as_ap(); // make effective the restored configration
+    // signal that SOFTAPMODE is ready
+    system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
+    if (os_strlen(station_ssid) > 0)
+        espwifi_connect_to_ap();
 }
 
 void wifi_event_handler(System_Event_t *evt)
@@ -81,7 +119,7 @@ void wifi_event_handler(System_Event_t *evt)
         }
         if (wifi_get_opmode() == STATION_MODE)
         {
-            Wifi::set_stationap();
+            espwifi_work_as_ap();
             system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
         }
         os_timer_disarm(&wait_before_reconnect);
@@ -130,7 +168,7 @@ void wifi_event_handler(System_Event_t *evt)
             // informing everybody of successfully connection to AP
             system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, GOT_IP_AFTER_CONNECTION);
             // time to update flash configuration for (eventually) saving ssid and password
-            Wifi::save_cfg();
+            espwifi_cfg_save();
         }
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
@@ -181,9 +219,21 @@ void wifi_event_handler(System_Event_t *evt)
     }
 }
 
-void Wifi::set_stationap(void)
+void espwifi_get_ip_address(struct ip_info *t_ip)
 {
-    ALL("Wifi::set_stationap");
+    if (wifi_get_opmode() == STATIONAP_MODE)
+    {
+        wifi_get_ip_info(0x01, t_ip);
+    }
+    else
+    {
+        wifi_get_ip_info(0x00, t_ip);
+    }
+}
+
+void espwifi_work_as_ap(void)
+{
+    ALL("espwifi_work_as_ap");
     struct ip_info ap_ip;
     struct dhcps_lease dhcp_lease;
     espmem.stack_mon();
@@ -195,7 +245,7 @@ void Wifi::set_stationap(void)
     if (!wifi_softap_set_config_current(&ap_config))
     {
         esp_diag.error(WIFI_SETAP_ERROR);
-        ERROR("Wifi::set_stationap failed to set AP cfg");
+        ERROR("espwifi_work_as_ap failed to set AP cfg");
     }
 
     wifi_softap_dhcps_stop();
@@ -238,15 +288,15 @@ void Wifi::set_stationap(void)
     }
 }
 
-void Wifi::connect(void)
+void espwifi_connect_to_ap(void)
 {
-    ALL("Wifi::connect");
+    ALL("espwifi_connect_to_ap");
     struct station_config stationConf;
 
     if (os_strlen(station_ssid) == 0)
     {
         esp_diag.error(WIFI_CONNECT_NO_SSID_AVAILABLE);
-        ERROR("Wifi::connect no ssid available");
+        ERROR("espwifi_connect_to_ap no ssid available");
         return;
     }
     bool result = wifi_station_ap_number_set(1);
@@ -268,291 +318,12 @@ void Wifi::connect(void)
     espmem.stack_mon();
 }
 
-#define WIFI_CFG_FILENAME f_str("wifi.cfg")
-
-static int wifi_cfg_restore(void)
+bool espwifi_is_connected(void)
 {
-    ALL("Wifi::wifi_cfg_restore");
-    if (!Espfile::exists(WIFI_CFG_FILENAME))
-        return CFG_cantRestore;
-    Cfgfile cfgfile(WIFI_CFG_FILENAME);
-    if (cfgfile.getErr() != JSON_noerr)
-    {
-        esp_diag.error(WIFI_CFG_RESTORE_ERROR);
-        ERROR("wifi_cfg_restore error");
-        return CFG_error;
-    }
-    espmem.stack_mon();
-    os_memset(station_ssid, 0, 32);
-    cfgfile.getStr(f_str("station_ssid"), station_ssid, 32);
-    if (cfgfile.getErr() == JSON_notFound)
-    {
-        esp_diag.info(WIFI_CFG_RESTORE_NO_SSID_FOUND);
-        INFO("Wifi::wifi_cfg_restore no SSID found");
-        cfgfile.clearErr();
-    }
-    os_memset(station_pwd, 0, 64);
-    cfgfile.getStr(f_str("station_pwd"), station_pwd, 64);
-    if (cfgfile.getErr() == JSON_notFound)
-    {
-        esp_diag.info(WIFI_CFG_RESTORE_NO_PWD_FOUND);
-        INFO("Wifi::wifi_cfg_restore no PWD found");
-        cfgfile.clearErr();
-    }
-    int channel = cfgfile.getInt(f_str("ap_channel"));
-    if (cfgfile.getErr() == JSON_notFound)
-    {
-        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, 1);
-        INFO("Wifi::wifi_cfg_restore AP channel: %d", 1);
-    }
-    if (cfgfile.getErr() == JSON_noerr)
-    {
-        if ((channel < 1) || (channel > 11))
-        {
-            esp_diag.error(WIFI_CFG_RESTORE_AP_CH_OOR, channel);
-            ERROR("Wifi::wifi_cfg_restore AP channel out of range (%)", channel);
-            channel = 1;
-        }
-        ap_config.channel = channel;
-        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, channel);
-        INFO("Wifi::wifi_cfg_restore AP channel: %d", channel);
-    }
-    char ap_password[64];
-    os_memset(ap_password, 0, 64);
-    cfgfile.getStr(f_str("ap_pwd"), ap_password, 64);
-    if (cfgfile.getErr() == JSON_notFound)
-    {
-        esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
-        INFO("Wifi::wifi_cfg_restore AP default password");
-    }
-    if (cfgfile.getErr() == JSON_noerr)
-    {
-        os_memset((char *)ap_config.password, 0, 64);
-        os_strncpy((char *)ap_config.password, ap_password, 63);
-        if (0 == os_strcmp((char *)ap_config.password, f_str("espbot123456")))
-        {
-            esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
-            INFO("Wifi::wifi_cfg_restore AP default password");
-        }
-        else
-        {
-            esp_diag.info(WIFI_CFG_RESTORE_AP_CUSTOM_PWD);
-            INFO("Wifi::wifi_cfg_restore AP custom password: %s", ap_password);
-        }
-    }
-    return CFG_ok;
+    return stamode_connected;
 }
 
-static int wifi_cfg_uptodate(void)
-{
-    ALL("Wifi::wifi_cfg_uptodate");
-    if (!Espfile::exists(WIFI_CFG_FILENAME))
-    {
-        return CFG_notUpdated;
-    }
-    Cfgfile cfgfile(WIFI_CFG_FILENAME);
-    espmem.stack_mon();
-    char st_ssid[32];
-    cfgfile.getStr(f_str("station_ssid"), st_ssid, 32);
-    char st_pwd[64];
-    cfgfile.getStr(f_str("station_pwd"), st_pwd, 64);
-    char ap_pwd[64];
-    cfgfile.getStr(f_str("ap_pwd"), ap_pwd, 64);
-    int ap_channel = cfgfile.getInt(f_str("ap_channel"));
-    if (cfgfile.getErr() != JSON_noerr)
-    {
-        esp_diag.error(WIFI_CFG_UPTODATE_ERROR);
-        ERROR("wifi_cfg_uptodate error");
-        return CFG_error;
-    }
-    if (os_strcmp(station_ssid, st_ssid) ||
-        os_strcmp(station_pwd, st_pwd) ||
-        os_strcmp(ap_config.password, ap_pwd) ||
-        (ap_channel != ap_config.channel))
-    {
-        return CFG_notUpdated;
-    }
-    return CFG_ok;
-}
-
-int Wifi::save_cfg(void)
-{
-    ALL("Wifi::saved_cfg");
-    return CFG_OK;
-    //    // don't write to flash when no update is required
-    //    if (wifi_cfg_uptodate() != CFG_REQUIRES_UPDATE)
-    //        return CFG_OK;
-    //    // writes update to flash
-    //    if (!espfs.is_available())
-    //    {
-    //        esp_diag.error(WIFI_SAVE_CFG_FS_NOT_AVAILABLE);
-    //        ERROR("Wifi::save_cfg FS not available");
-    //        return CFG_ERROR;
-    //    }
-    //    Ffile cfgfile(&espfs, (char *)WIFI_CFG_FILENAME);
-    //    espmem.stack_mon();
-    //    if (!cfgfile.is_available())
-    //    {
-    //        esp_diag.error(WIFI_SAVE_CFG_CANNOT_OPEN_FILE);
-    //        ERROR("Wifi::save_cfg cannot open file");
-    //        return CFG_ERROR;
-    //    }
-    //    cfgfile.clear();
-    //    // {"station_ssid":"","station_pwd":"","ap_pwd":"","ap_channel":11}
-    //    // 64 + 1 + 32 + 64 + 64 + 2 = 137
-    //    Heap_chunk buffer(227);
-    //    if (buffer.ref == NULL)
-    //    {
-    //        esp_diag.error(WIFI_SAVE_CFG_HEAP_EXHAUSTED, 227);
-    //        ERROR("Wifi::save_cfg heap exhausted %d", 227);
-    //        return CFG_ERROR;
-    //    }
-    //    fs_sprintf(buffer.ref,
-    //               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\",\"ap_pwd\":\"%s\",\"ap_channel\":%d}",
-    //               station_ssid,
-    //               station_pwd,
-    //               (char *)ap_config.password,
-    //               ap_config.channel);
-    //    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
-    //    return CFG_OK;
-}
-
-void Wifi::init()
-{
-    // default AP config
-    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32);    // uint8 ssid[32];
-    os_memset((char *)ap_config.password, 0, 64);                 //
-    os_strcpy((char *)ap_config.password, f_str("espbot123456")); // uint8 password[64];
-    ap_config.ssid_len = os_strlen(espbot.get_name());            // uint8 ssid_len;
-    ap_config.channel = 1;                                        // uint8 channel;
-    ap_config.authmode = AUTH_WPA2_PSK;                           // uint8 authmode;
-    ap_config.ssid_hidden = 0;                                    // uint8 ssid_hidden;
-    ap_config.max_connection = 4;                                 // uint8 max_connection;
-    ap_config.beacon_interval = 100;                              // uint16 beacon_interval;
-
-    // default STATION config
-    wifi_station_set_reconnect_policy(false);
-    if (wifi_station_get_auto_connect() != 0)
-        wifi_station_set_auto_connect(0);
-    os_timer_disarm(&wait_before_reconnect);
-    os_timer_setfn(&wait_before_reconnect, (os_timer_func_t *)&Wifi::connect, NULL);
-    if (wifi_get_phy_mode() != PHY_MODE_11N)
-        wifi_set_phy_mode(PHY_MODE_11N);
-    wifi_set_event_handler_cb((wifi_event_handler_cb_t)wifi_event_handler);
-    os_memset(station_ssid, 0, 32);
-    os_memset(station_pwd, 0, 64);
-    stamode_connected = false;
-    stamode_connecting = 0; // never connected
-
-    ap_count = 0;
-    ap_list = NULL;
-
-    // overwrite AP and STATION config from file, if any...
-    wifi_cfg_restore();
-
-    // start as SOFTAP and try to switch to STATION
-    // this will ensure that softap and station configurations are set by espbot
-    // otherwise default configurations by NON OS SDK are used
-    Wifi::set_stationap(); // make effective the restored configration
-    // signal that SOFTAPMODE is ready
-    system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
-    if (os_strlen(station_ssid) > 0)
-        Wifi::connect();
-}
-
-void Wifi::station_set_ssid(char *t_str, int t_len)
-{
-    ALL("Wifi::station_set_ssid");
-    os_memset(station_ssid, 0, 32);
-    if (t_len > 31)
-    {
-        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_31_CHAR);
-        WARN("Wifi::station_set_ssid: truncating ssid to 31 characters");
-        os_strncpy(station_ssid, t_str, 31);
-    }
-    else
-    {
-        os_strncpy(station_ssid, t_str, t_len);
-    }
-}
-
-char *Wifi::station_get_ssid(void)
-{
-    return station_ssid;
-}
-
-void Wifi::station_set_pwd(char *t_str, int t_len)
-{
-    ALL("Wifi::station_set_pwd");
-    os_memset(station_pwd, 0, 64);
-    if (t_len > 63)
-    {
-        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
-        WARN("Wifi::station_set_pwd: truncating pwd to 63 characters");
-        os_strncpy(station_pwd, t_str, 63);
-    }
-    else
-    {
-        os_strncpy(station_pwd, t_str, t_len);
-    }
-}
-
-char *Wifi::station_get_password(void)
-{
-    return station_pwd;
-}
-
-void Wifi::ap_set_pwd(char *t_str, int t_len)
-{
-    ALL("Wifi::ap_set_pwd");
-    os_memset(ap_config.password, 0, 64);
-    if (t_len > 63)
-    {
-        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
-        WARN("Wifi::ap_set_pwd: truncating pwd to 63 characters");
-        os_strncpy((char *)ap_config.password, t_str, 63);
-    }
-    else
-    {
-        os_strncpy((char *)ap_config.password, t_str, t_len);
-    }
-    // in case wifi is already in STATIONAP_MODE update config
-    if (wifi_get_opmode() != STATION_MODE)
-    {
-        Wifi::set_stationap();
-    }
-}
-
-char *Wifi::ap_get_password(void)
-{
-    return (char *)ap_config.password;
-}
-
-void Wifi::ap_set_ch(int ch)
-{
-    ALL("Wifi::ap_set_ch");
-    if ((ch < 1) || (ch > 11))
-    {
-        esp_diag.error(WIFI_AP_SET_CH_OOR, ch);
-        ERROR("Wifi::ap_set_ch: %d is OOR, AP channel set to 1");
-        ap_config.channel = 1;
-    }
-    else
-    {
-        ap_config.channel = ch;
-    }
-    // in case wifi is already in STATIONAP_MODE update config
-    if (wifi_get_opmode() == STATIONAP_MODE)
-    {
-        Wifi::set_stationap();
-    }
-}
-
-int Wifi::ap_get_ch(void)
-{
-    return ap_config.channel;
-}
-
+// SCAN
 static void (*scan_completed_cb)(void *) = NULL;
 static void *scan_completed_param = NULL;
 
@@ -560,7 +331,7 @@ static void fill_in_ap_list(void *arg, STATUS status)
 {
     ALL("fill_in_ap_list");
     // delete previuos results
-    Wifi::free_ap_list();
+    espwifi_free_ap_list();
     // now check results
     if (status == OK)
     {
@@ -598,31 +369,31 @@ static void fill_in_ap_list(void *arg, STATUS status)
         else
         {
             esp_diag.error(WIFI_AP_LIST_HEAP_EXHAUSTED, 33 * ap_count);
-            ERROR("Wifi::fill_in_ap_list heap exhausted %d", 33 * ap_count);
+            ERROR("espwifi_fill_in_ap_list heap exhausted %d", 33 * ap_count);
         }
     }
     else
     {
         esp_diag.error(WIFI_AP_LIST_CANNOT_COMPLETE_SCAN);
-        ERROR("Wifi::fill_in_ap_list cannot complete ap scan");
+        ERROR("espwifi_fill_in_ap_list cannot complete ap scan");
     }
     if (scan_completed_cb)
         scan_completed_cb(scan_completed_param);
 }
 
-void Wifi::scan_for_ap(struct scan_config *config, void (*callback)(void *), void *param)
+void espwifi_scan_for_ap(struct scan_config *config, void (*callback)(void *), void *param)
 {
     scan_completed_cb = callback;
     scan_completed_param = param;
     wifi_station_scan(config, (scan_done_cb_t)fill_in_ap_list);
 }
 
-int Wifi::get_ap_count(void)
+int espwifi_get_ap_count(void)
 {
     return ap_count;
 }
 
-char *Wifi::get_ap_name(int t_idx)
+char *espwifi_get_ap_name(int t_idx)
 {
     if (t_idx < ap_count)
         return (ap_list + (33 * t_idx));
@@ -630,7 +401,7 @@ char *Wifi::get_ap_name(int t_idx)
         return "";
 }
 
-void Wifi::free_ap_list(void)
+void espwifi_free_ap_list(void)
 {
     ap_count = 0;
     if (ap_list)
@@ -640,95 +411,273 @@ void Wifi::free_ap_list(void)
     }
 }
 
-// static Profiler *fast_scan_profiler;
+// CONFIG
 
-static struct scan_config qs_cfg;
-static struct fast_scan qs_vars;
-
-static void fast_scan_check_results(void *arg, STATUS status)
+void espwifi_station_set_ssid(char *t_str, int t_len)
 {
-    if (status == OK)
+    ALL("espwifi_station_set_ssid");
+    os_memset(station_ssid, 0, 32);
+    if (t_len > 31)
     {
-        struct bss_info *scan_list = (struct bss_info *)arg;
-        while (scan_list)
-        {
-            if (0 == os_strncmp((char *)qs_cfg.ssid, (char *)scan_list->ssid, qs_vars.ssid_len))
-            {
-                if (scan_list->rssi > qs_vars.best_rssi)
-                {
-                    // update bssid and channel
-                    qs_vars.best_rssi = scan_list->rssi;
-                    qs_vars.best_channel = scan_list->channel;
-                    os_memcpy(qs_vars.best_bssid, scan_list->bssid, 6);
-                }
-            }
-            scan_list = scan_list->next.stqe_next;
-        }
-    }
-    qs_vars.ch_idx++;
-    if (qs_vars.ch_idx < qs_vars.ch_count)
-    {
-        qs_cfg.channel = qs_vars.ch_list[qs_vars.ch_idx];
-        wifi_station_scan(&qs_cfg, (scan_done_cb_t)fast_scan_check_results);
+        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_31_CHAR);
+        WARN("espwifi_station_set_ssid: truncating ssid to 31 characters");
+        os_strncpy(station_ssid, t_str, 31);
     }
     else
     {
-        if (qs_vars.callback)
-            qs_vars.callback(qs_vars.param);
+        os_strncpy(station_ssid, t_str, t_len);
     }
 }
 
-void Wifi::fast_scan_for_best_ap(char *ssid, char *ch_list, char ch_count, void (*callback)(void *), void *param)
+char *espwifi_station_get_ssid(void)
 {
-    // init results
-    qs_vars.best_rssi = -128;
-    qs_vars.best_channel = 0;
-    os_memset(qs_vars.best_bssid, 0, 6);
+    return station_ssid;
+}
 
-    // init algo vars
-    qs_vars.ssid_len = os_strlen(ssid);
-    qs_vars.ch_list = ch_list;
-    qs_vars.ch_count = ch_count;
-    qs_vars.callback = callback;
-    qs_vars.param = param;
-
-    qs_cfg.ssid = (uint8 *)ssid;
-    qs_cfg.show_hidden = 0;
-    qs_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-    qs_cfg.scan_time.active.min = 0;
-    qs_cfg.scan_time.active.max = 30;
-
-    qs_vars.ch_idx = 0;
-    if (qs_vars.ch_idx < qs_vars.ch_count)
+void espwifi_station_set_pwd(char *t_str, int t_len)
+{
+    ALL("espwifi_station_set_pwd");
+    os_memset(station_pwd, 0, 64);
+    if (t_len > 63)
     {
-        qs_cfg.channel = qs_vars.ch_list[qs_vars.ch_idx];
-        wifi_station_scan(&qs_cfg, (scan_done_cb_t)fast_scan_check_results);
+        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
+        WARN("espwifi_station_set_pwd: truncating pwd to 63 characters");
+        os_strncpy(station_pwd, t_str, 63);
     }
     else
     {
-        if (qs_vars.callback)
-            qs_vars.callback(qs_vars.param);
+        os_strncpy(station_pwd, t_str, t_len);
     }
 }
 
-struct fast_scan *Wifi::get_fast_scan_results(void)
+void espwifi_ap_set_pwd(char *t_str, int t_len)
 {
-    return &qs_vars;
+    ALL("espwifi_ap_set_pwd");
+    os_memset(ap_config.password, 0, 64);
+    if (t_len > 63)
+    {
+        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
+        WARN("espwifi_ap_set_pwd: truncating pwd to 63 characters");
+        os_strncpy((char *)ap_config.password, t_str, 63);
+    }
+    else
+    {
+        os_strncpy((char *)ap_config.password, t_str, t_len);
+    }
+    // in case wifi is already in STATIONAP_MODE update config
+    if (wifi_get_opmode() != STATION_MODE)
+    {
+        espwifi_work_as_ap();
+    }
 }
 
-int Wifi::get_op_mode(void)
+void espwifi_ap_set_ch(int ch)
 {
-    return wifi_get_opmode();
-}
-
-void Wifi::get_ip_address(struct ip_info *t_ip)
-{
+    ALL("espwifi_ap_set_ch");
+    if ((ch < 1) || (ch > 11))
+    {
+        esp_diag.error(WIFI_AP_SET_CH_OOR, ch);
+        ERROR("espwifi_ap_set_ch: %d is OOR, AP channel set to 1");
+        ap_config.channel = 1;
+    }
+    else
+    {
+        ap_config.channel = ch;
+    }
+    // in case wifi is already in STATIONAP_MODE update config
     if (wifi_get_opmode() == STATIONAP_MODE)
     {
-        wifi_get_ip_info(0x01, t_ip);
+        espwifi_work_as_ap();
+    }
+}
+
+#define WIFI_CFG_FILENAME ((char *)f_str("wifi.cfg"))
+
+static int wifi_cfg_restore(void)
+{
+    ALL("espwifi_wifi_cfg_restore");
+    if (!Espfile::exists(WIFI_CFG_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(WIFI_CFG_FILENAME);
+    if (cfgfile.getErr() != JSON_noerr)
+    {
+        esp_diag.error(WIFI_CFG_RESTORE_ERROR);
+        ERROR("wifi_cfg_restore error");
+        return CFG_error;
+    }
+    espmem.stack_mon();
+    os_memset(station_ssid, 0, 32);
+    cfgfile.getStr(f_str("station_ssid"), station_ssid, 32);
+    if (cfgfile.getErr() == JSON_notFound)
+    {
+        esp_diag.info(WIFI_CFG_RESTORE_NO_SSID_FOUND);
+        INFO("espwifi_wifi_cfg_restore no SSID found");
+        cfgfile.clearErr();
+    }
+    os_memset(station_pwd, 0, 64);
+    cfgfile.getStr(f_str("station_pwd"), station_pwd, 64);
+    if (cfgfile.getErr() == JSON_notFound)
+    {
+        esp_diag.info(WIFI_CFG_RESTORE_NO_PWD_FOUND);
+        INFO("espwifi_wifi_cfg_restore no PWD found");
+        cfgfile.clearErr();
+    }
+    int channel = cfgfile.getInt(f_str("ap_channel"));
+    if (cfgfile.getErr() == JSON_notFound)
+    {
+        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, 1);
+        INFO("espwifi_wifi_cfg_restore AP channel: %d", 1);
+    }
+    if (cfgfile.getErr() == JSON_noerr)
+    {
+        if ((channel < 1) || (channel > 11))
+        {
+            esp_diag.error(WIFI_CFG_RESTORE_AP_CH_OOR, channel);
+            ERROR("espwifi_wifi_cfg_restore AP channel out of range (%)", channel);
+            channel = 1;
+        }
+        ap_config.channel = channel;
+        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, channel);
+        INFO("espwifi_wifi_cfg_restore AP channel: %d", channel);
+    }
+    char ap_password[64];
+    os_memset(ap_password, 0, 64);
+    cfgfile.getStr(f_str("ap_pwd"), ap_password, 64);
+    if (cfgfile.getErr() == JSON_notFound)
+    {
+        esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
+        INFO("espwifi_wifi_cfg_restore AP default password");
+    }
+    if (cfgfile.getErr() == JSON_noerr)
+    {
+        os_memset((char *)ap_config.password, 0, 64);
+        os_strncpy((char *)ap_config.password, ap_password, 63);
+        if (0 == os_strcmp((char *)ap_config.password, f_str("espbot123456")))
+        {
+            esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
+            INFO("espwifi_wifi_cfg_restore AP default password");
+        }
+        else
+        {
+            esp_diag.info(WIFI_CFG_RESTORE_AP_CUSTOM_PWD);
+            INFO("espwifi_wifi_cfg_restore AP custom password: %s", ap_password);
+        }
+    }
+    return CFG_ok;
+}
+
+static int wifi_cfg_uptodate(void)
+{
+    ALL("espwifi_wifi_cfg_uptodate");
+    if (!Espfile::exists(WIFI_CFG_FILENAME))
+    {
+        return CFG_notUpdated;
+    }
+    Cfgfile cfgfile(WIFI_CFG_FILENAME);
+    espmem.stack_mon();
+    char st_ssid[32];
+    cfgfile.getStr(f_str("station_ssid"), st_ssid, 32);
+    char st_pwd[64];
+    cfgfile.getStr(f_str("station_pwd"), st_pwd, 64);
+    char ap_pwd[64];
+    cfgfile.getStr(f_str("ap_pwd"), ap_pwd, 64);
+    int ap_channel = cfgfile.getInt(f_str("ap_channel"));
+    if (cfgfile.getErr() != JSON_noerr)
+    {
+        esp_diag.error(WIFI_CFG_UPTODATE_ERROR);
+        ERROR("wifi_cfg_uptodate error");
+        return CFG_error;
+    }
+    if (os_strcmp(station_ssid, st_ssid) ||
+        os_strcmp(station_pwd, st_pwd) ||
+        os_strcmp((const char *)ap_config.password, ap_pwd) ||
+        (ap_channel != ap_config.channel))
+    {
+        return CFG_notUpdated;
+    }
+    return CFG_ok;
+}
+
+int espwifi_cfg_save(void)
+{
+    ALL("espwifi_cfg_save");
+    if (wifi_cfg_uptodate() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(WIFI_CFG_FILENAME);
+    espmem.stack_mon();
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+
+    char str[158];
+    espwifi_cfg_json_stringify(str, 158);
+    int res = cfgfile.n_append(str, os_strlen(str));
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    return CFG_ok;
+}
+
+char *espwifi_cfg_json_stringify(char *dest = NULL, int len = 0)
+{
+    // {"station_ssid":"","station_pwd":"","ap_channel":,"ap_pwd":""}
+    int msg_len = 62 + 32 + 64 + 2 + 64 + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
+            ERROR("espwifi_cfg_json_stringify heap exhausted");
+            return NULL;
+        }
     }
     else
     {
-        wifi_get_ip_info(0x00, t_ip);
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
     }
+    fs_sprintf(msg,
+               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\",\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
+               station_ssid,
+               station_pwd,
+               ap_config.channel,
+               (char *)ap_config.password);
+    return msg;
+}
+
+char *espwifi_status_json_stringify(char *dest = NULL, int len = 0)
+{
+    // {"station_ssid":"","station_pwd":"","ap_channel":,"ap_pwd":""}
+    int msg_len = 62 + 32 + 64 + 2 + 64 + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
+            ERROR("espwifi_cfg_json_stringify heap exhausted");
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    fs_sprintf(msg,
+               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\",\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
+               station_ssid,
+               station_pwd,
+               ap_config.channel,
+               (char *)ap_config.password);
+    return msg;
 }
