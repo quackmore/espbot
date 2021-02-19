@@ -48,7 +48,7 @@ static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_GET_API_INFO_HEAP_EXHAUSTED, str_len);
+        dia_error_evnt(APP_GET_API_INFO_HEAP_EXHAUSTED, str_len);
         ERROR("get_api_info heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -94,7 +94,7 @@ static void runTest(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(64, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(APP_RUNTEST_HEAP_EXHAUSTED, 36);
+        dia_error_evnt(APP_RUNTEST_HEAP_EXHAUSTED, 36);
         ERROR("runTest heap exhausted %d", 36);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;

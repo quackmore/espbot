@@ -13,6 +13,7 @@ extern "C"
 #include "c_types.h"
 #include "ip_addr.h"
 #include "sntp.h"
+#include "user_interface.h"
 }
 
 #include "espbot.hpp"
@@ -48,7 +49,7 @@ void TimeDate::init(void)
 
     if (restore_cfg())
     {
-        esp_diag.warn(TIMEDATE_INIT_DEFAULT_CFG);
+        dia_warn_evnt(TIMEDATE_INIT_DEFAULT_CFG);
         WARN("TimeDate::init no cfg available");
     }
 }
@@ -62,12 +63,12 @@ void TimeDate::start_sntp(void)
         sntp_setservername(2, (char *)f_str("2.pool.ntp.org"));
         if (sntp_set_timezone(0) == false)
         {
-            esp_diag.error(SNTP_CANNOT_SET_TIMEZONE);
+            dia_error_evnt(SNTP_CANNOT_SET_TIMEZONE);
             ERROR("TimeDate::start_sntp cannot set timezone");
         }
         sntp_init();
         _sntp_running = true;
-        esp_diag.info(SNTP_START);
+        dia_info_evnt(SNTP_START);
         INFO("Sntp started");
     }
 }
@@ -78,7 +79,7 @@ void TimeDate::stop_sntp(void)
     {
         sntp_stop();
         _sntp_running = false;
-        esp_diag.info(SNTP_STOP);
+        dia_info_evnt(SNTP_STOP);
         INFO("Sntp ended");
     }
 }
@@ -132,7 +133,7 @@ void TimeDate::set_time_manually(uint32 t_time)
     time_pair.rtc_time = system_get_rtc_time();
     time_pair.sntp_time = t_time;
     system_rtc_mem_write(RTC_TIMEDATE, &time_pair, (sizeof(struct espbot_time) - 4));
-    esp_diag.info(TIMEDATE_CHANGED, t_time);
+    dia_info_evnt(TIMEDATE_CHANGED, t_time);
     INFO("timedate changed to %d", t_time);
 }
 
@@ -141,7 +142,7 @@ void TimeDate::set_timezone(signed char tz)
     if (tz != _timezone)
     {
         _timezone = tz;
-        esp_diag.info(TIMEZONE_CHANGED, _timezone);
+        dia_info_evnt(TIMEZONE_CHANGED, _timezone);
         INFO("timezone changed to %d", _timezone);
     }
 }
@@ -186,14 +187,14 @@ int TimeDate::restore_cfg(void)
     //    }
     //    if (cfgfile.find_string(f_str("sntp_enabled")))
     //    {
-    //        esp_diag.error(TIMEDATE_RESTORE_CFG_INCOMPLETE);
+    //        dia_error_evnt(TIMEDATE_RESTORE_CFG_INCOMPLETE);
     //        ERROR("TimeDate::restore_cfg incomplete cfg");
     //        return CFG_ERROR;
     //    }
     //    _sntp_enabled = atoi(cfgfile.get_value());
     //    if (cfgfile.find_string(f_str("timezone")))
     //    {
-    //        esp_diag.error(TIMEDATE_RESTORE_CFG_INCOMPLETE);
+    //        dia_error_evnt(TIMEDATE_RESTORE_CFG_INCOMPLETE);
     //        ERROR("TimeDate::restore_cfg incomplete cfg");
     //        return CFG_ERROR;
     //    }
@@ -213,7 +214,7 @@ int TimeDate::saved_cfg_not_updated(void)
     //    }
     //    if (cfgfile.find_string(f_str("sntp_enabled")))
     //    {
-    //        esp_diag.error(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        dia_error_evnt(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //        ERROR("TimeDate::saved_cfg_not_updated incomplete cfg");
     //        return CFG_ERROR;
     //    }
@@ -223,7 +224,7 @@ int TimeDate::saved_cfg_not_updated(void)
     //    }
     //    if (cfgfile.find_string(f_str("timezone")))
     //    {
-    //        esp_diag.error(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        dia_error_evnt(TIMEDATE_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //        ERROR("TimeDate::saved_cfg_not_updated incomplete cfg");
     //        return CFG_ERROR;
     //    }
@@ -242,14 +243,14 @@ int TimeDate::save_cfg(void)
 //        return CFG_OK;
 //    if (!espfs.is_available())
 //    {
-//        esp_diag.error(TIMEDATE_SAVE_CFG_FS_NOT_AVAILABLE);
+//        dia_error_evnt(TIMEDATE_SAVE_CFG_FS_NOT_AVAILABLE);
 //        ERROR("TimeDate::save_cfg FS not available");
 //        return CFG_ERROR;
 //    }
 //    Ffile cfgfile(&espfs, (char *)TIMEDATE_FILENAME);
 //    if (!cfgfile.is_available())
 //    {
-//        esp_diag.error(TIMEDATE_SAVE_CFG_CANNOT_OPEN_FILE);
+//        dia_error_evnt(TIMEDATE_SAVE_CFG_CANNOT_OPEN_FILE);
 //        ERROR("TimeDate::save_cfg cannot open file");
 //        return CFG_ERROR;
 //    }

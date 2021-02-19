@@ -8,6 +8,7 @@
  */
 
 #include "espbot_cfgfile.hpp"
+#include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 
@@ -22,7 +23,7 @@ static char *get_file_content(Cfgfile *ptr, char *&str, char *filename)
   }
   else
   {
-    esp_diag.error(CFGFILE_HEAP_EXHAUSTED, len);
+    dia_error_evnt(CFGFILE_HEAP_EXHAUSTED, len);
     ERROR("Cfgfile heap exhasted [%d]", len);
     tmp_ptr = (char *) f_str("");
   }

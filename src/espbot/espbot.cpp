@@ -32,6 +32,7 @@ extern "C"
 #include "espbot_spiffs.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
+#include "espbot_wifi.hpp"
 #include "spiffs_esp8266.hpp"
 
 typedef enum
@@ -161,7 +162,7 @@ void Espbot::set_name(char *t_name)
     os_memset(_name, 0, 32);
     if (os_strlen(t_name) > 31)
     {
-        esp_diag.warn(ESPOT_SET_NAME_TRUNCATED);
+        dia_warn_evnt(ESPOT_SET_NAME_TRUNCATED);
         WARN("Espbot::set_name truncating name to 32 characters");
     }
     os_strncpy(_name, t_name, 31);
@@ -183,10 +184,10 @@ void espbot_init(void)
     esp_time.init_essential(); // cause diagnostic will use timestamp
     // print_greetings();
     esp_gpio.init();           // cause it's used by diagnostic
-    esp_diag.init_essential(); // FS not available yet
+    dia_init_essential(); // FS not available yet
 
     esp_spiffs_mount();
-    esp_diag.init_custom(); // FS is available now
+    dia_init_custom(); // FS is available now
     esp_time.init();        // FS is available now
     espbot.init();
     esp_mDns.init();
@@ -197,7 +198,7 @@ void espbot_init(void)
     cron_init();
     app_init_before_wifi();
 
-    Wifi::init();
+    espwifi_init();
 }
 
 int Espbot::restore_cfg(void)
@@ -210,7 +211,7 @@ int Espbot::restore_cfg(void)
     {
         if (cfgfile.find_string(f_str("espbot_name")))
         {
-            esp_diag.error(ESPBOT_RESTORE_CFG_INCOMPLETE);
+            dia_error_evnt(ESPBOT_RESTORE_CFG_INCOMPLETE);
             ERROR("Espbot::restore_cfg incomplete cfg");
             return CFG_ERROR;
         }
@@ -233,7 +234,7 @@ int Espbot::saved_cfg_not_updated(void)
     {
         if (cfgfile.find_string(f_str("espbot_name")))
         {
-            esp_diag.error(ESPBOT_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+            dia_error_evnt(ESPBOT_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
             ERROR("Espbot::saved_cfg_not_updated incomplete cfg");
             return CFG_ERROR;
         }
@@ -270,21 +271,21 @@ int Espbot::save_cfg(void)
     //         }
     //         else
     //         {
-    //             esp_diag.error(ESPBOT_SAVE_CFG_HEAP_EXHAUSTED, 64);
+    //             dia_error_evnt(ESPBOT_SAVE_CFG_HEAP_EXHAUSTED, 64);
     //             ERROR("Espbot::save_cfg heap exhausted %d", 64);
     //             return CFG_ERROR;
     //         }
     //     }
     //     else
     //     {
-    //         esp_diag.error(ESPBOT_SAVE_CFG_CANNOT_OPEN_FILE);
+    //         dia_error_evnt(ESPBOT_SAVE_CFG_CANNOT_OPEN_FILE);
     //         ERROR("Espbot::save_cfg cannot open file");
     //         return CFG_ERROR;
     //     }
     // }
     // else
     // {
-    //     esp_diag.error(ESPBOT_SAVE_CFG_FS_NOT_AVAILABLE);
+    //     dia_error_evnt(ESPBOT_SAVE_CFG_FS_NOT_AVAILABLE);
     //     ERROR("Espbot::save_cfg FS not available");
     //     return CFG_ERROR;
     // }
@@ -319,7 +320,7 @@ void Espbot::reset(int t_reset)
         break;
     case 1:
         // stop services over wifi
-        stop_cron();
+        cron_stop();
         espwebsvr.stop();
         esp_mDns.stop();
         esp_time.stop_sntp();
@@ -350,7 +351,7 @@ void Espbot::init(void)
     fs_sprintf(_name, "ESPBOT-%d", system_get_chip_id());
     if (restore_cfg())
     {
-        esp_diag.warn(ESPBOT_INIT_DEFAULT_CFG);
+        dia_warn_evnt(ESPBOT_INIT_DEFAULT_CFG);
         WARN("Espbot::init no cfg available, espbot name set to %s", get_name());
     }
     os_timer_disarm(&graceful_rst_timer);

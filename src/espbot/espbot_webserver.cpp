@@ -59,7 +59,7 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
     }
     if (parsed_req.url == NULL)
     {
-        esp_diag.debug(WEB_SERVER_EMPTY_URL);
+        dia_debug_evnt(WEB_SERVER_EMPTY_URL);
         DEBUG("webserver_recv empty url");
         return;
     }
@@ -124,7 +124,7 @@ void Websvr::start(uint32 port)
 
         // now the server is up
         _status = up;
-        esp_diag.info(WEB_SERVER_START);
+        dia_info_evnt(WEB_SERVER_START);
         INFO("webserver started");
     }
 }
@@ -139,7 +139,7 @@ void Websvr::stop()
 
         http_queues_clear();
 
-        esp_diag.info(WEB_SERVER_STOP);
+        dia_info_evnt(WEB_SERVER_STOP);
         INFO("webserver stopped");
     }
 }

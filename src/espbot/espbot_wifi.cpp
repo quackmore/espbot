@@ -39,56 +39,13 @@ static bool stamode_connected;
 static int ap_count;
 static char *ap_list;
 
-void espwifi_init()
-{
-    // default AP config
-    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32);    // uint8 ssid[32];
-    os_memset((char *)ap_config.password, 0, 64);                 //
-    os_strcpy((char *)ap_config.password, f_str("espbot123456")); // uint8 password[64];
-    ap_config.ssid_len = os_strlen(espbot.get_name());            // uint8 ssid_len;
-    ap_config.channel = 1;                                        // uint8 channel;
-    ap_config.authmode = AUTH_WPA2_PSK;                           // uint8 authmode;
-    ap_config.ssid_hidden = 0;                                    // uint8 ssid_hidden;
-    ap_config.max_connection = 4;                                 // uint8 max_connection;
-    ap_config.beacon_interval = 100;                              // uint16 beacon_interval;
-
-    // default STATION config
-    wifi_station_set_reconnect_policy(false);
-    if (wifi_station_get_auto_connect() != 0)
-        wifi_station_set_auto_connect(0);
-    os_timer_disarm(&wait_before_reconnect);
-    os_timer_setfn(&wait_before_reconnect, (os_timer_func_t *)&espwifi_connect_to_ap, NULL);
-    if (wifi_get_phy_mode() != PHY_MODE_11N)
-        wifi_set_phy_mode(PHY_MODE_11N);
-    wifi_set_event_handler_cb((wifi_event_handler_cb_t)wifi_event_handler);
-    os_memset(station_ssid, 0, 32);
-    os_memset(station_pwd, 0, 64);
-    stamode_connected = false;
-    stamode_connecting = 0; // never connected
-
-    ap_count = 0;
-    ap_list = NULL;
-
-    // overwrite AP and STATION config from file, if any...
-    wifi_cfg_restore();
-
-    // start as SOFTAP and try to switch to STATION
-    // this will ensure that softap and station configurations are set by espbot
-    // otherwise default configurations by NON OS SDK are used
-    espwifi_work_as_ap(); // make effective the restored configration
-    // signal that SOFTAPMODE is ready
-    system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
-    if (os_strlen(station_ssid) > 0)
-        espwifi_connect_to_ap();
-}
-
 void wifi_event_handler(System_Event_t *evt)
 {
     static ip_addr old_ip = {0};
     switch (evt->event)
     {
     case EVENT_STAMODE_CONNECTED:
-        esp_diag.info(WIFI_CONNECTED);
+        dia_info_evnt(WIFI_CONNECTED);
         INFO("connected to %s ch %d",
              evt->event_info.connected.ssid,
              evt->event_info.connected.channel);
@@ -100,7 +57,7 @@ void wifi_event_handler(System_Event_t *evt)
             // so only if it was connected or never connected to an AP
             if (evt->event_info.disconnected.reason == REASON_ASSOC_LEAVE)
             {
-                esp_diag.info(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
+                dia_info_evnt(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
                 INFO("disconnected from %s rsn %d",
                      evt->event_info.disconnected.ssid,
                      evt->event_info.disconnected.reason);
@@ -108,7 +65,7 @@ void wifi_event_handler(System_Event_t *evt)
             }
             else
             {
-                esp_diag.error(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
+                dia_error_evnt(WIFI_DISCONNECTED, evt->event_info.disconnected.reason);
                 ERROR("disconnected from %s rsn %d",
                       evt->event_info.disconnected.ssid,
                       evt->event_info.disconnected.reason);
@@ -126,13 +83,13 @@ void wifi_event_handler(System_Event_t *evt)
         os_timer_arm(&wait_before_reconnect, WIFI_WAIT_BEFORE_RECONNECT, 0);
         break;
     case EVENT_STAMODE_AUTHMODE_CHANGE:
-        esp_diag.info(WIFI_AUTHMODE_CHANGE, evt->event_info.auth_change.new_mode);
+        dia_info_evnt(WIFI_AUTHMODE_CHANGE, evt->event_info.auth_change.new_mode);
         INFO("wifi auth %d -> %d",
              evt->event_info.auth_change.old_mode,
              evt->event_info.auth_change.new_mode);
         break;
     case EVENT_STAMODE_DHCP_TIMEOUT:
-        esp_diag.warn(WIFI_DHCP_TIMEOUT);
+        dia_warn_evnt(WIFI_DHCP_TIMEOUT);
         WARN("dhcp timeout");
         // DEBUG("ESPBOT WIFI [STATION]: dhcp timeout, ip:" IPSTR ",mask:" IPSTR ",gw:" IPSTR,
         //       IP2STR(&evt->event_info.got_ip.ip),
@@ -156,7 +113,7 @@ void wifi_event_handler(System_Event_t *evt)
             stamode_connecting = 1; // was connected at least one time
 
             os_memcpy(&old_ip, &evt->event_info.got_ip.ip, sizeof(struct ip_addr));
-            esp_diag.info(WIFI_GOT_IP);
+            dia_info_evnt(WIFI_GOT_IP);
             INFO("got IP " IPSTR " " IPSTR " " IPSTR,
                  IP2STR(&evt->event_info.got_ip.ip),
                  IP2STR(&evt->event_info.got_ip.mask),
@@ -172,7 +129,7 @@ void wifi_event_handler(System_Event_t *evt)
         }
         break;
     case EVENT_SOFTAPMODE_STACONNECTED:
-        esp_diag.info(WIFI_STA_CONNECTED);
+        dia_info_evnt(WIFI_STA_CONNECTED);
         INFO(MACSTR " connected (AID %d)",
              MAC2STR(evt->event_info.sta_connected.mac),
              evt->event_info.sta_connected.aid);
@@ -180,7 +137,7 @@ void wifi_event_handler(System_Event_t *evt)
         // a station connected to ESP8266
         break;
     case EVENT_SOFTAPMODE_STADISCONNECTED:
-        esp_diag.info(WIFI_STA_DISCONNECTED);
+        dia_info_evnt(WIFI_STA_DISCONNECTED);
         INFO(MACSTR " disconnected (AID %d)",
              MAC2STR(evt->event_info.sta_disconnected.mac),
              evt->event_info.sta_disconnected.aid);
@@ -191,7 +148,7 @@ void wifi_event_handler(System_Event_t *evt)
         // TRACE("AP probed");
         break;
     case EVENT_OPMODE_CHANGED:
-        esp_diag.info(WIFI_OPMODE_CHANGED, wifi_get_opmode());
+        dia_info_evnt(WIFI_OPMODE_CHANGED, wifi_get_opmode());
         switch (wifi_get_opmode())
         {
         case STATION_MODE:
@@ -244,7 +201,7 @@ void espwifi_work_as_ap(void)
     wifi_set_opmode_current(STATIONAP_MODE);
     if (!wifi_softap_set_config_current(&ap_config))
     {
-        esp_diag.error(WIFI_SETAP_ERROR);
+        dia_error_evnt(WIFI_SETAP_ERROR);
         ERROR("espwifi_work_as_ap failed to set AP cfg");
     }
 
@@ -295,7 +252,7 @@ void espwifi_connect_to_ap(void)
 
     if (os_strlen(station_ssid) == 0)
     {
-        esp_diag.error(WIFI_CONNECT_NO_SSID_AVAILABLE);
+        dia_error_evnt(WIFI_CONNECT_NO_SSID_AVAILABLE);
         ERROR("espwifi_connect_to_ap no ssid available");
         return;
     }
@@ -368,13 +325,13 @@ static void fill_in_ap_list(void *arg, STATUS status)
         }
         else
         {
-            esp_diag.error(WIFI_AP_LIST_HEAP_EXHAUSTED, 33 * ap_count);
+            dia_error_evnt(WIFI_AP_LIST_HEAP_EXHAUSTED, 33 * ap_count);
             ERROR("espwifi_fill_in_ap_list heap exhausted %d", 33 * ap_count);
         }
     }
     else
     {
-        esp_diag.error(WIFI_AP_LIST_CANNOT_COMPLETE_SCAN);
+        dia_error_evnt(WIFI_AP_LIST_CANNOT_COMPLETE_SCAN);
         ERROR("espwifi_fill_in_ap_list cannot complete ap scan");
     }
     if (scan_completed_cb)
@@ -419,7 +376,7 @@ void espwifi_station_set_ssid(char *t_str, int t_len)
     os_memset(station_ssid, 0, 32);
     if (t_len > 31)
     {
-        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_31_CHAR);
+        dia_warn_evnt(WIFI_TRUNCATING_STRING_TO_31_CHAR);
         WARN("espwifi_station_set_ssid: truncating ssid to 31 characters");
         os_strncpy(station_ssid, t_str, 31);
     }
@@ -440,7 +397,7 @@ void espwifi_station_set_pwd(char *t_str, int t_len)
     os_memset(station_pwd, 0, 64);
     if (t_len > 63)
     {
-        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
+        dia_warn_evnt(WIFI_TRUNCATING_STRING_TO_63_CHAR);
         WARN("espwifi_station_set_pwd: truncating pwd to 63 characters");
         os_strncpy(station_pwd, t_str, 63);
     }
@@ -456,7 +413,7 @@ void espwifi_ap_set_pwd(char *t_str, int t_len)
     os_memset(ap_config.password, 0, 64);
     if (t_len > 63)
     {
-        esp_diag.warn(WIFI_TRUNCATING_STRING_TO_63_CHAR);
+        dia_warn_evnt(WIFI_TRUNCATING_STRING_TO_63_CHAR);
         WARN("espwifi_ap_set_pwd: truncating pwd to 63 characters");
         os_strncpy((char *)ap_config.password, t_str, 63);
     }
@@ -476,7 +433,7 @@ void espwifi_ap_set_ch(int ch)
     ALL("espwifi_ap_set_ch");
     if ((ch < 1) || (ch > 11))
     {
-        esp_diag.error(WIFI_AP_SET_CH_OOR, ch);
+        dia_error_evnt(WIFI_AP_SET_CH_OOR, ch);
         ERROR("espwifi_ap_set_ch: %d is OOR, AP channel set to 1");
         ap_config.channel = 1;
     }
@@ -501,7 +458,7 @@ static int wifi_cfg_restore(void)
     Cfgfile cfgfile(WIFI_CFG_FILENAME);
     if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(WIFI_CFG_RESTORE_ERROR);
+        dia_error_evnt(WIFI_CFG_RESTORE_ERROR);
         ERROR("wifi_cfg_restore error");
         return CFG_error;
     }
@@ -510,7 +467,7 @@ static int wifi_cfg_restore(void)
     cfgfile.getStr(f_str("station_ssid"), station_ssid, 32);
     if (cfgfile.getErr() == JSON_notFound)
     {
-        esp_diag.info(WIFI_CFG_RESTORE_NO_SSID_FOUND);
+        dia_info_evnt(WIFI_CFG_RESTORE_NO_SSID_FOUND);
         INFO("espwifi_wifi_cfg_restore no SSID found");
         cfgfile.clearErr();
     }
@@ -518,26 +475,26 @@ static int wifi_cfg_restore(void)
     cfgfile.getStr(f_str("station_pwd"), station_pwd, 64);
     if (cfgfile.getErr() == JSON_notFound)
     {
-        esp_diag.info(WIFI_CFG_RESTORE_NO_PWD_FOUND);
+        dia_info_evnt(WIFI_CFG_RESTORE_NO_PWD_FOUND);
         INFO("espwifi_wifi_cfg_restore no PWD found");
         cfgfile.clearErr();
     }
     int channel = cfgfile.getInt(f_str("ap_channel"));
     if (cfgfile.getErr() == JSON_notFound)
     {
-        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, 1);
+        dia_info_evnt(WIFI_CFG_RESTORE_AP_CH, 1);
         INFO("espwifi_wifi_cfg_restore AP channel: %d", 1);
     }
     if (cfgfile.getErr() == JSON_noerr)
     {
         if ((channel < 1) || (channel > 11))
         {
-            esp_diag.error(WIFI_CFG_RESTORE_AP_CH_OOR, channel);
+            dia_error_evnt(WIFI_CFG_RESTORE_AP_CH_OOR, channel);
             ERROR("espwifi_wifi_cfg_restore AP channel out of range (%)", channel);
             channel = 1;
         }
         ap_config.channel = channel;
-        esp_diag.info(WIFI_CFG_RESTORE_AP_CH, channel);
+        dia_info_evnt(WIFI_CFG_RESTORE_AP_CH, channel);
         INFO("espwifi_wifi_cfg_restore AP channel: %d", channel);
     }
     char ap_password[64];
@@ -545,7 +502,7 @@ static int wifi_cfg_restore(void)
     cfgfile.getStr(f_str("ap_pwd"), ap_password, 64);
     if (cfgfile.getErr() == JSON_notFound)
     {
-        esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
+        dia_info_evnt(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
         INFO("espwifi_wifi_cfg_restore AP default password");
     }
     if (cfgfile.getErr() == JSON_noerr)
@@ -554,12 +511,12 @@ static int wifi_cfg_restore(void)
         os_strncpy((char *)ap_config.password, ap_password, 63);
         if (0 == os_strcmp((char *)ap_config.password, f_str("espbot123456")))
         {
-            esp_diag.info(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
+            dia_info_evnt(WIFI_CFG_RESTORE_AP_DEFAULT_PWD);
             INFO("espwifi_wifi_cfg_restore AP default password");
         }
         else
         {
-            esp_diag.info(WIFI_CFG_RESTORE_AP_CUSTOM_PWD);
+            dia_info_evnt(WIFI_CFG_RESTORE_AP_CUSTOM_PWD);
             INFO("espwifi_wifi_cfg_restore AP custom password: %s", ap_password);
         }
     }
@@ -584,7 +541,7 @@ static int wifi_cfg_uptodate(void)
     int ap_channel = cfgfile.getInt(f_str("ap_channel"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(WIFI_CFG_UPTODATE_ERROR);
+        dia_error_evnt(WIFI_CFG_UPTODATE_ERROR);
         ERROR("wifi_cfg_uptodate error");
         return CFG_error;
     }
@@ -608,15 +565,15 @@ int espwifi_cfg_save(void)
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
 
-    char str[158];
-    espwifi_cfg_json_stringify(str, 158);
+    char str[225];
+    espwifi_cfg_json_stringify(str, 225);
     int res = cfgfile.n_append(str, os_strlen(str));
     if (res < SPIFFS_OK)
         return CFG_error;
     return CFG_ok;
 }
 
-char *espwifi_cfg_json_stringify(char *dest = NULL, int len = 0)
+char *espwifi_cfg_json_stringify(char *dest, int len)
 {
     // {"station_ssid":"","station_pwd":"","ap_channel":,"ap_pwd":""}
     int msg_len = 62 + 32 + 64 + 2 + 64 + 1;
@@ -626,7 +583,7 @@ char *espwifi_cfg_json_stringify(char *dest = NULL, int len = 0)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
+            dia_error_evnt(WIFI_CFG_STRINGIFY_HEAP_EXHAUSTED);
             ERROR("espwifi_cfg_json_stringify heap exhausted");
             return NULL;
         }
@@ -649,18 +606,18 @@ char *espwifi_cfg_json_stringify(char *dest = NULL, int len = 0)
     return msg;
 }
 
-char *espwifi_status_json_stringify(char *dest = NULL, int len = 0)
+char *espwifi_status_json_stringify(char *dest, int len)
 {
-    // {"station_ssid":"","station_pwd":"","ap_channel":,"ap_pwd":""}
-    int msg_len = 62 + 32 + 64 + 2 + 64 + 1;
+    // {"op_mode":"STATION","SSID":"","ip_address":"123.123.123.123"}
+    int msg_len = 62 + 32 + 1;
     char *msg;
     if (dest == NULL)
     {
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
-            ERROR("espwifi_cfg_json_stringify heap exhausted");
+            dia_error_evnt(WIFI_STATUS_STRINGIFY_HEAP_EXHAUSTED);
+            ERROR("espwifi_status_json_stringify heap exhausted");
             return NULL;
         }
     }
@@ -673,11 +630,107 @@ char *espwifi_status_json_stringify(char *dest = NULL, int len = 0)
             return msg;
         }
     }
-    fs_sprintf(msg,
-               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\",\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
-               station_ssid,
-               station_pwd,
-               ap_config.channel,
-               (char *)ap_config.password);
+    switch (wifi_get_opmode())
+    {
+    case STATION_MODE:
+        fs_sprintf(msg, "{\"op_mode\":\"STATION\",\"SSID\":\"%s\",", espwifi_station_get_ssid());
+        break;
+    case SOFTAP_MODE:
+        fs_sprintf(msg, "{\"op_mode\":\"AP\",\"SSID\":\"%s\",", espbot.get_name());
+        break;
+    case STATIONAP_MODE:
+        fs_sprintf(msg, "{\"op_mode\":\"AP\",\"SSID\":\"%s\",", espbot.get_name());
+        break;
+    default:
+        break;
+    }
+    char *ptr = msg + os_strlen(msg);
+    struct ip_info tmp_ip;
+    espwifi_get_ip_address(&tmp_ip);
+    char *ip_ptr = (char *)&tmp_ip.ip.addr;
+    fs_sprintf(ptr, "\"ip_address\":\"%d.%d.%d.%d\"}", ip_ptr[0], ip_ptr[1], ip_ptr[2], ip_ptr[3]);
     return msg;
+}
+
+char *espwifi_scan_results_json_stringify(char *dest, int len)
+{
+    // {"AP_count":,"AP_SSIDs":["",]}
+    int msg_len = 27 + (32 + 3) * espwifi_get_ap_count();
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(WIFI_SCAN_RESULTS_STRINGIFY_HEAP_EXHAUSTED);
+            ERROR("espwifi_scan_results_json_stringify heap exhausted");
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    char *tmp_ptr;
+    fs_sprintf(msg, "{\"AP_count\":%d,\"AP_SSIDs\":[", espwifi_get_ap_count());
+    for (int idx = 0; idx < espwifi_get_ap_count(); idx++)
+    {
+        tmp_ptr = msg + os_strlen(msg);
+        if (idx > 0)
+            *(tmp_ptr++) = ',';
+        os_sprintf(tmp_ptr, "\"%s\"", espwifi_get_ap_name(idx));
+    }
+    tmp_ptr = msg + os_strlen(msg);
+    fs_sprintf(tmp_ptr, "]}");
+    espwifi_free_ap_list();
+    espmem.stack_mon();
+    return msg;
+}
+
+void espwifi_init()
+{
+    // default AP config
+    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32);    // uint8 ssid[32];
+    os_memset((char *)ap_config.password, 0, 64);                 //
+    os_strcpy((char *)ap_config.password, f_str("espbot123456")); // uint8 password[64];
+    ap_config.ssid_len = os_strlen(espbot.get_name());            // uint8 ssid_len;
+    ap_config.channel = 1;                                        // uint8 channel;
+    ap_config.authmode = AUTH_WPA2_PSK;                           // uint8 authmode;
+    ap_config.ssid_hidden = 0;                                    // uint8 ssid_hidden;
+    ap_config.max_connection = 4;                                 // uint8 max_connection;
+    ap_config.beacon_interval = 100;                              // uint16 beacon_interval;
+
+    // default STATION config
+    wifi_station_set_reconnect_policy(false);
+    if (wifi_station_get_auto_connect() != 0)
+        wifi_station_set_auto_connect(0);
+    os_timer_disarm(&wait_before_reconnect);
+    os_timer_setfn(&wait_before_reconnect, (os_timer_func_t *)&espwifi_connect_to_ap, NULL);
+    if (wifi_get_phy_mode() != PHY_MODE_11N)
+        wifi_set_phy_mode(PHY_MODE_11N);
+    wifi_set_event_handler_cb((wifi_event_handler_cb_t)wifi_event_handler);
+    os_memset(station_ssid, 0, 32);
+    os_memset(station_pwd, 0, 64);
+    stamode_connected = false;
+    stamode_connecting = 0; // never connected
+
+    ap_count = 0;
+    ap_list = NULL;
+
+    // overwrite AP and STATION config from file, if any...
+    wifi_cfg_restore();
+
+    // start as SOFTAP and try to switch to STATION
+    // this will ensure that softap and station configurations are set by espbot
+    // otherwise default configurations by NON OS SDK are used
+    espwifi_work_as_ap(); // make effective the restored configration
+    // signal that SOFTAPMODE is ready
+    system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
+    if (os_strlen(station_ssid) > 0)
+        espwifi_connect_to_ap();
 }

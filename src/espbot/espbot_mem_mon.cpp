@@ -89,7 +89,7 @@ void *Esp_mem::espbot_zalloc(size_t size)
     }
     else
     {
-        esp_diag.fatal(MEM_MON_HEAP_EXHAUSTED);
+        dia_fatal_evnt(MEM_MON_HEAP_EXHAUSTED);
         FATAL("Esp_mem::espbot_zalloc heap exhausted");
     }
     espmem.heap_mon();

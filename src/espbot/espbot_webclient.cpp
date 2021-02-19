@@ -61,7 +61,7 @@ static void add_client_espconn_association(Webclnt *client, struct espconn *p_pe
     A_espconn_webclnt *new_association = new A_espconn_webclnt;
     if (new_association == NULL)
     {
-        esp_diag.error(WEB_CLIENT_ADD_CLIENT_ESPCONN_ASSOCIATION_HEAP_EXHAUSTED, sizeof(A_espconn_webclnt));
+        dia_error_evnt(WEB_CLIENT_ADD_CLIENT_ESPCONN_ASSOCIATION_HEAP_EXHAUSTED, sizeof(A_espconn_webclnt));
         ERROR("add_client_espconn_association heap exhausted %d", sizeof(A_espconn_webclnt));
         return;
     }
@@ -70,7 +70,7 @@ static void add_client_espconn_association(Webclnt *client, struct espconn *p_pe
     List_err err = webclnt_espconn->push_back(new_association);
     if (err != list_ok)
     {
-        esp_diag.error(WEB_CLIENT_ADD_CLIENT_ASSOCIATION_REG_ERROR);
+        dia_error_evnt(WEB_CLIENT_ADD_CLIENT_ASSOCIATION_REG_ERROR);
         ERROR("add_client_espconn_association webclient %X and espconn full queue", client);
         delete new_association;
         return;
@@ -128,7 +128,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
     Webclnt *client = get_client(ptr_espconn);
     if (client == NULL)
     {
-        esp_diag.error(WEB_CLIENT_RECV_CANNOT_FIND_ESPCONN, (uint32) ptr_espconn);
+        dia_error_evnt(WEB_CLIENT_RECV_CANNOT_FIND_ESPCONN, (uint32) ptr_espconn);
         ERROR("webclient_recv - cannot get client ref for espconn %X", ptr_espconn);
         return;
     }
@@ -215,7 +215,7 @@ static void webclient_discon(void *arg)
     // espmem.stack_mon();
     // if (client == NULL)
     // {
-    //     esp_diag.error(WEB_CLIENT_DISCON_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
+    //     dia_error_evnt(WEB_CLIENT_DISCON_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
     //     ERROR("webclient_discon cannot get webclient ref for espconn %X", pesp_conn);
     //     return;
     // }
@@ -240,7 +240,7 @@ static void webclient_connected(void *arg)
     espconn_regist_disconcb(pesp_conn, webclient_discon);
     if (client == NULL)
     {
-        esp_diag.error(WEB_CLIENT_CONNECTED_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
+        dia_error_evnt(WEB_CLIENT_CONNECTED_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
         ERROR("webclient_connected cannot get webclient ref for espconn %X", pesp_conn);
         return;
     }
@@ -342,7 +342,7 @@ void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *),
     this->request = new char[msg_len + 1];
     if (this->request == NULL)
     {
-        esp_diag.error(WEB_CLIENT_SEND_REQ_HEAP_EXHAUSTED, (msg_len + 1));
+        dia_error_evnt(WEB_CLIENT_SEND_REQ_HEAP_EXHAUSTED, (msg_len + 1));
         ERROR("Webclnt::send_req heap exhausted %d", (msg_len + 1));
         return;
     }

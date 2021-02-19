@@ -32,6 +32,7 @@ extern "C"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webserver.hpp"
+#include "espbot_wifi.hpp"
 
 static os_timer_t delay_timer;
 
@@ -44,32 +45,12 @@ static void getAPlist(void *param)
 {
     struct espconn *ptr_espconn = (struct espconn *)param;
     ALL("getAPlist");
-    char *scan_list = new char[40 + ((32 + 6) * Wifi::get_ap_count())];
+    char *scan_list = espwifi_scan_results_json_stringify();
     if (scan_list)
-    {
-        char *tmp_ptr;
-        espmem.stack_mon();
-        fs_sprintf(scan_list, "{\"AP_count\": %d,\"AP_SSIDs\":[", Wifi::get_ap_count());
-        for (int idx = 0; idx < Wifi::get_ap_count(); idx++)
-        {
-            tmp_ptr = scan_list + os_strlen(scan_list);
-            if (idx > 0)
-                *(tmp_ptr++) = ',';
-            os_sprintf(tmp_ptr, "\"%s\"", Wifi::get_ap_name(idx));
-        }
-        tmp_ptr = scan_list + os_strlen(scan_list);
-        fs_sprintf(tmp_ptr, "]}");
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, scan_list, true);
-        Wifi::free_ap_list();
-    }
     else
-    {
-        esp_diag.error(ROUTES_GETAPLIST_HEAP_EXHAUSTED, (40 + ((32 + 6) * Wifi::get_ap_count())));
-        ERROR("getAPlist heap exhausted %d", (32 + (40 + ((32 + 6) * Wifi::get_ap_count()))));
-        // may be the list was too big but there is enough heap memory for a response
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        Wifi::free_ap_list();
-    }
+    espwifi_free_ap_list();
 }
 
 static const char *get_file_mime_type(char *filename)
@@ -135,7 +116,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
                 mem_size = buffer_size;
                 delete[] buffer.ref;
             }
-            esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, mem_size);
+            dia_error_evnt(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, mem_size);
             ERROR("send_remaining_file heap exhausted %d", mem_size);
             http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -164,7 +145,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
             delete[] p_sr->content;
             delete[] buffer.ref;
             delete p_pending_response;
-            esp_diag.error(ROUTES_SEND_REMAINING_MSG_PENDING_RES_QUEUE_FULL);
+            dia_error_evnt(ROUTES_SEND_REMAINING_MSG_PENDING_RES_QUEUE_FULL);
             ERROR("send_remaining_file full pending res queue");
             return;
         }
@@ -178,7 +159,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
         Heap_chunk buffer(remaining_size, dont_free);
         if (buffer.ref == NULL)
         {
-            esp_diag.error(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, remaining_size);
+            dia_error_evnt(ROUTES_SEND_REMAINING_MSG_HEAP_EXHAUSTED, remaining_size);
             ERROR("send_remaining_file heap exhausted %d", remaining_size);
             http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             delete[] p_sr->content;
@@ -216,7 +197,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
         header.m_origin = new char[(os_strlen(parsed_req->origin) + 1)];
         if (header.m_origin == NULL)
         {
-            esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            dia_error_evnt(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
             ERROR("return_file heap exhausted %d", (os_strlen(parsed_req->origin) + 1));
             http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -226,7 +207,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
     char *header_str = http_format_header(&header);
     if (header_str == NULL)
     {
-        esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, (os_strlen(header_str)));
+        dia_error_evnt(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, (os_strlen(header_str)));
         ERROR("return_file heap exhausted %d", (os_strlen(header_str)));
         http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -263,7 +244,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
                 delete[] filename_copy.ref;
                 mem_size = sizeof(struct http_split_send);
             }
-            esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, mem_size);
+            dia_error_evnt(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, mem_size);
             ERROR("return_file heap exhausted %d", mem_size);
             http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -292,7 +273,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
             delete[] buffer.ref;
             delete[] filename_copy.ref;
             delete p_pending_response;
-            esp_diag.error(ROUTES_RETURN_FILE_PENDING_RES_QUEUE_FULL);
+            dia_error_evnt(ROUTES_RETURN_FILE_PENDING_RES_QUEUE_FULL);
             ERROR("return_file full pending response queue");
             return;
         }
@@ -307,7 +288,7 @@ void return_file(struct espconn *p_espconn, Http_parsed_req *parsed_req, char *f
         Heap_chunk buffer(file_size, dont_free);
         if (buffer.ref == NULL)
         {
-            esp_diag.error(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, file_size);
+            dia_error_evnt(ROUTES_RETURN_FILE_HEAP_EXHAUSTED, file_size);
             ERROR("return_file heap exhausted %d", file_size);
             http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -335,7 +316,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
         header.m_origin = new char[os_strlen(parsed_req->origin) + 1];
         if (header.m_origin == NULL)
         {
-            esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            dia_error_evnt(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
             http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
         }
@@ -350,7 +331,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
         header.m_acrh = new char[os_strlen(parsed_req->acrh) + 1];
         if (header.m_acrh == NULL)
         {
-            esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->acrh) + 1));
+            dia_error_evnt(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED, (os_strlen(parsed_req->acrh) + 1));
             http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
         }
@@ -367,7 +348,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
     char *header_str = http_format_header(&header);
     if (header_str == NULL)
     {
-        esp_diag.error(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED);
+        dia_error_evnt(ROUTES_PREFLIGHT_RESPONSE_HEAP_EXHAUSTED);
         http_response(p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
     }
@@ -396,9 +377,9 @@ static void setCron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         return;
     }
     if (enabled)
-        enable_cron();
+        cron_enable();
     else
-        disable_cron();
+        cron_disable();
     cron_state_save();
 
     char *msg = cron_state_json_stringify();
@@ -426,7 +407,7 @@ static void getHexMemDump(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETHEXMEMDUMP_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_GETHEXMEMDUMP_HEAP_EXHAUSTED, msg_len);
         ERROR("getHexMemDump heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -476,7 +457,7 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     Heap_chunk msg(str_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETLASTRESET_HEAP_EXHAUSTED, str_len);
+        dia_error_evnt(ROUTES_GETLASTRESET_HEAP_EXHAUSTED, str_len);
         ERROR("getlastreset heap exhausted %d", str_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -532,7 +513,7 @@ static void getMemDump(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     espmem.stack_mon();
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETMEMDUMP_HEAP_EXHAUSTED, 48 + length);
+        dia_error_evnt(ROUTES_GETMEMDUMP_HEAP_EXHAUSTED, 48 + length);
         ERROR("getMemDump heap exhausted %d", 48 + length);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -555,7 +536,7 @@ static void getMemInfo(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(166 + 54, dont_free); // formatting string and values
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETMEMINFO_HEAP_EXHAUSTED, (166 + 54));
+        dia_error_evnt(ROUTES_GETMEMINFO_HEAP_EXHAUSTED, (166 + 54));
         ERROR("getMemInfo heap exhausted %d", (166 + 54));
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -583,34 +564,18 @@ static void getMemInfo(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 static void ackDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("ackDiagnosticEvents");
-    esp_diag.ack_events();
+    dia_ack_events();
     http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Events acknoledged\"}"), false);
 }
 
 static void getDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getDiagnosticCfg");
-    // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
-    int msg_len = 91;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"diag_led_mask\":%d,\"serial_log_mask\":%d,",
-                   esp_diag.get_led_mask(),
-                   esp_diag.get_serial_log_mask());
-        fs_sprintf(msg.ref + os_strlen(msg.ref),
-                   "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
-                   esp_diag.get_uart_0_bitrate(),
-                   esp_diag.get_sdk_print_enabled());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = dia_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        esp_diag.error(ROUTES_GETDIAGNOSTICCFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("getDiagnosticCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -626,31 +591,17 @@ static void setDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parse
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    esp_diag.set_led_mask(diag_led_mask);
-    esp_diag.set_serial_log_mask(serial_log_mask);
-    esp_diag.set_sdk_print_enabled(sdk_print_enabled);
-    esp_diag.set_uart_0_bitrate((uint32)uart_0_bitrate);
-    esp_diag.save_cfg();
+    dia_set_led_mask((char)diag_led_mask);
+    dia_set_serial_log_mask((char)serial_log_mask);
+    dia_set_sdk_print_enabled((bool)sdk_print_enabled);
+    dia_set_uart_0_bitrate((uint32)uart_0_bitrate);
+    dia_cfg_save();
 
-    // "{"diag_led_mask":256,"serial_log_mask":256,"uart_0_bitrate":3686400,"sdk_print_enabled":1}"
-    int msg_len = 91;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        esp_diag.error(ROUTES_SETDIAGNOSTICCFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("setDiagnosticCfg heap exhausted %d", msg_len);
+    char *msg = dia_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref,
-               "{\"diag_led_mask\":%d,\"serial_log_mask\":%d,",
-               esp_diag.get_led_mask(),
-               esp_diag.get_serial_log_mask());
-    fs_sprintf(msg.ref + os_strlen(msg.ref),
-               "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
-               esp_diag.get_uart_0_bitrate(),
-               esp_diag.get_sdk_print_enabled());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     espmem.stack_mon();
 }
 
@@ -673,7 +624,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
         Heap_chunk buffer(buffer_size, dont_free);
         if (buffer.ref == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, buffer_size);
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, buffer_size);
             ERROR("getdiagnosticevents_next heap exhausted %d", buffer_size);
             http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -681,7 +632,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
         struct http_split_send *p_pending_response = new struct http_split_send;
         if (p_pending_response == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, sizeof(struct http_split_send));
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, sizeof(struct http_split_send));
             ERROR("getdiagnosticevents_next not heap exhausted %dn", sizeof(struct http_split_send));
             http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             delete[] buffer.ref;
@@ -693,7 +644,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
         for (idx = p_sr->content_transferred; idx < ev_count; idx++)
         {
             fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
-            event_ptr = esp_diag.get_event(idx);
+            event_ptr = dia_get_event(idx);
             if (event_ptr)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
                            event_ptr->timestamp,
@@ -714,7 +665,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
         {
             delete[] buffer.ref;
             delete p_pending_response;
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_PENDING_RES_QUEUE_FULL);
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_NEXT_PENDING_RES_QUEUE_FULL);
             ERROR("getdiagnosticevents_next full pending res queue");
             return;
         }
@@ -728,7 +679,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
         Heap_chunk buffer(remaining_size, dont_free);
         if (buffer.ref == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, remaining_size);
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_NEXT_HEAP_EXHAUSTED, remaining_size);
             ERROR("getdiagnosticevents_next heap exhausted %d", remaining_size);
             http_response(p_sr->p_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -738,7 +689,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
         for (idx = p_sr->content_transferred; idx < p_sr->content_size; idx++)
         {
             fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
-            event_ptr = esp_diag.get_event(idx);
+            event_ptr = dia_get_event(idx);
             if (event_ptr)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
                            event_ptr->timestamp,
@@ -765,7 +716,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
     int content_len = 16 + 2 - 1;
     {
         char tmp_msg[42 + 12 + 1 + 2 + 4 + 12 + 1];
-        struct dia_event *event_ptr = esp_diag.get_event(evnt_count);
+        struct dia_event *event_ptr = dia_get_event(evnt_count);
         while (event_ptr)
         {
             evnt_count++;
@@ -776,9 +727,9 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
                        event_ptr->code,
                        event_ptr->value);
             content_len += os_strlen(tmp_msg);
-            if (evnt_count >= esp_diag.get_max_events_count())
+            if (evnt_count >= dia_get_max_events_count())
                 break;
-            event_ptr = esp_diag.get_event(evnt_count);
+            event_ptr = dia_get_event(evnt_count);
         }
     }
     // let's start with the header
@@ -795,7 +746,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
         header.m_origin = new char[(os_strlen(parsed_req->origin) + 1)];
         if (header.m_origin == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, (os_strlen(parsed_req->origin) + 1));
             ERROR("getDiagnosticEvents heap exhausted %d", (os_strlen(parsed_req->origin) + 1));
             heap_exhausted = true;
         }
@@ -805,7 +756,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
     char *header_str = http_format_header(&header);
     if (header_str == NULL)
     {
-        esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, (os_strlen(header_str)));
+        dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, (os_strlen(header_str)));
         ERROR("getDiagnosticEvents heap exhausted %d", (os_strlen(header_str)));
         heap_exhausted = true;
     }
@@ -824,14 +775,14 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
         Heap_chunk buffer(buffer_size, dont_free);
         if (buffer.ref == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, buffer_size);
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, buffer_size);
             ERROR("getDiagnosticEvents heap exhausted %d", buffer_size);
             return;
         }
         struct http_split_send *p_pending_response = new struct http_split_send;
         if (p_pending_response == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, sizeof(struct http_split_send));
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, sizeof(struct http_split_send));
             ERROR("getDiagnosticEvents heap exhausted %d", sizeof(struct http_split_send));
             delete[] buffer.ref;
             return;
@@ -847,7 +798,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
                 first_time = false;
             else
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
-            event_ptr = esp_diag.get_event(idx);
+            event_ptr = dia_get_event(idx);
             if (event_ptr)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
                            event_ptr->timestamp,
@@ -868,7 +819,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
         {
             delete[] buffer.ref;
             delete p_pending_response;
-            esp_diag.error(ROUTES_GETDIAGEVENTS_PENDING_RES_QUEUE_FULL);
+            dia_error_evnt(ROUTES_GETDIAGEVENTS_PENDING_RES_QUEUE_FULL);
             ERROR("getDiagnosticEvents full pending response queue");
             return;
         }
@@ -883,7 +834,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
         Heap_chunk buffer(content_len, dont_free);
         if (buffer.ref == NULL)
         {
-            esp_diag.error(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, content_len);
+            dia_error_evnt(ROUTES_GETDIAGNOSTICEVENTS_HEAP_EXHAUSTED, content_len);
             ERROR("getDiagnosticEvents heap exhausted %d", content_len);
             http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
             return;
@@ -898,7 +849,7 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
                 first_time = false;
             else
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref), ",");
-            event_ptr = esp_diag.get_event(idx);
+            event_ptr = dia_get_event(idx);
             if (event_ptr)
                 fs_sprintf(buffer.ref + os_strlen(buffer.ref), "{\"ts\":%d,\"ack\":%d,\"type\":\"%X\",\"code\":\"%X\",\"val\":%d}",
                            event_ptr->timestamp,
@@ -924,7 +875,7 @@ static void getDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     }
     else
     {
-        esp_diag.error(ROUTES_GETDEVICENAME_HEAP_EXHAUSTED, 64);
+        dia_error_evnt(ROUTES_GETDEVICENAME_HEAP_EXHAUSTED, 64);
         ERROR("getDeviceName heap exhausted %d", 64);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
@@ -946,7 +897,7 @@ static void setDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     espmem.stack_mon();
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETDEVICENAME_HEAP_EXHAUSTED, 64);
+        dia_error_evnt(ROUTES_SETDEVICENAME_HEAP_EXHAUSTED, 64);
         ERROR("setDeviceName heap exhausted %d", 64);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -964,7 +915,7 @@ static void getFs(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(128, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETFS_HEAP_EXHAUSTED, 128);
+        dia_error_evnt(ROUTES_GETFS_HEAP_EXHAUSTED, 128);
         ERROR("getFs heap exhausted %d", 128);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1012,7 +963,7 @@ static void getFileList(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     Heap_chunk file_list(file_list_len, dont_free);
     if (file_list.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETFILELIST_HEAP_EXHAUSTED, file_list_len);
+        dia_error_evnt(ROUTES_GETFILELIST_HEAP_EXHAUSTED, file_list_len);
         ERROR("getFileList heap exhausted %d", file_list_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1173,7 +1124,7 @@ static void getGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     else
     {
-        esp_diag.error(ROUTES_GETGPIOCFG_HEAP_EXHAUSTED, 48);
+        dia_error_evnt(ROUTES_GETGPIOCFG_HEAP_EXHAUSTED, 48);
         ERROR("getGpioCfg heap exhausted %d", 48);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
@@ -1239,7 +1190,7 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(48, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETGPIOCFG_HEAP_EXHAUSTED, parsed_req->content_len);
+        dia_error_evnt(ROUTES_SETGPIOCFG_HEAP_EXHAUSTED, parsed_req->content_len);
         ERROR("setGpioCfg heap exhausted %d", parsed_req->content_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1286,7 +1237,7 @@ static void getGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     Heap_chunk msg(48, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_GETGPIOLEVEL_HEAP_EXHAUSTED, 48);
+        dia_error_evnt(ROUTES_GETGPIOLEVEL_HEAP_EXHAUSTED, 48);
         ERROR("getGpioLevel heap exhausted %d", 64);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1353,7 +1304,7 @@ static void setGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     Heap_chunk msg(48, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETGPIOLEVEL_HEAP_EXHAUSTED, 48);
+        dia_error_evnt(ROUTES_SETGPIOLEVEL_HEAP_EXHAUSTED, 48);
         ERROR("setGpioLevel heap exhausted %d", 48);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1416,7 +1367,7 @@ static void getMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     else
     {
-        esp_diag.error(ROUTES_GETMDNS_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_GETMDNS_HEAP_EXHAUSTED, msg_len);
         ERROR("getMdns heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
@@ -1442,7 +1393,7 @@ static void setMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETMDNS_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_SETMDNS_HEAP_EXHAUSTED, msg_len);
         ERROR("setMdns heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1470,7 +1421,7 @@ static void getTimedateCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_
     }
     else
     {
-        esp_diag.error(ROUTES_GETTIMEDATECFG_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_GETTIMEDATECFG_HEAP_EXHAUSTED, msg_len);
         ERROR("getTimedateCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
@@ -1499,7 +1450,7 @@ static void setTimedateCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETTIMEDATECFG_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_SETTIMEDATECFG_HEAP_EXHAUSTED, msg_len);
         ERROR("setTimedateCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1533,7 +1484,7 @@ static void getTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     }
     else
     {
-        esp_diag.error(ROUTES_GETTIMEDATE_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_GETTIMEDATE_HEAP_EXHAUSTED, msg_len);
         ERROR("getTimedate heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
@@ -1557,7 +1508,7 @@ static void setTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETTIMEDATE_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_SETTIMEDATE_HEAP_EXHAUSTED, msg_len);
         ERROR("setTimedate heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1620,7 +1571,7 @@ static void getOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     }
     else
     {
-        esp_diag.error(ROUTES_GETOTACFG_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_GETOTACFG_HEAP_EXHAUSTED, msg_len);
         ERROR("getOtaCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
@@ -1656,7 +1607,7 @@ static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(msg_len, dont_free);
     if (msg.ref == NULL)
     {
-        esp_diag.error(ROUTES_SETOTACFG_HEAP_EXHAUSTED, msg_len);
+        dia_error_evnt(ROUTES_SETOTACFG_HEAP_EXHAUSTED, msg_len);
         ERROR("setOtaCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
         return;
@@ -1677,59 +1628,21 @@ static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 static void getWifi(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getWifi");
-    // {"op_mode":"STATION","SSID":"","ip_address":"123.123.123.123"}
-    Heap_chunk msg(62 + 32 + 1, dont_free);
-    if (msg.ref)
-    {
-        switch (Wifi::get_op_mode())
-        {
-        case STATION_MODE:
-            fs_sprintf(msg.ref, "{\"op_mode\":\"STATION\",\"SSID\":\"%s\",", Wifi::station_get_ssid());
-            break;
-        case SOFTAP_MODE:
-            fs_sprintf(msg.ref, "{\"op_mode\":\"AP\",");
-            break;
-        case STATIONAP_MODE:
-            fs_sprintf(msg.ref, "{\"op_mode\":\"AP\",");
-            break;
-        default:
-            break;
-        }
-        char *ptr = msg.ref + os_strlen(msg.ref);
-        struct ip_info tmp_ip;
-        Wifi::get_ip_address(&tmp_ip);
-        char *ip_ptr = (char *)&tmp_ip.ip.addr;
-        fs_sprintf(ptr, "\"ip_address\":\"%d.%d.%d.%d\"}", ip_ptr[0], ip_ptr[1], ip_ptr[2], ip_ptr[3]);
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = espwifi_status_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        esp_diag.error(ROUTES_GETWIFI_HEAP_EXHAUSTED, 44 + 32 + 42);
-        ERROR("getWifi heap exhausted %d", 44 + 32 + 42);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void getWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getWifiApCfg");
-    int msg_len = 29 + 64 + 1;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        // {"ap_channel":11,"ap_pwd":""}
-        fs_sprintf(msg.ref,
-                   "{\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
-                   Wifi::ap_get_ch(),
-                   Wifi::ap_get_password());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = espwifi_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        esp_diag.error(ROUTES_GETWIFIAPCFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("getWifiApCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1745,48 +1658,26 @@ static void setWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         return;
     }
 
-    Wifi::ap_set_ch(ap_channel);
-    Wifi::ap_set_pwd(ap_pwd, os_strlen(ap_pwd));
-    Wifi::cfg_save();
+    espwifi_ap_set_ch(ap_channel);
+    espwifi_ap_set_pwd(ap_pwd, os_strlen(ap_pwd));
+    espwifi_cfg_save();
     espmem.stack_mon();
 
-    int msg_len = 29 + 64 + 1;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        esp_diag.error(ROUTES_SETWIFIAPCFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("setWifiApCfg heap exhausted %d", msg_len);
+    char *msg = espwifi_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    // {"ap_channel":11,"ap_pwd":""}
-    fs_sprintf(msg.ref,
-               "{\"ap_channel\":%d,\"ap_pwd\":\"%s\"}",
-               Wifi::ap_get_ch(),
-               Wifi::ap_get_password());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
 static void getWifiStationCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getWifiStationCfg");
-    int msg_len = 36 + 32 + 64 + 1;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        // {"station_ssid":"","station_pwd":""}
-        fs_sprintf(msg.ref,
-                   "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
-                   Wifi::station_get_ssid(),
-                   Wifi::station_get_password());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = espwifi_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        esp_diag.error(ROUTES_GETWIFISTATIONCFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("getWifiStationCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setWifiStationCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1803,48 +1694,40 @@ static void setWifiStationCfg(struct espconn *ptr_espconn, Http_parsed_req *pars
         return;
     }
 
-    Wifi::station_set_ssid(ssid, os_strlen(ssid));
-    Wifi::station_set_pwd(pwd, os_strlen(pwd));
+    espwifi_station_set_ssid(ssid, os_strlen(ssid));
+    espwifi_station_set_pwd(pwd, os_strlen(pwd));
 
     // wait before connecting to the AP so that the client could get the response
     os_timer_disarm(&delay_timer);
-    os_timer_setfn(&delay_timer, (os_timer_func_t *)Wifi::connect, NULL);
+    os_timer_setfn(&delay_timer, (os_timer_func_t *)espwifi_connect_to_ap, NULL);
     os_timer_arm(&delay_timer, 1000, 0);
-    // Wifi::connect();
     espmem.stack_mon();
 
-    Heap_chunk msg(140, dont_free);
-    if (msg.ref == NULL)
-    {
-        esp_diag.error(ROUTES_SETWIFISTATIONCFG_HEAP_EXHAUSTED, 140);
-        ERROR("setWifiStationCfg heap exhausted %d", 140);
+    char *msg = espwifi_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref,
-               "{\"station_ssid\":\"%s\",\"station_pwd\":\"%s\"}",
-               Wifi::station_get_ssid(),
-               Wifi::station_get_password());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
 static void connectWifi(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("connectWifi");
     // {"msg":"Connecting to SSID ..."}
-    Heap_chunk msg(32 + 32 + 1, dont_free);
-    if (msg.ref)
+    int msg_len = 32 + 32 + 1;
+    char *msg = new char[msg_len];
+    if (msg)
     {
-        fs_sprintf(msg.ref, "{\"msg\":\"Connecting to SSID %s...\",", Wifi::station_get_ssid());
-        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_JSON, msg.ref, true);
+        fs_sprintf(msg, "{\"msg\":\"Connecting to SSID %s...\",", espwifi_station_get_ssid());
+        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_JSON, msg, true);
         os_timer_disarm(&delay_timer);
-        os_timer_setfn(&delay_timer, (os_timer_func_t *)Wifi::connect, NULL);
+        os_timer_setfn(&delay_timer, (os_timer_func_t *)espwifi_connect_to_ap, NULL);
         os_timer_arm(&delay_timer, 500, 0);
     }
     else
     {
-        esp_diag.error(ROUTES_CONNECTWIFI_HEAP_EXHAUSTED, 44 + 32 + 42);
-        ERROR("connectWifi heap exhausted %d", 44 + 32 + 42);
+        dia_error_evnt(ROUTES_CONNECTWIFI_HEAP_EXHAUSTED, msg_len);
+        ERROR("connectWifi heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
 }
@@ -1853,19 +1736,20 @@ static void disconnectWifi(struct espconn *ptr_espconn, Http_parsed_req *parsed_
 {
     ALL("disconnectWifi");
     // {"msg":"Disconnecting from SSID ..."}
-    Heap_chunk msg(37 + 32 + 1, dont_free);
-    if (msg.ref)
+    int msg_len = 37 + 32 + 1;
+    char *msg = new char[msg_len];
+    if (msg)
     {
-        fs_sprintf(msg.ref, "{\"msg\":\"Disconnecting from SSID %s...\",", Wifi::station_get_ssid());
-        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_JSON, msg.ref, true);
+        fs_sprintf(msg, "{\"msg\":\"Disconnecting from SSID %s...\",", espwifi_station_get_ssid());
+        http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_JSON, msg, true);
         os_timer_disarm(&delay_timer);
-        os_timer_setfn(&delay_timer, (os_timer_func_t *)Wifi::set_stationap, NULL);
+        os_timer_setfn(&delay_timer, (os_timer_func_t *)espwifi_work_as_ap, NULL);
         os_timer_arm(&delay_timer, 500, 0);
     }
     else
     {
-        esp_diag.error(ROUTES_DISCONNECTWIFI_HEAP_EXHAUSTED, 44 + 32 + 42);
-        ERROR("disconnectWifi heap exhausted %d", 44 + 32 + 42);
+        dia_error_evnt(ROUTES_DISCONNECTWIFI_HEAP_EXHAUSTED, msg_len);
+        ERROR("disconnectWifi heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
 }
@@ -2070,7 +1954,7 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/scan"))) && (parsed_req->req_method == HTTP_GET))
     {
-        Wifi::scan_for_ap(NULL, getAPlist, (void *)ptr_espconn);
+        espwifi_scan_for_ap(NULL, getAPlist, (void *)ptr_espconn);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi/ap/cfg"))) && (parsed_req->req_method == HTTP_GET))

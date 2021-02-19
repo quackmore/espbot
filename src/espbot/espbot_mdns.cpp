@@ -13,6 +13,7 @@ extern "C"
 #include "c_types.h"
 #include "ip_addr.h"
 #include "espconn.h"
+#include "user_interface.h"
 }
 
 #include "espbot.hpp"
@@ -30,7 +31,7 @@ void Mdns::init(void)
 
     if (restore_cfg())
     {
-        esp_diag.warn(MDNS_INIT_DEFAULT_CFG);
+        dia_warn_evnt(MDNS_INIT_DEFAULT_CFG);
         WARN("Mdns::init no cfg available");
     }
 }
@@ -48,7 +49,7 @@ void Mdns::start(char *app_alias)
         _info.txt_data[0] = app_alias;
         espconn_mdns_init(&_info);
         _running = true;
-        esp_diag.info(MDNS_START);
+        dia_info_evnt(MDNS_START);
         INFO("mDns started");
     }
 }
@@ -59,7 +60,7 @@ void Mdns::stop(void)
     {
         espconn_mdns_close();
         _running = false;
-        esp_diag.info(MDNS_STOP);
+        dia_info_evnt(MDNS_STOP);
         INFO("mDns ended");
     }
 }
@@ -99,7 +100,7 @@ int Mdns::restore_cfg(void)
     //    }
     //    if (cfgfile.find_string(f_str("enabled")))
     //    {
-    //        esp_diag.error(MDNS_RESTORE_CFG_INCOMPLETE);
+    //        dia_error_evnt(MDNS_RESTORE_CFG_INCOMPLETE);
     //        ERROR("Mdns::restore_cfg incomplete cfg");
     //        return CFG_ERROR;
     //    }
@@ -119,7 +120,7 @@ int Mdns::saved_cfg_not_updated(void)
     //    }
     //    if (cfgfile.find_string(f_str("enabled")))
     //    {
-    //        esp_diag.error(MDNS_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //        dia_error_evnt(MDNS_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //        ERROR("Mdns::saved_cfg_not_updated incomplete cfg");
     //        return CFG_ERROR;
     //    }
@@ -138,14 +139,14 @@ int Mdns::save_cfg(void)
 //        return CFG_OK;
 //    if (!espfs.is_available())
 //    {
-//        esp_diag.error(MDNS_SAVE_CFG_FS_NOT_AVAILABLE);
+//        dia_error_evnt(MDNS_SAVE_CFG_FS_NOT_AVAILABLE);
 //        ERROR("Mdns::save_cfg FS not available");
 //        return CFG_ERROR;
 //    }
 //    Ffile cfgfile(&espfs, (char *)MDNS_FILENAME);
 //    if (!cfgfile.is_available())
 //    {
-//        esp_diag.error(MDNS_SAVE_CFG_CANNOT_OPEN_FILE);
+//        dia_error_evnt(MDNS_SAVE_CFG_CANNOT_OPEN_FILE);
 //        ERROR("Mdns::save_cfg cannot open file");
 //        return CFG_ERROR;
 //    }

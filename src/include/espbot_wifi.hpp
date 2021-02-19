@@ -37,11 +37,11 @@ bool espwifi_is_connected(void); // true  -> connected to AP
                                  // false -> not connected to AP
 
 // scan
-void espwifi_scan_for_ap(void (*)(void *), void *); // start a new AP scan
-int espwifi_get_ap_count(void);                                           // return the number of APs found
-char *espwifi_get_ap_name(int);                                           // return the name of AP number xx
+void espwifi_scan_for_ap(struct scan_config *config, void (*)(void *), void *); // start a new AP scan
+int espwifi_get_ap_count(void);                                                 // return the number of APs found
+char *espwifi_get_ap_name(int);                                                 // return the name of AP number xx
 char *espwifi_scan_results_json_stringify(char *dest = NULL, int len = 0);
-                                                                          // (from 0 to (ap_count-1))
+// (from 0 to (ap_count-1))
 void espwifi_free_ap_list(void);
 
 // CONFIG

@@ -38,7 +38,7 @@ void Ota_upgrade::init(void)
         os_strncpy(_path, f_str("/"), 1);
         _check_version = false;
         _reboot_on_completion = false;
-        esp_diag.warn(OTA_INIT_DEFAULT_CFG);
+        dia_warn_evnt(OTA_INIT_DEFAULT_CFG);
         WARN("OTA init starting with default configuration");
     }
     _status = OTA_IDLE;
@@ -72,7 +72,7 @@ void Ota_upgrade::set_path(char *t_str)
     }
     else
     {
-        esp_diag.error(OTA_SET_PATH_HEAP_EXHAUSTED, os_strlen(t_str));
+        dia_error_evnt(OTA_SET_PATH_HEAP_EXHAUSTED, os_strlen(t_str));
         ERROR("OTA set_path heap exhausted %d", os_strlen(t_str));
     }
 }
@@ -312,20 +312,20 @@ static void check_version(void *param)
             }
             else
             {
-                esp_diag.error(OTA_CHECK_VERSION_BAD_FORMAT);
+                dia_error_evnt(OTA_CHECK_VERSION_BAD_FORMAT);
                 ERROR("check_version bad version format");
                 esp_ota.set_status(OTA_FAILED);
             }
         }
         else
         {
-            esp_diag.error(OTA_CHECK_VERSION_EMPTY_RES);
+            dia_error_evnt(OTA_CHECK_VERSION_EMPTY_RES);
             ERROR("check_version empty response");
             esp_ota.set_status(OTA_FAILED);
         }
         break;
     default:
-        esp_diag.error(OTA_CHECK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
+        dia_error_evnt(OTA_CHECK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
         ERROR("check_version unexpected webclient status %d", ota_client->get_status());
         esp_ota.set_status(OTA_FAILED);
         break;
@@ -357,7 +357,7 @@ static void ota_ask_version(void *param)
     }
     break;
     default:
-        esp_diag.error(OTA_ASK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
+        dia_error_evnt(OTA_ASK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
         ERROR("ota_ask_version unexpected webclient status %d", ota_client->get_status());
         esp_ota.set_status(OTA_FAILED);
         ota_client->disconnect(check_for_new_release_cleanup, NULL);
@@ -443,7 +443,7 @@ static void ota_engine(void)
             binary_file = (char *)f_str("user1.bin");
             break;
         default:
-            esp_diag.error(OTA_TIMER_FUNCTION_USERBIN_ID_UNKNOWN);
+            dia_error_evnt(OTA_TIMER_FUNCTION_USERBIN_ID_UNKNOWN);
             ERROR("OTA: bad userbin number");
             esp_ota.set_status(OTA_FAILED);
             subsequent_function(ota_engine);
@@ -452,7 +452,7 @@ static void ota_engine(void)
         upgrade_svr = new struct upgrade_server_info;
         if (upgrade_svr == NULL)
         {
-            esp_diag.error(OTA_ENGINE_HEAP_EXHAUSTED, sizeof(upgrade_server_info));
+            dia_error_evnt(OTA_ENGINE_HEAP_EXHAUSTED, sizeof(upgrade_server_info));
             ERROR("ota_engine heap exhausted %d", sizeof(upgrade_server_info));
             esp_ota.set_status(OTA_FAILED);
             subsequent_function(ota_engine);
@@ -467,7 +467,7 @@ static void ota_engine(void)
         url = new char[url_len];
         if (url == NULL)
         {
-            esp_diag.error(OTA_ENGINE_HEAP_EXHAUSTED, url_len);
+            dia_error_evnt(OTA_ENGINE_HEAP_EXHAUSTED, url_len);
             ERROR("OTA save_cfg heap exhausted %d", url_len);
             esp_ota.set_status(OTA_FAILED);
             subsequent_function(ota_engine);
@@ -487,7 +487,7 @@ static void ota_engine(void)
         upgrade_svr->url = (uint8 *)url;
         if (system_upgrade_start(upgrade_svr) == false)
         {
-            esp_diag.error(OTA_CANNOT_START_UPGRADE);
+            dia_error_evnt(OTA_CANNOT_START_UPGRADE);
             ERROR("OTA cannot start upgrade");
             esp_ota.set_status(OTA_FAILED);
         }
@@ -498,11 +498,11 @@ static void ota_engine(void)
         esp_ota.set_last_result(OTA_SUCCESS);
         esp_ota.cb_on_completion();
         ota_cleanup();
-        esp_diag.info(OTA_SUCCESSFULLY_COMPLETED);
+        dia_info_evnt(OTA_SUCCESSFULLY_COMPLETED);
         INFO("OTA successfully completed");
         if (esp_ota.reboot_on_completion())
         {
-            esp_diag.debug(OTA_REBOOTING_AFTER_COMPLETION);
+            dia_debug_evnt(OTA_REBOOTING_AFTER_COMPLETION);
             DEBUG("OTA - rebooting after completion");
             espbot.reset(ESP_OTA_REBOOT);
         }
@@ -514,7 +514,7 @@ static void ota_engine(void)
         esp_ota.set_last_result(OTA_FAILED);
         esp_ota.cb_on_completion();
         ota_cleanup();
-        esp_diag.error(OTA_FAILURE);
+        dia_error_evnt(OTA_FAILURE);
         ERROR("OTA failed");
         esp_ota.set_status(OTA_IDLE);
         break;
@@ -524,7 +524,7 @@ static void ota_engine(void)
         esp_ota.set_last_result(OTA_ALREADY_TO_THE_LATEST);
         esp_ota.cb_on_completion();
         ota_cleanup();
-        esp_diag.info(OTA_UP_TO_DATE);
+        dia_info_evnt(OTA_UP_TO_DATE);
         INFO("OTA everything up to date");
         esp_ota.set_status(OTA_IDLE);
         break;
@@ -549,7 +549,7 @@ void Ota_upgrade::start_upgrade(void)
     }
     else
     {
-        esp_diag.warn(OTA_START_UPGRADE_CALLED_WHILE_OTA_IN_PROGRESS);
+        dia_warn_evnt(OTA_START_UPGRADE_CALLED_WHILE_OTA_IN_PROGRESS);
         WARN("start_upgrade called while OTA in progress");
     }
 }
@@ -573,35 +573,35 @@ int Ota_upgrade::restore_cfg(void)
     //    {
     //        if (cfgfile.find_string(f_str("host")))
     //        {
-    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
     //            ERROR("OTA restore_cfg cannot find 'host'");
     //            return CFG_ERROR;
     //        }
     //        set_host(cfgfile.get_value());
     //        if (cfgfile.find_string(f_str("port")))
     //        {
-    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
     //            ERROR("OTA restore_cfg cannot find 'port'");
     //            return CFG_ERROR;
     //        }
     //        set_port(atoi(cfgfile.get_value()));
     //        if (cfgfile.find_string(f_str("path")))
     //        {
-    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
     //            ERROR("OTA restore_cfg cannot find 'path'");
     //            return CFG_ERROR;
     //        }
     //        set_path(cfgfile.get_value());
     //        if (cfgfile.find_string(f_str("check_version")))
     //        {
-    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
     //            ERROR("OTA restore_cfg cannot find 'check_version'");
     //            return CFG_ERROR;
     //        }
     //        set_check_version((bool)atoi(cfgfile.get_value()));
     //        if (cfgfile.find_string(f_str("reboot_on_completion")))
     //        {
-    //            esp_diag.error(OTA_RESTORE_CFG_INCOMPLETE);
+    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
     //            ERROR("OTA restore_cfg cannot find 'reboot_on_completion'");
     //            return CFG_ERROR;
     //        }
@@ -610,7 +610,7 @@ int Ota_upgrade::restore_cfg(void)
     //    }
     //    else
     //    {
-    //        esp_diag.warn(OTA_RESTORE_CFG_FILE_NOT_FOUND);
+    //        dia_warn_evnt(OTA_RESTORE_CFG_FILE_NOT_FOUND);
     //        WARN("OTA restore_cfg file not found");
     //        return CFG_ERROR;
     //    }
@@ -626,7 +626,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
     //    {
     //        if (cfgfile.find_string(f_str("host")))
     //        {
-    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //            ERROR("OTA saved_cfg_not_updated cannot find 'host'");
     //            return CFG_ERROR;
     //        }
@@ -636,7 +636,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
     //        }
     //        if (cfgfile.find_string(f_str("port")))
     //        {
-    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //            ERROR("OTA saved_cfg_not_updated cannot find 'port'");
     //            return CFG_ERROR;
     //        }
@@ -646,7 +646,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
     //        }
     //        if (cfgfile.find_string(f_str("path")))
     //        {
-    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //            ERROR("OTA saved_cfg_not_updated cannot find 'path'");
     //            return CFG_ERROR;
     //        }
@@ -656,7 +656,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
     //        }
     //        if (cfgfile.find_string(f_str("check_version")))
     //        {
-    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //            ERROR("OTA saved_cfg_not_updated cannot find 'check_version'");
     //            return CFG_ERROR;
     //        }
@@ -666,7 +666,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
     //        }
     //        if (cfgfile.find_string(f_str("reboot_on_completion")))
     //        {
-    //            esp_diag.error(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
+    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
     //            ERROR("OTA saved_cfg_not_updated cannot find 'reboot_on_completion'");
     //            return CFG_ERROR;
     //        }
@@ -690,14 +690,14 @@ int Ota_upgrade::save_cfg(void)
 //        return CFG_OK;
 //    if (!espfs.is_available())
 //    {
-//        esp_diag.error(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
+//        dia_error_evnt(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
 //        ERROR("OTA save_cfg file system not available");
 //        return CFG_ERROR;
 //    }
 //    Ffile cfgfile(&espfs, (char *)f_str("ota.cfg"));
 //    if (!cfgfile.is_available())
 //    {
-//        esp_diag.error(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
+//        dia_error_evnt(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
 //        ERROR("OTA save_cfg cannot open file");
 //        return CFG_ERROR;
 //    }
@@ -708,7 +708,7 @@ int Ota_upgrade::save_cfg(void)
 //    espmem.stack_mon();
 //    if (buffer.ref == NULL)
 //    {
-//        esp_diag.error(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
+//        dia_error_evnt(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
 //        ERROR("OTA save_cfg heap exhausted %d", buffer_len);
 //        return CFG_ERROR;
 //    }

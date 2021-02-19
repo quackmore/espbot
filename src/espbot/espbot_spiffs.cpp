@@ -7,10 +7,14 @@
  * ----------------------------------------------------------------------------
  */
 
-#include "espbot_diagnostic.hpp"
+extern "C"
+{
 #include "espbot_event_codes.h"
+}
+
 #include "espbot_global.hpp"
 #include "espbot_spiffs.hpp"
+#include "espbot_diagnostic.hpp"
 
 /**
  * @brief file system possible status
@@ -86,7 +90,7 @@ void esp_spiffs_mount(void)
     {
         if (res == SPIFFS_ERR_MAGIC_NOT_POSSIBLE)
         {
-            esp_diag.fatal(SPIFFS_INIT_CANNOT_MOUNT, res);
+            dia_fatal_evnt(SPIFFS_INIT_CANNOT_MOUNT, res);
             FATAL("Error %d mounting File System", res);
             FATAL("Try another page size or block size");
             return;
@@ -104,12 +108,12 @@ void esp_spiffs_mount(void)
         res = SPIFFS_format(&esp_spiffs.handler);
         if (res == SPIFFS_OK)
         {
-            esp_diag.info(SPIFFS_INIT_FS_FORMATTED);
+            dia_info_evnt(SPIFFS_INIT_FS_FORMATTED);
             INFO("File System formatted");
         }
         else
         {
-            esp_diag.fatal(SPIFFS_INIT_CANNOT_FORMAT);
+            dia_fatal_evnt(SPIFFS_INIT_CANNOT_FORMAT);
             FATAL("Error %d formatting File System", res);
             return;
         }
@@ -123,19 +127,19 @@ void esp_spiffs_mount(void)
                            0);
         if (res != SPIFFS_OK)
         {
-            esp_diag.fatal(SPIFFS_INIT_CANNOT_MOUNT, res);
+            dia_fatal_evnt(SPIFFS_INIT_CANNOT_MOUNT, res);
             FATAL("Error %d mounting File System", res);
             return;
         }
     }
-    esp_diag.info(SPIFFS_INIT_FS_MOUNTED);
+    dia_info_evnt(SPIFFS_INIT_FS_MOUNTED);
     INFO("File System mounted");
     esp_spiffs.status = FS_mounted;
     u32_t total = 0;
     u32_t used = 0;
     res = SPIFFS_info(&esp_spiffs.handler, &total, &used);
-    esp_diag.info(SPIFFS_INIT_FS_SIZE, total);
-    esp_diag.info(SPIFFS_INIT_FS_USED, used);
+    dia_info_evnt(SPIFFS_INIT_FS_SIZE, total);
+    dia_info_evnt(SPIFFS_INIT_FS_USED, used);
     INFO("File System size [bytes]: %d, used [bytes]:%d", total, used);
     espmem.stack_mon();
 }
@@ -144,7 +148,7 @@ u32_t esp_spiffs_total_size()
 {
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(SPIFFS_GET_TOTAL_SIZE_FS_NOT_MOUNTED);
+        dia_error_evnt(SPIFFS_GET_TOTAL_SIZE_FS_NOT_MOUNTED);
         ERROR("FS is not mounted, cannot get total size");
         return 0;
     }
@@ -160,7 +164,7 @@ u32_t esp_spiffs_used_size()
 {
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(SPIFFS_GET_USED_SIZE_FS_NOT_MOUNTED);
+        dia_error_evnt(SPIFFS_GET_USED_SIZE_FS_NOT_MOUNTED);
         ERROR("FS is not mounted, cannot get total size");
         return 0;
     }
@@ -177,19 +181,19 @@ s32_t esp_spiffs_check()
     ALL("esp_spiffs_check");
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(SPIFFS_CHECK_FS_NOT_MOUNTED);
+        dia_error_evnt(SPIFFS_CHECK_FS_NOT_MOUNTED);
         ERROR("FS is not mounted, cannot check it");
         return 0;
     }
     s32_t res = SPIFFS_check(&esp_spiffs.handler);
     if (res == SPIFFS_OK)
     {
-        esp_diag.info(SPIFFS_CHECK_SUCCESSFULLY);
+        dia_info_evnt(SPIFFS_CHECK_SUCCESSFULLY);
         INFO("Successfully checked File System");
     }
     else
     {
-        esp_diag.error(SPIFFS_CHECK_ERRORS, res);
+        dia_error_evnt(SPIFFS_CHECK_ERRORS, res);
         ERROR("Error %d checking File System", res);
     }
     espmem.stack_mon();
@@ -200,7 +204,7 @@ struct spiffs_dirent *esp_spiffs_list(int file_idx)
 {
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(SPIFFS_LIST_FS_NOT_MOUNTED);
+        dia_error_evnt(SPIFFS_LIST_FS_NOT_MOUNTED);
         ERROR("FS is not mounted, cannot list");
         return NULL;
     }
@@ -237,13 +241,13 @@ Espfile::Espfile(char *filename)
     os_strncpy(_name, filename, 31);
     if (os_strlen(filename) > 31)
     {
-        esp_diag.warn(ESPFILE_NAME_TRUNCATED);
+        dia_warn_evnt(ESPFILE_NAME_TRUNCATED);
         WARN("Filename truncated to 31 characters");
     }
     if (esp_spiffs.status != FS_mounted)
     {
         _err = SPIFFS_ERR_NOT_MOUNTED;
-        esp_diag.error(ESPFILE_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_FS_NOT_MOUNTED);
         ERROR("Espfile::Espfile FS not mounted");
         return;
     }
@@ -251,7 +255,7 @@ Espfile::Espfile(char *filename)
     if (_handler < 0)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_OPEN_ERROR, _err);
+        dia_error_evnt(ESPFILE_OPEN_ERROR, _err);
         ERROR("Espfile::Espfile error %d opening file %s", _err, _name);
     }
 }
@@ -270,7 +274,7 @@ Espfile::~Espfile()
     s32_t res = SPIFFS_close(&esp_spiffs.handler, _handler);
     if (res != SPIFFS_OK)
     {
-        esp_diag.error(ESPFILE_CLOSE_ERROR, SPIFFS_errno(&esp_spiffs.handler));
+        dia_error_evnt(ESPFILE_CLOSE_ERROR, SPIFFS_errno(&esp_spiffs.handler));
         ERROR("Espfile::~Espfile error %d closing file %s", SPIFFS_errno(&esp_spiffs.handler), _name);
     }
 }
@@ -280,7 +284,7 @@ s32_t Espfile::n_read(char *buffer, int len)
     s32_t res = SPIFFS_OK;
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_N_READ_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_N_READ_FS_NOT_MOUNTED);
         ERROR("Espfile::n_read FS not mounted");
         return SPIFFS_ERR_NOT_MOUNTED;
     }
@@ -294,7 +298,7 @@ s32_t Espfile::n_read(char *buffer, int len)
     if (res < SPIFFS_OK)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_N_READ_READ_ERROR, _err);
+        dia_error_evnt(ESPFILE_N_READ_READ_ERROR, _err);
         ERROR("Espfile::n_read error %d reading file %s", _err, _name);
     }
     espmem.stack_mon();
@@ -306,7 +310,7 @@ s32_t Espfile::n_read(char *buffer, int offset, int len)
     s32_t res = SPIFFS_OK;
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_N_READ_OFFSET_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_N_READ_OFFSET_FS_NOT_MOUNTED);
         ERROR("Espfile::n_read_offset FS not mounted");
         return SPIFFS_ERR_NOT_MOUNTED;
     }
@@ -320,7 +324,7 @@ s32_t Espfile::n_read(char *buffer, int offset, int len)
     if (res < SPIFFS_OK)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_N_READ_SEEK_ERROR, _err);
+        dia_error_evnt(ESPFILE_N_READ_SEEK_ERROR, _err);
         ERROR("Espfile::n_read error %d seeking into file %s", _err, _name);
         return res;
     }
@@ -328,7 +332,7 @@ s32_t Espfile::n_read(char *buffer, int offset, int len)
     if (res < SPIFFS_OK)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_N_READ_OFFSET_READ_ERROR, _err);
+        dia_error_evnt(ESPFILE_N_READ_OFFSET_READ_ERROR, _err);
         ERROR("Espfile::n_read error %d reading file %s", _err, _name);
         return res;
     }
@@ -341,7 +345,7 @@ s32_t Espfile::n_append(char *buffer, int len)
     s32_t res = SPIFFS_OK;
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_N_APPEND_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_N_APPEND_FS_NOT_MOUNTED);
         ERROR("Espfile::n_append FS not mounted");
         return SPIFFS_ERR_NOT_MOUNTED;
     }
@@ -355,7 +359,7 @@ s32_t Espfile::n_append(char *buffer, int len)
     if (res < SPIFFS_OK)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_N_APPEND_WRITE_ERROR, _err);
+        dia_error_evnt(ESPFILE_N_APPEND_WRITE_ERROR, _err);
         ERROR("Espfile::n_append error %d writing file %s", _err, _name);
     }
     espmem.stack_mon();
@@ -367,7 +371,7 @@ s32_t Espfile::clear()
     s32_t res = SPIFFS_OK;
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_CLEAR_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_CLEAR_FS_NOT_MOUNTED);
         ERROR("Espfile::clear FS not mounted");
         return SPIFFS_ERR_NOT_MOUNTED;
     }
@@ -381,7 +385,7 @@ s32_t Espfile::clear()
     if (res != SPIFFS_OK)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_CLEAR_CLOSE_ERROR, _err);
+        dia_error_evnt(ESPFILE_CLEAR_CLOSE_ERROR, _err);
         ERROR("Espfile::clear error %d closing file %s", _err, _name);
         return _err;
     }
@@ -389,7 +393,7 @@ s32_t Espfile::clear()
     if (_handler < 0)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_CLEAR_OPEN_ERROR, _err);
+        dia_error_evnt(ESPFILE_CLEAR_OPEN_ERROR, _err);
         ERROR("Espfile::clear error %d opening file %s", _err, _name);
         return _err;
     }
@@ -402,7 +406,7 @@ s32_t Espfile::remove()
     s32_t res = SPIFFS_OK;
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_REMOVE_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_REMOVE_FS_NOT_MOUNTED);
         ERROR("Espfile::remove FS not mounted");
         return SPIFFS_ERR_NOT_MOUNTED;
     }
@@ -416,7 +420,7 @@ s32_t Espfile::remove()
     if (res != SPIFFS_OK)
     {
         _err = SPIFFS_errno(&esp_spiffs.handler);
-        esp_diag.error(ESPFILE_REMOVE_ERROR, _err);
+        dia_error_evnt(ESPFILE_REMOVE_ERROR, _err);
         ERROR("Espfile::remove error %d removing file %s", _err, _name);
         return res;
     }
@@ -428,7 +432,7 @@ bool Espfile::exists(char *name)
 {
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_EXISTS_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_EXISTS_FS_NOT_MOUNTED);
         ERROR("Espfile::exists FS not mounted");
         return false;
     }
@@ -456,7 +460,7 @@ int Espfile::size(char *name)
 {
     if (esp_spiffs.status != FS_mounted)
     {
-        esp_diag.error(ESPFILE_SIZE_FS_NOT_MOUNTED);
+        dia_error_evnt(ESPFILE_SIZE_FS_NOT_MOUNTED);
         ERROR("Espfile::size FS not mounted");
         return -1;
     }

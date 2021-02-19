@@ -90,7 +90,7 @@ void atoipaddr(struct ip_addr *ip, char *str)
             end_ptr = str + os_strlen(str);
         if (end_ptr == NULL)
         {
-            esp_diag.error(UTILS_CANNOT_PARSE_IP);
+            dia_error_evnt(UTILS_CANNOT_PARSE_IP);
             TRACE("atoipaddr cannot parse IP");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;
@@ -98,7 +98,7 @@ void atoipaddr(struct ip_addr *ip, char *str)
         len = end_ptr - tmp_ptr;
         if(len > 3)
         {
-            esp_diag.error(UTILS_CANNOT_PARSE_IP);
+            dia_error_evnt(UTILS_CANNOT_PARSE_IP);
             TRACE("atoipaddr cannot parse IP");
             IP4_ADDR(ip, 1, 1, 1, 1);
             return;

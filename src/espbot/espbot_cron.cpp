@@ -156,12 +156,12 @@ static void state_current_time(struct date *time)
 
 static struct date current_time;
 
-struct date *get_current_time(void)
+struct date *cron_get_current_time(void)
 {
     return &current_time;
 }
 
-void init_current_time(void)
+void cron_init_current_time(void)
 {
     state_current_time(&current_time);
 }
@@ -221,17 +221,17 @@ void cron_init(void)
     cron_state.running = false;
     if (cron_restore_state() != CFG_ok)
     {
-        esp_diag.warn(CRON_INIT_DEFAULT_CFG);
+        dia_warn_evnt(CRON_INIT_DEFAULT_CFG);
         WARN("cron_init no cfg available");
     }
     if (cron_state.enabled)
     {
-        esp_diag.info(CRON_START);
+        dia_info_evnt(CRON_START);
         INFO("cron started");
     }
     else
     {
-        esp_diag.info(CRON_STOP);
+        dia_info_evnt(CRON_STOP);
         INFO("cron stopped");
     }
     os_timer_disarm(&cron_timer);
@@ -286,7 +286,7 @@ int cron_add_job(char minutes,
     struct job *new_job = new struct job;
     if (new_job == NULL)
     {
-        esp_diag.error(CRON_ADD_JOB_HEAP_EXHAUSTED, sizeof(struct job));
+        dia_error_evnt(CRON_ADD_JOB_HEAP_EXHAUSTED, sizeof(struct job));
         ERROR("cron_add_job heap exhausted %d", sizeof(struct job));
         return -1;
     }
@@ -333,7 +333,7 @@ int cron_add_job(char minutes,
     int result = job_list->push_back(new_job);
     if (result != list_ok)
     {
-        esp_diag.error(CRON_ADD_JOB_CANNOT_COMPLETE);
+        dia_error_evnt(CRON_ADD_JOB_CANNOT_COMPLETE);
         ERROR("cron_add_job cannot complete");
         return -1;
     }
@@ -375,56 +375,56 @@ void cron_print_jobs(void)
 /*
  * CONFIGURATION & PERSISTENCY
  */
-void enable_cron(void)
+void cron_enable(void)
 {
     if (!cron_state.enabled)
     {
         cron_state.enabled = true;
-        esp_diag.info(CRON_ENABLED);
+        dia_info_evnt(CRON_ENABLED);
         INFO("cron enabled");
     }
     if (!cron_state.running)
     {
         cron_sync();
-        esp_diag.info(CRON_START);
+        dia_info_evnt(CRON_START);
         INFO("cron started");
     }
 }
 
-void start_cron(void)
+void cron_start(void)
 {
     if (!cron_state.running)
     {
         cron_sync();
-        esp_diag.info(CRON_START);
+        dia_info_evnt(CRON_START);
         INFO("cron started");
     }
 }
 
-void disable_cron(void)
+void cron_disable(void)
 {
     os_timer_disarm(&cron_timer);
     if (cron_state.enabled)
     {
         cron_state.enabled = false;
-        esp_diag.info(CRON_DISABLED);
+        dia_info_evnt(CRON_DISABLED);
         INFO("cron disabled");
     }
     if (cron_state.running)
     {
         cron_state.running = false;
-        esp_diag.info(CRON_STOP);
+        dia_info_evnt(CRON_STOP);
         INFO("cron stopped");
     }
 }
 
-void stop_cron(void)
+void cron_stop(void)
 {
     os_timer_disarm(&cron_timer);
     if (cron_state.running)
     {
         cron_state.running = false;
-        esp_diag.info(CRON_STOP);
+        dia_info_evnt(CRON_STOP);
         INFO("cron stopped");
     }
 }
@@ -447,7 +447,7 @@ static int cron_restore_state(void)
     int enabled = cfgfile.getInt(f_str("cron_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(CRON_RESTORE_STATE_ERROR);
+        dia_error_evnt(CRON_RESTORE_STATE_ERROR);
         ERROR("cron_restore_state error");
         return CFG_error;
     }
@@ -467,7 +467,7 @@ static int cron_saved_state_updated(void)
     int enabled = cfgfile.getInt(f_str("cron_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        esp_diag.error(CRON_SAVED_STATE_UPDATED_ERROR);
+        dia_error_evnt(CRON_SAVED_STATE_UPDATED_ERROR);
         ERROR("cron_saved_state_updated error");
         return CFG_error;
     }
@@ -488,7 +488,7 @@ char *cron_state_json_stringify(char *dest, int len)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            esp_diag.error(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
+            dia_error_evnt(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
             ERROR("cron_state_json_stringify heap exhausted");
             return NULL;
         }
