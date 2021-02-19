@@ -11,12 +11,14 @@
 extern "C"
 {
 #include "mem.h"
+#include "user_interface.h"
 #include "library_dio_task.h"
 #include "esp8266_io.h"
 }
 
 #include "app.hpp"
 #include "espbot_cron.hpp"
+#include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
 #include "espbot_utils.hpp"
 #include "library_dht.hpp"

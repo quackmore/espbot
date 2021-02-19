@@ -14,6 +14,7 @@ extern "C"
 }
 
 #include "espbot_global.hpp"
+#include "espbot_diagnostic.hpp"
 
 extern "C" void __cxa_pure_virtual(void)
 {
