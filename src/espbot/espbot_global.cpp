@@ -27,4 +27,3 @@ Mdns esp_mDns;
 TimeDate esp_time;
 Websvr espwebsvr;
 Ota_upgrade esp_ota;
-Gpio esp_gpio;

@@ -24,6 +24,7 @@ extern "C"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
+#include "espbot_gpio.hpp"
 #include "espbot_http.hpp"
 #include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
@@ -1099,7 +1100,7 @@ static void getGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     Heap_chunk msg(48, dont_free);
     if (msg.ref)
     {
-        int result = esp_gpio.get_config(gpio_id);
+        int result = gpio_get_config(gpio_id);
         switch (result)
         {
         case ESPBOT_GPIO_WRONG_IDX:
@@ -1155,7 +1156,7 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     if ((os_strcmp(gpio_type_str, f_str("UNPROVISIONED")) == 0) ||
         (os_strcmp(gpio_type_str, f_str("unprovisioned")) == 0))
     {
-        if (esp_gpio.unconfig(gpio_id) == ESPBOT_GPIO_WRONG_IDX)
+        if (gpio_unconfig(gpio_id) == ESPBOT_GPIO_WRONG_IDX)
         {
             http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
             return;
@@ -1165,7 +1166,7 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
              (os_strcmp(gpio_type_str, f_str("input")) == 0))
 
     {
-        if (esp_gpio.config(gpio_id, ESPBOT_GPIO_INPUT) == ESPBOT_GPIO_WRONG_IDX)
+        if (gpio_config(gpio_id, ESPBOT_GPIO_INPUT) == ESPBOT_GPIO_WRONG_IDX)
         {
             http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
             return;
@@ -1174,7 +1175,7 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     else if ((os_strcmp(gpio_type_str, f_str("OUTPUT")) == 0) ||
              (os_strcmp(gpio_type_str, f_str("output")) == 0))
     {
-        if (esp_gpio.config(gpio_id, ESPBOT_GPIO_OUTPUT) == ESPBOT_GPIO_WRONG_IDX)
+        if (gpio_config(gpio_id, ESPBOT_GPIO_OUTPUT) == ESPBOT_GPIO_WRONG_IDX)
         {
             http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
             return;
@@ -1196,7 +1197,7 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         return;
     }
 
-    int result = esp_gpio.get_config(gpio_id);
+    int result = gpio_get_config(gpio_id);
     switch (result)
     {
     case ESPBOT_GPIO_WRONG_IDX:
@@ -1243,7 +1244,7 @@ static void getGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         return;
     }
 
-    int result = esp_gpio.read(gpio_id);
+    int result = gpio_read(gpio_id);
     switch (result)
     {
     case ESPBOT_GPIO_WRONG_IDX:
@@ -1298,7 +1299,7 @@ static void setGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO level"), false);
         return;
     }
-    int result = esp_gpio.set(gpio_id, output_level);
+    int result = gpio_set(gpio_id, output_level);
 
     // {"gpio_id":,"gpio_level":"unprovisioned"}
     Heap_chunk msg(48, dont_free);
@@ -1325,7 +1326,7 @@ static void setGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         return;
     case ESPBOT_GPIO_OK:
     {
-        int result = esp_gpio.read(gpio_id);
+        int result = gpio_read(gpio_id);
         switch (result)
         {
         case ESPBOT_GPIO_WRONG_IDX:

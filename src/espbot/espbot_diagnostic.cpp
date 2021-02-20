@@ -20,6 +20,7 @@ extern "C"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
+#include "espbot_gpio.hpp"
 #include "espbot_profiler.hpp"
 #include "espbot_utils.hpp"
 
@@ -44,9 +45,9 @@ static struct
     char serial_log_mask;
 } dia_cfg;
 
-bool diag_log_err_type(int)
+bool diag_log_err_type(int type)
 {
-    return (dia_cfg.serial_log_mask & EVNT_FATAL);
+    return (dia_cfg.serial_log_mask & type);
 }
 
 static void print_greetings(void)
@@ -76,7 +77,7 @@ inline void dia_add_event(char type, int code, uint32 value)
     dia_event_queue.last = idx;
     // switch on the diag led
     if (dia_cfg.led_mask & type)
-        esp_gpio.set(DIA_LED, ESPBOT_LOW);
+        gpio_set(DIA_LED, ESPBOT_LOW);
     // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_LOW);
 }
 
@@ -152,7 +153,7 @@ void dia_ack_events(void)
     }
     // switch off the diag led
     if (dia_cfg.led_mask)
-        esp_gpio.set(DIA_LED, ESPBOT_HIGH);
+        gpio_set(DIA_LED, ESPBOT_HIGH);
     // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
 }
 
@@ -161,8 +162,8 @@ void dia_set_led_mask(char mask)
     dia_cfg.led_mask = mask;
     if (dia_cfg.led_mask)
     {
-        esp_gpio.config(DIA_LED, ESPBOT_GPIO_OUTPUT);
-        esp_gpio.set(DIA_LED, ESPBOT_HIGH);
+        gpio_config(DIA_LED, ESPBOT_GPIO_OUTPUT);
+        gpio_set(DIA_LED, ESPBOT_HIGH);
         // PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
         // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
         //
@@ -173,12 +174,12 @@ void dia_set_led_mask(char mask)
         {
             if (dia_event_queue.evnt[idx].type)
                 if (dia_cfg.led_mask & dia_event_queue.evnt[idx].type)
-                    esp_gpio.set(DIA_LED, ESPBOT_LOW);
+                    gpio_set(DIA_LED, ESPBOT_LOW);
         }
     }
     else
     {
-        esp_gpio.unconfig(DIA_LED);
+        gpio_unconfig(DIA_LED);
     }
 }
 
@@ -367,8 +368,8 @@ void dia_init_custom(void)
     // set the diagnostic led in case it is used
     if (dia_cfg.led_mask)
     {
-        esp_gpio.config(DIA_LED, ESPBOT_GPIO_OUTPUT);
-        esp_gpio.set(DIA_LED, ESPBOT_HIGH);
+        gpio_config(DIA_LED, ESPBOT_GPIO_OUTPUT);
+        gpio_set(DIA_LED, ESPBOT_HIGH);
         // PIN_FUNC_SELECT(gpio_MUX(DIA_LED), gpio_FUNC(DIA_LED));
         // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
         //
@@ -379,7 +380,7 @@ void dia_init_custom(void)
         {
             if (dia_event_queue.evnt[idx].type)
                 if (dia_cfg.led_mask & dia_event_queue.evnt[idx].type)
-                    esp_gpio.set(DIA_LED, ESPBOT_LOW);
+                    gpio_set(DIA_LED, ESPBOT_LOW);
         }
     }
 }

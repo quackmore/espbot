@@ -183,7 +183,7 @@ void espbot_init(void)
     espmem.init();
     esp_time.init_essential(); // cause diagnostic will use timestamp
     // print_greetings();
-    esp_gpio.init();           // cause it's used by diagnostic
+    gpio_init();           // cause it's used by diagnostic
     dia_init_essential(); // FS not available yet
 
     esp_spiffs_mount();

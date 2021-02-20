@@ -18,13 +18,19 @@ extern "C"
 #include "espbot_config.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
 #include "spiffs_esp8266.hpp"
 
 #define ESPBOT_INPUT_GET(input_reg, gpio_no) ((input_reg >> gpio_no) & BIT0)
+
+static struct espbot_gpio
+{
+    int32_t provisioned;
+    int32_t type;
+} gpio_cfg;
+
 
 static int gpio_getNum(int idx)
 {
@@ -65,30 +71,30 @@ static int gpio_getNum(int idx)
     else
     {
         dia_warn_evnt(GPIO_GETNUM_WRONG_INDEX);
-        ERROR("Gpio::set_as_input wrong index");
+        ERROR("gpio_set_as_input wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
 
-void Gpio::init(void)
+void gpio_init(void)
 {
-    m_gpio_provisioned = 0;
-    m_gpio_config = 0;
+    gpio_cfg.provisioned = 0;
+    gpio_cfg.type = 0;
 }
 
-int Gpio::config(int t_idx, int t_type)
+int gpio_config(int t_idx, int t_type)
 {
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
     {
-        m_gpio_provisioned = m_gpio_provisioned | (0x00000001 << t_idx);
+        gpio_cfg.provisioned = gpio_cfg.provisioned | (0x00000001 << t_idx);
         if (t_type == ESPBOT_GPIO_INPUT)
-            m_gpio_config = ~((~m_gpio_config) | (0x00000001 << t_idx));
+            gpio_cfg.type = ~((~gpio_cfg.type) | (0x00000001 << t_idx));
         else if (t_type == ESPBOT_GPIO_OUTPUT)
-            m_gpio_config = m_gpio_config | (0x00000001 << t_idx);
+            gpio_cfg.type = gpio_cfg.type | (0x00000001 << t_idx);
         else
         {
             dia_warn_evnt(GPIO_CONFIG_WRONG_TYPE);
-            ERROR("Gpio::config wrong type");
+            ERROR("gpio_config wrong type");
             return ESPBOT_GPIO_WRONG_TYPE;
         }
 
@@ -142,33 +148,33 @@ int Gpio::config(int t_idx, int t_type)
     else
     {
         dia_warn_evnt(GPIO_CONFIG_WRONG_INDEX);
-        ERROR("Gpio::config wrong index");
+        ERROR("gpio_config wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
 
-int Gpio::unconfig(int t_idx)
+int gpio_unconfig(int t_idx)
 {
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
     {
-        m_gpio_provisioned = ~((~m_gpio_provisioned) | (0x00000001 << t_idx));
+        gpio_cfg.provisioned = ~((~gpio_cfg.provisioned) | (0x00000001 << t_idx));
         return ESPBOT_GPIO_OK;
     }
     else
     {
         dia_warn_evnt(GPIO_UNCONFIG_WRONG_INDEX);
-        ERROR("Gpio::unconfig wrong gpio index");
+        ERROR("gpio_unconfig wrong gpio index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
 
-int Gpio::get_config(int t_idx)
+int gpio_get_config(int t_idx)
 {
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
     {
-        if (m_gpio_provisioned & (0x00000001 << t_idx))
+        if (gpio_cfg.provisioned & (0x00000001 << t_idx))
         {
-            if (m_gpio_config & (0x00000001 << t_idx))
+            if (gpio_cfg.type & (0x00000001 << t_idx))
                 return ESPBOT_GPIO_OUTPUT;
             else
                 return ESPBOT_GPIO_INPUT;
@@ -179,16 +185,16 @@ int Gpio::get_config(int t_idx)
     else
     {
         dia_warn_evnt(GPIO_GET_CONFIG_WRONG_INDEX);
-        ERROR("Gpio::get_config wrong index");
+        ERROR("gpio_get_config wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
 
-int Gpio::read(int t_idx)
+int gpio_read(int t_idx)
 {
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
     {
-        if (m_gpio_provisioned & (0x00000001 << t_idx))
+        if (gpio_cfg.provisioned & (0x00000001 << t_idx))
         {
             return (ESPBOT_INPUT_GET(gpio_input_get(), gpio_getNum(t_idx)));
         }
@@ -200,18 +206,18 @@ int Gpio::read(int t_idx)
     else
     {
         dia_warn_evnt(GPIO_READ_WRONG_INDEX);
-        ERROR("Gpio::read wrong index");
+        ERROR("gpio_read wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }
 
-int Gpio::set(int t_idx, int t_value)
+int gpio_set(int t_idx, int t_value)
 {
     if ((t_idx >= ESPBOT_D1) && (t_idx <= ESPBOT_D8))
     {
-        if (m_gpio_provisioned & (0x00000001 << t_idx))
+        if (gpio_cfg.provisioned & (0x00000001 << t_idx))
         {
-            if (m_gpio_config & (0x00000001 << t_idx))
+            if (gpio_cfg.type & (0x00000001 << t_idx))
             {
                 if ((t_value == ESPBOT_LOW) || (t_value == ESPBOT_HIGH))
                 {
@@ -249,14 +255,14 @@ int Gpio::set(int t_idx, int t_value)
                 else
                 {
                     dia_warn_evnt(GPIO_SET_WRONG_LEVEL);
-                    ERROR("Gpio::set wrong level");
+                    ERROR("gpio_set wrong level");
                     return ESPBOT_GPIO_WRONG_LVL;
                 }
             }
             else
             {
                 dia_warn_evnt(GPIO_SET_CANNOT_CHANGE);
-                ERROR("Gpio::set cannot change input");
+                ERROR("gpio_set cannot change input");
                 return ESPBOT_GPIO_CANNOT_CHANGE_INPUT;
             }
         }
@@ -266,7 +272,7 @@ int Gpio::set(int t_idx, int t_value)
     else
     {
         dia_warn_evnt(GPIO_GETNUM_WRONG_INDEX);
-        ERROR("Gpio::set wrong index");
+        ERROR("gpio_set wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
 }

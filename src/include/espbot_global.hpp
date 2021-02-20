@@ -15,7 +15,6 @@ extern "C"
 }
 
 #include "espbot.hpp"
-#include "espbot_gpio.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_ota.hpp"
@@ -29,6 +28,5 @@ extern Mdns esp_mDns;
 extern TimeDate esp_time;
 extern Websvr espwebsvr;
 extern Ota_upgrade esp_ota;
-extern Gpio esp_gpio;
 
 #endif
