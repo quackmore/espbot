@@ -488,8 +488,8 @@ char *cron_state_json_stringify(char *dest, int len)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            dia_error_evnt(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED);
-            ERROR("cron_state_json_stringify heap exhausted");
+            dia_error_evnt(CRON_STATE_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("cron_state_json_stringify heap exhausted [%d]", msg_len);
             return NULL;
         }
     }

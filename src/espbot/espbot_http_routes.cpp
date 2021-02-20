@@ -371,7 +371,7 @@ static void setCron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("setCron");
     JSONP req_croncfg(parsed_req->req_content, parsed_req->content_len);
-    int enabled = req_croncfg.getInt("cron_enabled");
+    int enabled = req_croncfg.getInt(f_str("cron_enabled"));
     if (req_croncfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -396,8 +396,8 @@ static void getHexMemDump(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     ALL("getHexMemDump");
     JSONP mem_param(parsed_req->req_content, parsed_req->content_len);
     char address_str[16];
-    mem_param.getStr("address", address_str, 16);
-    int length = mem_param.getInt("length");
+    mem_param.getStr(f_str("address"), address_str, 16);
+    int length = mem_param.getInt(f_str("length"));
     if (mem_param.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -502,8 +502,8 @@ static void getMemDump(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     ALL("getMemDump");
     JSONP mem_param(parsed_req->req_content, parsed_req->content_len);
     char address_str[16];
-    mem_param.getStr("address", address_str, 16);
-    int length = mem_param.getInt("length");
+    mem_param.getStr(f_str("address"), address_str, 16);
+    int length = mem_param.getInt(f_str("length"));
     if (mem_param.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -583,10 +583,10 @@ static void setDiagnosticCfg(struct espconn *ptr_espconn, Http_parsed_req *parse
 {
     ALL("setDiagnosticCfg");
     JSONP diag_cfg(parsed_req->req_content, parsed_req->content_len);
-    int diag_led_mask = diag_cfg.getInt("diag_led_mask");
-    int serial_log_mask = diag_cfg.getInt("serial_log_mask");
-    int sdk_print_enabled = diag_cfg.getInt("sdk_print_enabled");
-    int uart_0_bitrate = diag_cfg.getInt("uart_0_bitrate");
+    int diag_led_mask = diag_cfg.getInt(f_str("diag_led_mask"));
+    int serial_log_mask = diag_cfg.getInt(f_str("serial_log_mask"));
+    int sdk_print_enabled = diag_cfg.getInt(f_str("sdk_print_enabled"));
+    int uart_0_bitrate = diag_cfg.getInt(f_str("uart_0_bitrate"));
     if (diag_cfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -887,7 +887,7 @@ static void setDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
     ALL("setDeviceName");
     JSONP device_cfg(parsed_req->req_content, parsed_req->content_len);
     char device_name[32];
-    device_cfg.getStr("device_name", device_name, 32);
+    device_cfg.getStr(f_str("device_name"), device_name, 32);
     if (device_cfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -1096,39 +1096,21 @@ static void getGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         return;
     }
     gpio_id = atoi(gpio_name);
-    // {"gpio_id":,"gpio_type":"unprovisioned"}
-    Heap_chunk msg(48, dont_free);
-    if (msg.ref)
+    if (!gpio_valid_id(gpio_id))
     {
-        int result = gpio_get_config(gpio_id);
-        switch (result)
-        {
-        case ESPBOT_GPIO_WRONG_IDX:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-            return;
-        case ESPBOT_GPIO_UNPROVISIONED:
-            fs_sprintf(msg.ref, "{\"gpio_id\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_id);
-            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-            return;
-        case ESPBOT_GPIO_INPUT:
-            fs_sprintf(msg.ref, "{\"gpio_id\": %d,\"gpio_type\":\"input\"}", gpio_id);
-            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-            return;
-        case ESPBOT_GPIO_OUTPUT:
-            fs_sprintf(msg.ref, "{\"gpio_id\": %d,\"gpio_type\":\"output\"}", gpio_id);
-            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-            return;
-        default:
-            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Gpio.get_config error"), false);
-            return;
-        }
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
+        return;
+    }
+    char *msg = gpio_cfg_json_stringify(gpio_id);
+    if (msg)
+    {
+        if (os_strlen(msg) == 0)
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("gpio_get_config error"), false);
+        else
+            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     }
     else
-    {
-        dia_error_evnt(ROUTES_GETGPIOCFG_HEAP_EXHAUSTED, 48);
-        ERROR("getGpioCfg heap exhausted %d", 48);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
     espmem.stack_mon();
 }
 
@@ -1143,82 +1125,45 @@ static void setGpioCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         return;
     }
     gpio_id = atoi(gpio_name);
-
+    if (!gpio_valid_id(gpio_id))
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
+        return;
+    }
     JSONP req_gpio(parsed_req->req_content, parsed_req->content_len);
     char gpio_type_str[16];
-    req_gpio.getStr("gpio_type", gpio_type_str, 16);
+    req_gpio.getStr(f_str("gpio_type"), gpio_type_str, 16);
     if (req_gpio.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-
     if ((os_strcmp(gpio_type_str, f_str("UNPROVISIONED")) == 0) ||
         (os_strcmp(gpio_type_str, f_str("unprovisioned")) == 0))
-    {
-        if (gpio_unconfig(gpio_id) == ESPBOT_GPIO_WRONG_IDX)
-        {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-            return;
-        }
-    }
+        gpio_unconfig(gpio_id);
     else if ((os_strcmp(gpio_type_str, f_str("INPUT")) == 0) ||
              (os_strcmp(gpio_type_str, f_str("input")) == 0))
-
-    {
-        if (gpio_config(gpio_id, ESPBOT_GPIO_INPUT) == ESPBOT_GPIO_WRONG_IDX)
-        {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-            return;
-        }
-    }
+        gpio_config(gpio_id, ESPBOT_GPIO_INPUT);
     else if ((os_strcmp(gpio_type_str, f_str("OUTPUT")) == 0) ||
              (os_strcmp(gpio_type_str, f_str("output")) == 0))
-    {
-        if (gpio_config(gpio_id, ESPBOT_GPIO_OUTPUT) == ESPBOT_GPIO_WRONG_IDX)
-        {
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-            return;
-        }
-    }
+        gpio_config(gpio_id, ESPBOT_GPIO_OUTPUT);
     else
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO type"), false);
         return;
     }
 
-    // {"gpio_id": 1,"gpio_type":"unprovisioned"}
-    Heap_chunk msg(48, dont_free);
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETGPIOCFG_HEAP_EXHAUSTED, parsed_req->content_len);
-        ERROR("setGpioCfg heap exhausted %d", parsed_req->content_len);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-
     int result = gpio_get_config(gpio_id);
-    switch (result)
+    char *msg = gpio_cfg_json_stringify(gpio_id);
+    if (msg)
     {
-    case ESPBOT_GPIO_WRONG_IDX:
-        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-        return;
-    case ESPBOT_GPIO_UNPROVISIONED:
-        fs_sprintf(msg.ref, "{\"gpio_id\": %d,\"gpio_type\":\"unprovisioned\"}", gpio_id);
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-        return;
-    case ESPBOT_GPIO_INPUT:
-        fs_sprintf(msg.ref, "{\"gpio_id\": %d,\"gpio_type\":\"input\"}", gpio_id);
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-        return;
-    case ESPBOT_GPIO_OUTPUT:
-        fs_sprintf(msg.ref, "{\"gpio_id\": %d,\"gpio_type\":\"output\"}", gpio_id);
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-        return;
-    default:
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Gpio.get_config error"), false);
-        return;
+        if (os_strlen(msg) == 0)
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("gpio_set_config error"), false);
+        else
+            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     }
+    else
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     espmem.stack_mon();
 }
 
@@ -1233,36 +1178,21 @@ static void getGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         return;
     }
     gpio_id = atoi(gpio_name);
-
-    // {"gpio_id":,"gpio_level":"unprovisioned"}
-    Heap_chunk msg(48, dont_free);
-    if (msg.ref == NULL)
+    if (!gpio_valid_id(gpio_id))
     {
-        dia_error_evnt(ROUTES_GETGPIOLEVEL_HEAP_EXHAUSTED, 48);
-        ERROR("getGpioLevel heap exhausted %d", 64);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-
-    int result = gpio_read(gpio_id);
-    switch (result)
-    {
-    case ESPBOT_GPIO_WRONG_IDX:
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
         return;
-    case ESPBOT_GPIO_UNPROVISIONED:
-        fs_sprintf(msg.ref, "{\"gpio_id\":%d,\"gpio_level\":\"unprovisioned\"}", gpio_id);
-        break;
-    case ESPBOT_LOW:
-        fs_sprintf(msg.ref, "{\"gpio_id\":%d,\"gpio_level\":\"low\"}", gpio_id);
-        break;
-    case ESPBOT_HIGH:
-        fs_sprintf(msg.ref, "{\"gpio_id\":%d,\"gpio_level\":\"high\"}", gpio_id);
-        break;
-    default:
-        break;
     }
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
+    char *msg = gpio_state_json_stringify(gpio_id);
+    if (msg)
+    {
+        if (os_strlen(msg) == 0)
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("gpio_read error"), false);
+        else
+            http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    }
+    else
+        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     espmem.stack_mon();
 }
 
@@ -1277,17 +1207,20 @@ static void setGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         return;
     }
     gpio_id = atoi(gpio_name);
-
+    if (!gpio_valid_id(gpio_id))
+    {
+        http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
+        return;
+    }
     int output_level;
     JSONP req_gpio(parsed_req->req_content, parsed_req->content_len);
     char output_level_str[16];
-    req_gpio.getStr("gpio_level", output_level_str, 16);
+    req_gpio.getStr(f_str("gpio_level"), output_level_str, 16);
     if (req_gpio.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-
     if ((os_strcmp(output_level_str, f_str("LOW")) == 0) ||
         (os_strcmp(output_level_str, f_str("low")) == 0))
         output_level = ESPBOT_LOW;
@@ -1301,51 +1234,32 @@ static void setGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
     }
     int result = gpio_set(gpio_id, output_level);
 
-    // {"gpio_id":,"gpio_level":"unprovisioned"}
-    Heap_chunk msg(48, dont_free);
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETGPIOLEVEL_HEAP_EXHAUSTED, 48);
-        ERROR("setGpioLevel heap exhausted %d", 48);
-        http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
     switch (result)
     {
     case ESPBOT_GPIO_WRONG_IDX:
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-        return;
+        break;
     case ESPBOT_GPIO_UNPROVISIONED:
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("GPIO is unprovisioned"), false);
-        return;
+        break;
     case ESPBOT_GPIO_WRONG_LVL:
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong output level"), false);
-        return;
+        break;
     case ESPBOT_GPIO_CANNOT_CHANGE_INPUT:
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Cannot change input"), false);
-        return;
+        break;
     case ESPBOT_GPIO_OK:
     {
-        int result = gpio_read(gpio_id);
-        switch (result)
+        char *msg = gpio_state_json_stringify(gpio_id);
+        if (msg)
         {
-        case ESPBOT_GPIO_WRONG_IDX:
-            http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Wrong GPIO ID"), false);
-            return;
-        case ESPBOT_GPIO_UNPROVISIONED:
-            fs_sprintf(msg.ref, "{\"gpio_id\":%d,\"gpio_level\":\"unprovisioned\"}", gpio_id);
-            break;
-        case ESPBOT_LOW:
-            fs_sprintf(msg.ref, "{\"gpio_id\":%d,\"gpio_level\":\"low\"}", gpio_id);
-            break;
-        case ESPBOT_HIGH:
-            fs_sprintf(msg.ref, "{\"gpio_id\":%d,\"gpio_level\":\"high\"}", gpio_id);
-            break;
-        default:
-            break;
+            if (os_strlen(msg) == 0)
+                http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("gpio_read error"), false);
+            else
+                http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
         }
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-        return;
+        else
+            http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
     }
     default:
         break;
@@ -1378,7 +1292,7 @@ static void setMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("setMdns");
     JSONP mdns_cfg(parsed_req->req_content, parsed_req->content_len);
-    int mdns_enabled = mdns_cfg.getInt("mdns_enabled");
+    int mdns_enabled = mdns_cfg.getInt(f_str("mdns_enabled"));
     if (mdns_cfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -1432,8 +1346,8 @@ static void setTimedateCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_
 {
     ALL("setTimedateCfg");
     JSONP req_timedate(parsed_req->req_content, parsed_req->content_len);
-    int sntp_enabled = req_timedate.getInt("sntp_enabled");
-    int timezone = req_timedate.getInt("timezone");
+    int sntp_enabled = req_timedate.getInt(f_str("sntp_enabled"));
+    int timezone = req_timedate.getInt(f_str("timezone"));
     if (req_timedate.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -1495,7 +1409,7 @@ static void setTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
 {
     ALL("setTimedate");
     JSONP req_timedate(parsed_req->req_content, parsed_req->content_len);
-    int32 timestamp = (int32)req_timedate.getInt("timestamp");
+    int32 timestamp = (int32)req_timedate.getInt(f_str("timestamp"));
     if (req_timedate.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -1583,12 +1497,12 @@ static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     ALL("setOtaCfg");
     JSONP req_otacfg(parsed_req->req_content, parsed_req->content_len);
     char host[16];
-    req_otacfg.getStr("host", host, 16);
-    int port = req_otacfg.getInt("port");
+    req_otacfg.getStr(f_str("host"), host, 16);
+    int port = req_otacfg.getInt(f_str("port"));
     char path[128];
-    req_otacfg.getStr("path", path, 128);
-    bool check_version = (bool)req_otacfg.getInt("check_version");
-    bool reboot_on_completion = req_otacfg.getInt("reboot_on_completion");
+    req_otacfg.getStr(f_str("path"), path, 128);
+    bool check_version = (bool)req_otacfg.getInt(f_str("check_version"));
+    bool reboot_on_completion = req_otacfg.getInt(f_str("reboot_on_completion"));
     if (req_otacfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -1650,9 +1564,9 @@ static void setWifiApCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
 {
     ALL("setWifiApCfg");
     JSONP req_apcfg(parsed_req->req_content, parsed_req->content_len);
-    int ap_channel = req_apcfg.getInt("ap_channel");
+    int ap_channel = req_apcfg.getInt(f_str("ap_channel"));
     char ap_pwd[64];
-    req_apcfg.getStr("ap_pwd", ap_pwd, 64);
+    req_apcfg.getStr(f_str("ap_pwd"), ap_pwd, 64);
     if (req_apcfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
@@ -1686,9 +1600,9 @@ static void setWifiStationCfg(struct espconn *ptr_espconn, Http_parsed_req *pars
     ALL("setWifiStationCfg");
     JSONP req_stationcfg(parsed_req->req_content, parsed_req->content_len);
     char ssid[32];
-    req_stationcfg.getStr("station_ssid", ssid, 32);
+    req_stationcfg.getStr(f_str("station_ssid"), ssid, 32);
     char pwd[64];
-    req_stationcfg.getStr("station_pwd", pwd, 64);
+    req_stationcfg.getStr(f_str("station_pwd"), pwd, 64);
     if (req_stationcfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);

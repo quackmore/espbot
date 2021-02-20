@@ -52,4 +52,8 @@ int gpio_set(int, int); // takes the gpio index (1..8) and the output level (ESP
                         // returns ESPBOT_GPIO_UNPROVISIONED if gpio wasn't set as input/output
                         // returns ESPBOT_GPIO_CANNOT_SET_INPUT if gpio was set as input
 
+bool gpio_valid_id(int);
+char *gpio_cfg_json_stringify(int idx, char *dest = NULL, int len = 0);
+char *gpio_state_json_stringify(int idx, char *dest = NULL, int len = 0);
+
 #endif

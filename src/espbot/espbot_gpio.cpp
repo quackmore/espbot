@@ -31,7 +31,6 @@ static struct espbot_gpio
     int32_t type;
 } gpio_cfg;
 
-
 static int gpio_getNum(int idx)
 {
     int num;
@@ -275,4 +274,104 @@ int gpio_set(int t_idx, int t_value)
         ERROR("gpio_set wrong index");
         return ESPBOT_GPIO_WRONG_IDX;
     }
+}
+
+bool gpio_valid_id(int idx)
+{
+    if ((idx >= ESPBOT_D1) && (idx <= ESPBOT_D8))
+        return true;
+    else
+        return false;
+}
+
+char *gpio_cfg_json_stringify(int gpio_id, char *dest, int len)
+{
+    // {"gpio_id":,"gpio_type":"unprovisioned"}
+    int msg_len = 48;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(GPIO_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("gpio_cfg_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    int result = gpio_get_config(gpio_id);
+    switch (result)
+    {
+    case ESPBOT_GPIO_WRONG_IDX:
+        *msg = 0;
+        break;
+    case ESPBOT_GPIO_UNPROVISIONED:
+        fs_sprintf(msg, "{\"gpio_id\":%d,\"gpio_type\":\"unprovisioned\"}", gpio_id);
+        break;
+    case ESPBOT_GPIO_INPUT:
+        fs_sprintf(msg, "{\"gpio_id\":%d,\"gpio_type\":\"input\"}", gpio_id);
+        break;
+    case ESPBOT_GPIO_OUTPUT:
+        fs_sprintf(msg, "{\"gpio_id\":%d,\"gpio_type\":\"output\"}", gpio_id);
+        break;
+    default:
+        *msg = 0;
+        break;
+    }
+    return msg;
+}
+
+char *gpio_state_json_stringify(int gpio_id, char *dest, int len)
+{
+    // {"gpio_id":,"gpio_level":"unprovisioned"}
+    int msg_len = 48;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(GPIO_STATE_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("gpio_state_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            msg[0] = 0;
+            return msg;
+        }
+    }
+    int result = gpio_read(gpio_id);
+    switch (result)
+    {
+    case ESPBOT_GPIO_WRONG_IDX:
+        msg[0] = 0;
+        break;
+    case ESPBOT_GPIO_UNPROVISIONED:
+        fs_sprintf(msg, "{\"gpio_id\":%d,\"gpio_level\":\"unprovisioned\"}", gpio_id);
+        break;
+    case ESPBOT_LOW:
+        fs_sprintf(msg, "{\"gpio_id\":%d,\"gpio_level\":\"low\"}", gpio_id);
+        break;
+    case ESPBOT_HIGH:
+        fs_sprintf(msg, "{\"gpio_id\":%d,\"gpio_level\":\"high\"}", gpio_id);
+        break;
+    default:
+        msg[0] = 0;
+        break;
+    }
+    return msg;
 }

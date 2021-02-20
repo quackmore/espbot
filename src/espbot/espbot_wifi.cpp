@@ -583,8 +583,8 @@ char *espwifi_cfg_json_stringify(char *dest, int len)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            dia_error_evnt(WIFI_CFG_STRINGIFY_HEAP_EXHAUSTED);
-            ERROR("espwifi_cfg_json_stringify heap exhausted");
+            dia_error_evnt(WIFI_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("espwifi_cfg_json_stringify heap exhausted [%d]", msg_len);
             return NULL;
         }
     }
@@ -616,8 +616,8 @@ char *espwifi_status_json_stringify(char *dest, int len)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            dia_error_evnt(WIFI_STATUS_STRINGIFY_HEAP_EXHAUSTED);
-            ERROR("espwifi_status_json_stringify heap exhausted");
+            dia_error_evnt(WIFI_STATUS_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("espwifi_status_json_stringify heap exhausted [%d]", msg_len);
             return NULL;
         }
     }
@@ -662,8 +662,8 @@ char *espwifi_scan_results_json_stringify(char *dest, int len)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            dia_error_evnt(WIFI_SCAN_RESULTS_STRINGIFY_HEAP_EXHAUSTED);
-            ERROR("espwifi_scan_results_json_stringify heap exhausted");
+            dia_error_evnt(WIFI_SCAN_RESULTS_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("espwifi_scan_results_json_stringify heap exhausted [%d]", msg_len);
             return NULL;
         }
     }

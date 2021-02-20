@@ -234,8 +234,8 @@ char *dia_cfg_json_stringify(char *dest, int len)
         msg = new char[msg_len];
         if (msg == NULL)
         {
-            dia_error_evnt(DIAG_CFG_STRINGIFY_HEAP_EXHAUSTED);
-            ERROR("cron_state_json_stringify heap exhausted");
+            dia_error_evnt(DIAG_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("cron_state_json_stringify heap exhausted [%d]", msg_len);
             return NULL;
         }
     }
@@ -268,10 +268,10 @@ int dia_restore_cfg(void)
         return CFG_cantRestore;
     Cfgfile cfgfile(DIAG_FILENAME);
     espmem.stack_mon();
-    int uart_0_bitrate = cfgfile.getInt("uart_0_bitrate");
-    int sdk_print_enabled = cfgfile.getInt("sdk_print_enabled");
-    int led_mask = cfgfile.getInt("diag_led_mask");
-    int serial_log_mask = cfgfile.getInt("serial_log_mask");
+    int uart_0_bitrate = cfgfile.getInt(f_str("uart_0_bitrate"));
+    int sdk_print_enabled = cfgfile.getInt(f_str("sdk_print_enabled"));
+    int led_mask = cfgfile.getInt(f_str("diag_led_mask"));
+    int serial_log_mask = cfgfile.getInt(f_str("serial_log_mask"));
     if (cfgfile.getErr() != JSON_noerr)
     {
         dia_error_evnt(DIAG_RESTORE_CFG_ERROR);
@@ -294,10 +294,10 @@ static int dia_saved_cfg_updated(void)
     }
     Cfgfile cfgfile(DIAG_FILENAME);
     espmem.stack_mon();
-    int uart_0_bitrate = cfgfile.getInt("uart_0_bitrate");
-    int sdk_print_enabled = cfgfile.getInt("sdk_print_enabled");
-    int led_mask = cfgfile.getInt("diag_led_mask");
-    int serial_log_mask = cfgfile.getInt("serial_log_mask");
+    int uart_0_bitrate = cfgfile.getInt(f_str("uart_0_bitrate"));
+    int sdk_print_enabled = cfgfile.getInt(f_str("sdk_print_enabled"));
+    int led_mask = cfgfile.getInt(f_str("diag_led_mask"));
+    int serial_log_mask = cfgfile.getInt(f_str("serial_log_mask"));
     if (cfgfile.getErr() != JSON_noerr)
     {
         dia_error_evnt(DIAG_SAVED_CFG_UPDATED_ERROR);
