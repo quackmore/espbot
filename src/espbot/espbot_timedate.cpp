@@ -190,8 +190,9 @@ static int timedate_saved_cfg_updated(void)
     int timezone = cfgfile.getInt(f_str("timezone"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        dia_error_evnt(TIMEDATE_SAVED_CFG_UPDATED_ERROR);
-        ERROR("timedate_saved_cfg_updated error");
+        // no need to arise an error, the cfg file will be overwritten
+        // dia_error_evnt(TIMEDATE_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("timedate_saved_cfg_updated error");
         return CFG_error;
     }
     if ((timedate_cfg.sntp_enabled != (bool)sntp_enabled) ||

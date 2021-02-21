@@ -541,8 +541,9 @@ static int wifi_cfg_uptodate(void)
     int ap_channel = cfgfile.getInt(f_str("ap_channel"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        dia_error_evnt(WIFI_CFG_UPTODATE_ERROR);
-        ERROR("wifi_cfg_uptodate error");
+        // no need to arise an error, the cfg file will be overwritten
+        // dia_error_evnt(WIFI_CFG_UPTODATE_ERROR);
+        // ERROR("wifi_cfg_uptodate error");
         return CFG_error;
     }
     if (os_strcmp(station_ssid, st_ssid) ||

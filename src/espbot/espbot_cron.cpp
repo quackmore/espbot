@@ -473,8 +473,9 @@ static int cron_saved_cfg_updated(void)
     int enabled = cfgfile.getInt(f_str("cron_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        dia_error_evnt(CRON_SAVED_CFG_UPDATED_ERROR);
-        ERROR("cron_saved_cfg_updated error");
+        // no need to arise an error, the cfg file will be overwritten
+        // dia_error_evnt(CRON_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("cron_saved_cfg_updated error");
         return CFG_error;
     }
     if (cron_cfg.enabled != (bool)enabled)

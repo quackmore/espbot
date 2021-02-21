@@ -301,8 +301,9 @@ static int dia_saved_cfg_updated(void)
     int serial_log_mask = cfgfile.getInt(f_str("serial_log_mask"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        dia_error_evnt(DIAG_SAVED_CFG_UPDATED_ERROR);
-        ERROR("dia_saved_cfg_updated error");
+        // no need to arise an error, the cfg file will be overwritten
+        // dia_error_evnt(DIAG_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("dia_saved_cfg_updated error");
         return CFG_error;
     }
     if ((dia_cfg.uart_0_bitrate != (uint32)uart_0_bitrate) ||
@@ -356,7 +357,7 @@ void dia_init_essential(void)
 void dia_init_custom(void)
 {
     // restore cfg from flash if available
-    if (dia_restore_cfg())
+    if (dia_restore_cfg() != CFG_ok)
     {
         dia_warn_evnt(DIAG_INIT_DEFAULT_CFG);
         WARN("dia_init default cfg");

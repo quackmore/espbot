@@ -45,7 +45,7 @@ static int mdns_restore_cfg(void)
         return CFG_cantRestore;
     Cfgfile cfgfile(MDNS_FILENAME);
     espmem.stack_mon();
-    int enabled = cfgfile.getInt(f_str("enabled"));
+    int enabled = cfgfile.getInt(f_str("mdns_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
         dia_error_evnt(MDNS_RESTORE_CFG_ERROR);
@@ -65,11 +65,12 @@ static int mdns_saved_cfg_updated(void)
     }
     Cfgfile cfgfile(MDNS_FILENAME);
     espmem.stack_mon();
-    int enabled = cfgfile.getInt(f_str("enabled"));
+    int enabled = cfgfile.getInt(f_str("mdns_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        dia_error_evnt(MDNS_SAVED_CFG_UPDATED_ERROR);
-        ERROR("mdns_saved_cfg_updated error");
+        // no need to arise an error, the cfg file will be overwritten
+        // dia_error_evnt(MDNS_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("mdns_saved_cfg_updated error");
         return CFG_error;
     }
     if (mdns_cfg.enabled != (bool)enabled)
@@ -81,8 +82,8 @@ static int mdns_saved_cfg_updated(void)
 
 char *mdns_cfg_json_stringify(char *dest, int len)
 {
-    // {"enabled":0}
-    int msg_len = 13 + 1;
+    // {"mdns_enabled":0}
+    int msg_len = 18 + 1;
     char *msg;
     if (dest == NULL)
     {
@@ -104,7 +105,7 @@ char *mdns_cfg_json_stringify(char *dest, int len)
         }
     }
     fs_sprintf(msg,
-               "{\"enabled\":%d}",
+               "{\"mdns_enabled\":%d}",
                mdns_cfg.enabled);
     return msg;
 }
@@ -118,8 +119,8 @@ int mdns_cfg_save(void)
     espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
-    char str[14];
-    mdns_cfg_json_stringify(str, 14);
+    char str[19];
+    mdns_cfg_json_stringify(str, 19);
     int res = cfgfile.n_append(str, os_strlen(str));
     if (res < SPIFFS_OK)
         return CFG_error;
@@ -180,7 +181,7 @@ void mdns_init(void)
     mdns_cfg.enabled = false;
     mdns_state.running = false;
 
-    if (mdns_restore_cfg())
+    if (mdns_restore_cfg() != CFG_ok)
     {
         dia_warn_evnt(MDNS_INIT_DEFAULT_CFG);
         WARN("mdns_init no cfg available");
