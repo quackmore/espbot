@@ -22,6 +22,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_profiler.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 
 static struct
@@ -69,7 +70,7 @@ inline void dia_add_event(char type, int code, uint32 value)
     int idx = dia_event_queue.last + 1;
     if (idx >= EVNT_QUEUE_SIZE)
         idx = 0;
-    dia_event_queue.evnt[idx].timestamp = esp_time.get_timestamp();
+    dia_event_queue.evnt[idx].timestamp = timedate_get_timestamp();
     dia_event_queue.evnt[idx].ack = 0;
     dia_event_queue.evnt[idx].type = type;
     dia_event_queue.evnt[idx].code = code;

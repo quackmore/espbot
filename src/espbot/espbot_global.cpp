@@ -23,6 +23,5 @@ char *espbot_release = APP_RELEASE;
 
 Esp_mem espmem;
 Espbot espbot;
-TimeDate esp_time;
 Websvr espwebsvr;
 Ota_upgrade esp_ota;

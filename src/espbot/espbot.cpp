@@ -31,6 +31,7 @@ extern "C"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
 #include "espbot_spiffs.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_webclient.hpp"
 #include "espbot_wifi.hpp"
@@ -53,7 +54,7 @@ static void espbot_coordinator_task(os_event_t *e)
         if (e->par == GOT_IP_AFTER_CONNECTION)
         {
             // new connection
-            esp_time.start_sntp();
+            timedate_start_sntp();
             mdns_start(espbot.get_name());
             // check if there is a web server listening on esp AP interface
             if (espbot_http_status != not_running)
@@ -65,8 +66,8 @@ static void espbot_coordinator_task(os_event_t *e)
         if (e->par == GOT_IP_ALREADY_CONNECTED)
         {
             // dhcp lease renewal
-            esp_time.stop_sntp();
-            esp_time.start_sntp();
+            timedate_stop_sntp();
+            timedate_start_sntp();
             mdns_stop();
             mdns_start(espbot.get_name());
             if (espbot_http_status != not_running)
@@ -77,7 +78,7 @@ static void espbot_coordinator_task(os_event_t *e)
         break;
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
-        esp_time.stop_sntp();
+        timedate_stop_sntp();
         mdns_stop();
         // stop the webserver only if it is running on the WIFI STATION interface
         if (espbot_http_status == running_on_sta)
@@ -128,8 +129,8 @@ static void espbot_coordinator_task(os_event_t *e)
 static void heartbeat_cb(void)
 {
     TRACE("ESPBOT HEARTBEAT: ---------------------------------------------------");
-    uint32 current_timestamp = esp_time.get_timestamp();
-    TRACE("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, esp_time.get_timestr(current_timestamp));
+    uint32 current_timestamp = timedate_get_timestamp();
+    TRACE("ESPBOT HEARTBEAT: [%d] [UTC+1] %s", current_timestamp, timedate_get_timestr(current_timestamp));
     TRACE("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
 }
 
@@ -182,14 +183,14 @@ void espbot_init(void)
     // the previous setting will be overridden in esp_diag.init
     // according to custom values saved in flash
     espmem.init();
-    esp_time.init_essential(); // cause diagnostic will use timestamp
+    timedate_init_essential(); // cause diagnostic will use timestamp
     // print_greetings();
     gpio_init();           // cause it's used by diagnostic
     dia_init_essential(); // FS not available yet
 
     esp_spiffs_mount();
     dia_init_custom(); // FS is available now
-    esp_time.init();        // FS is available now
+    timedate_init();        // FS is available now
     espbot.init();
     mdns_init();
     esp_ota.init();
@@ -324,7 +325,7 @@ void Espbot::reset(int t_reset)
         cron_stop();
         espwebsvr.stop();
         mdns_stop();
-        esp_time.stop_sntp();
+        timedate_stop_sntp();
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 200, 0);
         break;
@@ -368,7 +369,7 @@ void Espbot::init(void)
     _queue = new os_event_t[QUEUE_LEN];
     system_os_task(espbot_coordinator_task, USER_TASK_PRIO_0, _queue, QUEUE_LEN);
     // keep trace of the reboot time
-    _lastRebootTime = esp_time.get_timestamp();
+    _lastRebootTime = timedate_get_timestamp();
 }
 
 uint32 Espbot::get_last_reboot_time(void)

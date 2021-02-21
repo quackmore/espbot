@@ -20,6 +20,7 @@ extern "C"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_global.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 #include "library_dht.hpp"
 
@@ -41,13 +42,13 @@ char *app_release = APP_RELEASE;
 static void heartbeat_cb(void *param)
 {
     DEBUG("ESPBOT HEARTBEAT: ---------------------------------------------------");
-    uint32 current_timestamp = esp_time.get_timestamp();
-    signed char tz = esp_time.get_timezone();
+    uint32 current_timestamp = timedate_get_timestamp();
+    signed char tz = timedate_get_timezone();
     DEBUG("ESPBOT HEARTBEAT: [%d] [UTC%c%d] %s",
           current_timestamp,
           (tz >= 0 ? '+' : ' '),
           tz,
-          esp_time.get_timestr(current_timestamp));
+          timedate_get_timestr(current_timestamp));
     DEBUG("ESPBOT HEARTBEAT: Available heap size: %d", system_get_free_heap_size());
 }
 
@@ -72,9 +73,9 @@ void app_init_after_wifi(void)
     {
         first_time = false;
         // test if sntp get_timestamp works fine
-        uint32 timestamp = esp_time.get_timestamp();
+        uint32 timestamp = timedate_get_timestamp();
         DEBUG("INIT AFTER WIFI");
-        fs_printf("=======> current timestamp %s\n", esp_time.get_timestr(timestamp));
+        fs_printf("=======> current timestamp %s\n", timedate_get_timestr(timestamp));
     }
 }
 

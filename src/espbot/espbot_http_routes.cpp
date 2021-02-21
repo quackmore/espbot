@@ -470,7 +470,7 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
                "\"reason\":\"%X\","
                "\"exccause\":\"%X\","
                "\"epc1\":\"%X\",",
-               esp_time.get_timestr(espbot.get_last_reboot_time()),
+               timedate_get_timestr(espbot.get_last_reboot_time()),
                last_rst->reason,
                last_rst->exccause,
                last_rst->epc1);
@@ -1305,23 +1305,11 @@ static void setMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 static void getTimedateCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getTimedateCfg");
-    // "{"sntp_enabled": 0,"timezone": -12}" 36 chars
-    int msg_len = 36;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"sntp_enabled\": %d,\"timezone\": %d}",
-                   esp_time.sntp_enabled(),
-                   esp_time.get_timezone());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = timedate_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        dia_error_evnt(ROUTES_GETTIMEDATECFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("getTimedateCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setTimedateCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1337,54 +1325,28 @@ static void setTimedateCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_
     }
 
     if (sntp_enabled)
-        esp_time.enable_sntp();
+        timedate_enable_sntp();
     else
-        esp_time.disable_sntp();
-    esp_time.set_timezone(timezone);
-    esp_time.save_cfg();
+        timedate_disable_sntp();
+    timedate_set_timezone(timezone);
+    timedate_cfg_save();
 
-    int msg_len = 36;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETTIMEDATECFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("setTimedateCfg heap exhausted %d", msg_len);
+    char *msg = timedate_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref,
-               "{\"sntp_enabled\": %d,\"timezone\": %d}",
-               esp_time.sntp_enabled(),
-               esp_time.get_timezone());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     espmem.stack_mon();
 }
 
 static void getTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getTimedate");
-    // "{"timestamp":1589272200,"timedate":"Tue May 12 09:30:00 2020","sntp_enabled":0,"timezone": -12}" 95 chars
-    int msg_len = 95 + 1;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        uint32 current_timestamp = esp_time.get_timestamp();
-        fs_sprintf(msg.ref,
-                   "{\"timestamp\":%d,\"date\":\"%s\",",
-                   current_timestamp,
-                   esp_time.get_timestr(current_timestamp));
-        fs_sprintf(msg.ref + os_strlen(msg.ref),
-                   "\"sntp_enabled\":%d,\"timezone\":%d}",
-                   esp_time.sntp_enabled(),
-                   esp_time.get_timezone());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = timedate_state_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        dia_error_evnt(ROUTES_GETTIMEDATE_HEAP_EXHAUSTED, msg_len);
-        ERROR("getTimedate heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1398,22 +1360,13 @@ static void setTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
         return;
     }
 
-    esp_time.set_time_manually((uint32)timestamp);
+    timedate_set_time_manually((uint32)timestamp);
 
-    // "{"timestamp": 01234567891}"
-    int msg_len = 27;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETTIMEDATE_HEAP_EXHAUSTED, msg_len);
-        ERROR("setTimedate heap exhausted %d", msg_len);
+    char *msg = timedate_state_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref,
-               "{\"timestamp\": %d}",
-               timestamp);
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     espmem.stack_mon();
 }
 

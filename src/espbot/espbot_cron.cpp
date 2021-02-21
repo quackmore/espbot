@@ -19,6 +19,7 @@ extern "C"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_list.hpp"
+#include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 
 struct job
@@ -105,10 +106,10 @@ static int get_month(char *str)
 
 static void state_current_time(struct date *time)
 {
-    uint32 timestamp = esp_time.get_timestamp();
+    uint32 timestamp = timedate_get_timestamp();
     time->timestamp = timestamp;
-    char *timestamp_str = esp_time.get_timestr(timestamp);
-    TRACE("state_current_time date: %s (UTC+%d) [%d]", timestamp_str, esp_time.get_timezone(), timestamp);
+    char *timestamp_str = timedate_get_timestr(timestamp);
+    TRACE("state_current_time date: %s (UTC+%d) [%d]", timestamp_str, timedate_get_timezone(), timestamp);
     char tmp_str[5];
     // get day of week
     char *init_ptr = timestamp_str;
@@ -256,7 +257,7 @@ void cron_sync(void)
     if (!cron_cfg.enabled)
         return;
     uint32 cron_period;
-    uint32 timestamp = esp_time.get_timestamp();
+    uint32 timestamp = timedate_get_timestamp();
     // TRACE("cron timestamp: %d", timestamp);
     timestamp = timestamp % 60;
 
