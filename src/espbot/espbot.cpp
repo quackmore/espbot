@@ -27,6 +27,7 @@ extern "C"
 #include "espbot_gpio.hpp"
 #include "espbot_hal.h"
 #include "espbot_mem_mon.hpp"
+#include "espbot_mdns.hpp"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
 #include "espbot_spiffs.hpp"
@@ -53,7 +54,7 @@ static void espbot_coordinator_task(os_event_t *e)
         {
             // new connection
             esp_time.start_sntp();
-            esp_mDns.start(espbot.get_name());
+            mdns_start(espbot.get_name());
             // check if there is a web server listening on esp AP interface
             if (espbot_http_status != not_running)
                 espwebsvr.stop();
@@ -66,8 +67,8 @@ static void espbot_coordinator_task(os_event_t *e)
             // dhcp lease renewal
             esp_time.stop_sntp();
             esp_time.start_sntp();
-            esp_mDns.stop();
-            esp_mDns.start(espbot.get_name());
+            mdns_stop();
+            mdns_start(espbot.get_name());
             if (espbot_http_status != not_running)
                 espwebsvr.stop();
             espwebsvr.start(80);
@@ -77,7 +78,7 @@ static void espbot_coordinator_task(os_event_t *e)
     case SIG_STAMODE_DISCONNECTED:
         // [wifi station] disconnected
         esp_time.stop_sntp();
-        esp_mDns.stop();
+        mdns_stop();
         // stop the webserver only if it is running on the WIFI STATION interface
         if (espbot_http_status == running_on_sta)
         {
@@ -190,7 +191,7 @@ void espbot_init(void)
     dia_init_custom(); // FS is available now
     esp_time.init();        // FS is available now
     espbot.init();
-    esp_mDns.init();
+    mdns_init();
     esp_ota.init();
     http_init();
     espwebsvr.init();
@@ -322,7 +323,7 @@ void Espbot::reset(int t_reset)
         // stop services over wifi
         cron_stop();
         espwebsvr.stop();
-        esp_mDns.stop();
+        mdns_stop();
         esp_time.stop_sntp();
         os_timer_setfn(&graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
         os_timer_arm(&graceful_rst_timer, 200, 0);

@@ -74,8 +74,8 @@ void cron_start(void);
 void cron_stop(void);
 bool cron_enabled(void);
 
-char *cron_state_json_stringify(char *dest = NULL, int len = 0);
-int cron_state_save(void);
+char *cron_cfg_json_stringify(char *dest = NULL, int len = 0);
+int cron_cfg_save(void);
 
 /*
  * DEBUG

@@ -29,6 +29,7 @@ extern "C"
 #include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
+#include "espbot_mdns.hpp"
 #include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
@@ -360,7 +361,7 @@ void preflight_response(struct espconn *p_espconn, Http_parsed_req *parsed_req)
 static void getCron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getCron");
-    char *msg = cron_state_json_stringify();
+    char *msg = cron_cfg_json_stringify();
     if (msg)
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
@@ -381,9 +382,9 @@ static void setCron(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         cron_enable();
     else
         cron_disable();
-    cron_state_save();
+    cron_cfg_save();
 
-    char *msg = cron_state_json_stringify();
+    char *msg = cron_cfg_json_stringify();
     if (msg)
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
@@ -1270,22 +1271,11 @@ static void setGpioLevel(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
 static void getMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getMdns");
-    // "{"mdns_enabled": 0}" 20 chars
-    int msg_len = 20;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"mdns_enabled\": %d}",
-                   esp_mDns.is_enabled());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = mdns_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        dia_error_evnt(ROUTES_GETMDNS_HEAP_EXHAUSTED, msg_len);
-        ERROR("getMdns heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1299,24 +1289,16 @@ static void setMdns(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         return;
     }
     if (mdns_enabled)
-        esp_mDns.enable();
+        mdns_enable();
     else
-        esp_mDns.disable();
-    esp_mDns.save_cfg();
+        mdns_disable();
+    mdns_cfg_save();
 
-    int msg_len = 36;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETMDNS_HEAP_EXHAUSTED, msg_len);
-        ERROR("setMdns heap exhausted %d", msg_len);
+    char *msg = mdns_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref,
-               "{\"mdns_enabled\": %d}",
-               esp_mDns.is_enabled());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     espmem.stack_mon();
 }
 

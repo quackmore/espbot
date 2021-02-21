@@ -17,146 +17,172 @@ extern "C"
 }
 
 #include "espbot.hpp"
-#include "espbot_config.hpp"
+#include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_global.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_utils.hpp"
 
-void Mdns::init(void)
+static struct
 {
-    _enabled = false;
-    _running = false;
+    bool enabled;
+} mdns_cfg;
 
-    if (restore_cfg())
+static struct
+{
+    bool running;
+    struct mdns_info info;
+} mdns_state;
+
+#define MDNS_FILENAME ((char *)f_str("mdns.cfg"))
+
+static int mdns_restore_cfg(void)
+{
+    ALL("mdns_restore_cfg");
+
+    if (!Espfile::exists(MDNS_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(MDNS_FILENAME);
+    espmem.stack_mon();
+    int enabled = cfgfile.getInt(f_str("enabled"));
+    if (cfgfile.getErr() != JSON_noerr)
     {
-        dia_warn_evnt(MDNS_INIT_DEFAULT_CFG);
-        WARN("Mdns::init no cfg available");
+        dia_error_evnt(MDNS_RESTORE_CFG_ERROR);
+        ERROR("mdns_restore_cfg error");
+        return CFG_error;
     }
+    mdns_cfg.enabled = (bool)enabled;
+    return CFG_ok;
 }
 
-void Mdns::start(char *app_alias)
+static int mdns_saved_cfg_updated(void)
 {
-    if (_enabled && !_running)
+    ALL("mdns_saved_cfg_updated");
+    if (!Espfile::exists(MDNS_FILENAME))
+    {
+        return CFG_notUpdated;
+    }
+    Cfgfile cfgfile(MDNS_FILENAME);
+    espmem.stack_mon();
+    int enabled = cfgfile.getInt(f_str("enabled"));
+    if (cfgfile.getErr() != JSON_noerr)
+    {
+        dia_error_evnt(MDNS_SAVED_CFG_UPDATED_ERROR);
+        ERROR("mdns_saved_cfg_updated error");
+        return CFG_error;
+    }
+    if (mdns_cfg.enabled != (bool)enabled)
+    {
+        return CFG_notUpdated;
+    }
+    return CFG_ok;
+}
+
+char *mdns_cfg_json_stringify(char *dest, int len)
+{
+    // {"enabled":0}
+    int msg_len = 13 + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(MDNS_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("mdns_cfg_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    fs_sprintf(msg,
+               "{\"enabled\":%d}",
+               mdns_cfg.enabled);
+    return msg;
+}
+
+int mdns_cfg_save(void)
+{
+    ALL("mdns_cfg_save");
+    if (mdns_saved_cfg_updated() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(MDNS_FILENAME);
+    espmem.stack_mon();
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char str[14];
+    mdns_cfg_json_stringify(str, 14);
+    int res = cfgfile.n_append(str, os_strlen(str));
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    return CFG_ok;
+}
+
+void mdns_start(char *app_alias)
+{
+    if (mdns_cfg.enabled && !mdns_state.running)
     {
         struct ip_info ipconfig;
         wifi_get_ip_info(STATION_IF, &ipconfig);
-        _info.host_name = espbot.get_name();
-        _info.ipAddr = ipconfig.ip.addr;
-        _info.server_name = espbot.get_name();
-        _info.server_port = SERVER_PORT;
-        _info.txt_data[0] = app_alias;
-        espconn_mdns_init(&_info);
-        _running = true;
+        mdns_state.info.host_name = espbot.get_name();
+        mdns_state.info.ipAddr = ipconfig.ip.addr;
+        mdns_state.info.server_name = espbot.get_name();
+        mdns_state.info.server_port = SERVER_PORT;
+        mdns_state.info.txt_data[0] = app_alias;
+        espconn_mdns_init(&mdns_state.info);
+        mdns_state.running = true;
         dia_info_evnt(MDNS_START);
         INFO("mDns started");
     }
 }
 
-void Mdns::stop(void)
+void mdns_stop(void)
 {
-    if (_running)
+    if (mdns_state.running)
     {
         espconn_mdns_close();
-        _running = false;
+        mdns_state.running = false;
         dia_info_evnt(MDNS_STOP);
         INFO("mDns ended");
     }
 }
 
-void Mdns::enable(void)
+void mdns_enable(void)
 {
-    if (!_enabled)
+    if (!mdns_cfg.enabled)
     {
-        _enabled = true;
-        this->start(espbot.get_name());
+        mdns_cfg.enabled = true;
+        mdns_start(espbot.get_name());
     }
 }
 
-void Mdns::disable(void)
+void mdns_disable(void)
 {
-    _enabled = false;
-    this->stop();
+    mdns_cfg.enabled = false;
+    mdns_stop();
 }
 
-bool Mdns::is_enabled(void)
+bool mdns_is_enabled(void)
 {
-    return _enabled;
+    return mdns_cfg.enabled;
 }
 
-#define MDNS_FILENAME f_str("mdns.cfg")
-
-int Mdns::restore_cfg(void)
+void mdns_init(void)
 {
-    ALL("Mdns::restore_cfg");
-    return CFG_OK;
-    //    File_to_json cfgfile(MDNS_FILENAME);
-    //    espmem.stack_mon();
-    //    if (!cfgfile.exists())
-    //    {
-    //        WARN("Mdns::restore_cfg file not found");
-    //        return CFG_ERROR;
-    //    }
-    //    if (cfgfile.find_string(f_str("enabled")))
-    //    {
-    //        dia_error_evnt(MDNS_RESTORE_CFG_INCOMPLETE);
-    //        ERROR("Mdns::restore_cfg incomplete cfg");
-    //        return CFG_ERROR;
-    //    }
-    //    _enabled = atoi(cfgfile.get_value());
-    //    return CFG_OK;
-}
+    mdns_cfg.enabled = false;
+    mdns_state.running = false;
 
-int Mdns::saved_cfg_not_updated(void)
-{
-    ALL("Mdns::saved_cfg_not_updated");
-    return CFG_OK;
-    //    File_to_json cfgfile(MDNS_FILENAME);
-    //    espmem.stack_mon();
-    //    if (!cfgfile.exists())
-    //    {
-    //        return CFG_REQUIRES_UPDATE;
-    //    }
-    //    if (cfgfile.find_string(f_str("enabled")))
-    //    {
-    //        dia_error_evnt(MDNS_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-    //        ERROR("Mdns::saved_cfg_not_updated incomplete cfg");
-    //        return CFG_ERROR;
-    //    }
-    //    if (_enabled != atoi(cfgfile.get_value()))
-    //    {
-    //        return CFG_REQUIRES_UPDATE;
-    //    }
-    //    return CFG_OK;
-}
-
-int Mdns::save_cfg(void)
-{
-    ALL("Mdns::save_cfg");
-    return CFG_OK;
-//    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-//        return CFG_OK;
-//    if (!espfs.is_available())
-//    {
-//        dia_error_evnt(MDNS_SAVE_CFG_FS_NOT_AVAILABLE);
-//        ERROR("Mdns::save_cfg FS not available");
-//        return CFG_ERROR;
-//    }
-//    Ffile cfgfile(&espfs, (char *)MDNS_FILENAME);
-//    if (!cfgfile.is_available())
-//    {
-//        dia_error_evnt(MDNS_SAVE_CFG_CANNOT_OPEN_FILE);
-//        ERROR("Mdns::save_cfg cannot open file");
-//        return CFG_ERROR;
-//    }
-//    cfgfile.clear();
-//    // "{"enabled": 0}" // 15 chars
-//    char buffer[37];
-//    espmem.stack_mon();
-//    fs_sprintf(buffer,
-//               "{\"enabled\": %d}",
-//               _enabled);
-//    cfgfile.n_append(buffer, os_strlen(buffer));
-//    return CFG_OK;
+    if (mdns_restore_cfg())
+    {
+        dia_warn_evnt(MDNS_INIT_DEFAULT_CFG);
+        WARN("mdns_init no cfg available");
+    }
 }
