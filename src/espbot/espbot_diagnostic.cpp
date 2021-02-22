@@ -301,7 +301,7 @@ static int dia_saved_cfg_updated(void)
     int serial_log_mask = cfgfile.getInt(f_str("serial_log_mask"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        // no need to arise an error, the cfg file will be overwritten
+        // no need to raise an error, the cfg file will be overwritten
         // dia_error_evnt(DIAG_SAVED_CFG_UPDATED_ERROR);
         // ERROR("dia_saved_cfg_updated error");
         return CFG_error;

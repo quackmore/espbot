@@ -155,7 +155,7 @@ static void clear_busy_sending_data(void *arg)
         send_buffer = NULL;
     }
     esp_busy_sending_data = false;
-    system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+    system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
 }
 
 void clean_pending_send(struct espconn *p_espconn)
@@ -276,7 +276,7 @@ void http_sentcb(void *arg)
         send_buffer = NULL;
     }
     esp_busy_sending_data = false;
-    system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+    system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
     system_soft_wdt_feed();
 }
 
@@ -336,7 +336,7 @@ void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int len)
                 send_buffer = NULL;
             }
             esp_busy_sending_data = false;
-            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+            system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
             system_soft_wdt_feed();
             return;
         }
@@ -360,7 +360,7 @@ void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int len)
                 send_buffer = NULL;
             }
             esp_busy_sending_data = false;
-            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+            system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
         }
         // esp_free(send_buffer); // http_sentcb will free it
     }
@@ -454,7 +454,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
     {
         TRACE("send_remaining_msg espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
         delete[] p_sr->content;
-        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+        system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
         return;
     }
     if ((p_sr->content_size - p_sr->content_transferred) > http_msg_max_size)
@@ -495,7 +495,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
                 delete[] buffer.ref;
                 delete[] p_sr->content;
                 // there will be no send, so trigger a check of pending send
-                system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+                system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
             }
         }
         else
@@ -504,7 +504,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
             ERROR("send_remaining_msg heap exhausted %d", buffer_size + 1);
             delete[] p_sr->content;
             // there will be no send, so trigger a check of pending send
-            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+            system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
         }
     }
     else
@@ -525,7 +525,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
             dia_error_evnt(HTTP_SEND_REMAINING_MSG_HEAP_EXHAUSTED, (buffer_size + 1));
             ERROR("send_remaining_msg heap exhausted %d", (buffer_size + 1));
             // there will be no send, so trigger a check of pending send
-            system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+            system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
         }
         delete[] p_sr->content;
     }

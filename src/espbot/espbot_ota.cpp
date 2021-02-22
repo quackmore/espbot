@@ -17,6 +17,7 @@ extern "C"
 #include "user_interface.h"
 }
 
+#include "espbot.hpp"
 #include "espbot_config.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
@@ -293,7 +294,7 @@ static void check_for_new_release_cleanup(void *param)
         delete ota_client;
         ota_client = NULL;
     }
-    subsequent_function(ota_engine);
+    next_function(ota_engine);
 }
 
 static void check_version(void *param)
@@ -378,7 +379,7 @@ static void ota_completed_cb(void *arg)
     {
         esp_ota.set_status(OTA_FAILED);
     }
-    subsequent_function(ota_engine);
+    next_function(ota_engine);
 }
 
 static void ota_cleanup(void)
@@ -413,7 +414,7 @@ static void ota_engine(void)
         {
             // no version check required, upgrade anyway
             esp_ota.set_status(OTA_UPGRADING);
-            subsequent_function(ota_engine);
+            next_function(ota_engine);
         }
         break;
     }
@@ -428,7 +429,7 @@ static void ota_engine(void)
         {
             esp_ota.set_status(OTA_ALREADY_TO_THE_LATEST);
         }
-        subsequent_function(ota_engine);
+        next_function(ota_engine);
         break;
     }
     case OTA_UPGRADING:
@@ -446,7 +447,7 @@ static void ota_engine(void)
             dia_error_evnt(OTA_TIMER_FUNCTION_USERBIN_ID_UNKNOWN);
             ERROR("OTA: bad userbin number");
             esp_ota.set_status(OTA_FAILED);
-            subsequent_function(ota_engine);
+            next_function(ota_engine);
             return;
         }
         upgrade_svr = new struct upgrade_server_info;
@@ -455,7 +456,7 @@ static void ota_engine(void)
             dia_error_evnt(OTA_ENGINE_HEAP_EXHAUSTED, sizeof(upgrade_server_info));
             ERROR("ota_engine heap exhausted %d", sizeof(upgrade_server_info));
             esp_ota.set_status(OTA_FAILED);
-            subsequent_function(ota_engine);
+            next_function(ota_engine);
             return;
         }
         // "GET  HTTP/1.1rnHost: :rnConnection: closernrn"
@@ -470,7 +471,7 @@ static void ota_engine(void)
             dia_error_evnt(OTA_ENGINE_HEAP_EXHAUSTED, url_len);
             ERROR("OTA save_cfg heap exhausted %d", url_len);
             esp_ota.set_status(OTA_FAILED);
-            subsequent_function(ota_engine);
+            next_function(ota_engine);
             return;
         }
         *((uint32 *)(upgrade_svr->ip)) = esp_ota.get_host_ip()->addr;
@@ -504,7 +505,7 @@ static void ota_engine(void)
         {
             dia_debug_evnt(OTA_REBOOTING_AFTER_COMPLETION);
             DEBUG("OTA - rebooting after completion");
-            espbot.reset(ESP_OTA_REBOOT);
+            espbot_reset(ESPBOT_rebootAfterOta);
         }
         esp_ota.set_status(OTA_IDLE);
         break;
@@ -545,7 +546,7 @@ void Ota_upgrade::start_upgrade(void)
     if ((_status == OTA_IDLE) || (_status == OTA_ALREADY_TO_THE_LATEST) || (_status == OTA_FAILED))
     {
         _status = OTA_IDLE;
-        subsequent_function(ota_engine);
+        next_function(ota_engine);
     }
     else
     {

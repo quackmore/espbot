@@ -68,7 +68,7 @@ static int mdns_saved_cfg_updated(void)
     int enabled = cfgfile.getInt(f_str("mdns_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        // no need to arise an error, the cfg file will be overwritten
+        // no need to raise an error, the cfg file will be overwritten
         // dia_error_evnt(MDNS_SAVED_CFG_UPDATED_ERROR);
         // ERROR("mdns_saved_cfg_updated error");
         return CFG_error;
@@ -133,9 +133,9 @@ void mdns_start(char *app_alias)
     {
         struct ip_info ipconfig;
         wifi_get_ip_info(STATION_IF, &ipconfig);
-        mdns_state.info.host_name = espbot.get_name();
+        mdns_state.info.host_name = espbot_get_name();
         mdns_state.info.ipAddr = ipconfig.ip.addr;
-        mdns_state.info.server_name = espbot.get_name();
+        mdns_state.info.server_name = espbot_get_name();
         mdns_state.info.server_port = SERVER_PORT;
         mdns_state.info.txt_data[0] = app_alias;
         espconn_mdns_init(&mdns_state.info);
@@ -161,7 +161,7 @@ void mdns_enable(void)
     if (!mdns_cfg.enabled)
     {
         mdns_cfg.enabled = true;
-        mdns_start(espbot.get_name());
+        mdns_start(espbot_get_name());
     }
 }
 

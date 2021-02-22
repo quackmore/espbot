@@ -97,7 +97,7 @@ static void send_remaining_file(struct http_split_send *p_sr)
         TRACE("send_remaining_file espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
         delete[] p_sr->content;
         // there will be no send, so trigger a check of pending send
-        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+        system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
         return;
     }
 
@@ -470,7 +470,7 @@ static void getLastReset(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
                "\"reason\":\"%X\","
                "\"exccause\":\"%X\","
                "\"epc1\":\"%X\",",
-               timedate_get_timestr(espbot.get_last_reboot_time()),
+               timedate_get_timestr(espbot_get_last_reboot_time()),
                last_rst->reason,
                last_rst->exccause,
                last_rst->epc1);
@@ -614,7 +614,7 @@ static void getDiagnosticEvents_next(struct http_split_send *p_sr)
     {
         TRACE("getdiagnosticevents_next espconn %X state %d, abort", p_sr->p_espconn, p_sr->p_espconn->state);
         // there will be no send, so trigger a check of pending send
-        system_os_post(USER_TASK_PRIO_0, SIG_HTTP_CHECK_PENDING_RESPONSE, '0');
+        system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
         return;
     }
     int remaining_size = (p_sr->content_size - p_sr->content_transferred) * (42 + 12 + 1 + 2 + 4 + 12) + 2;
@@ -869,18 +869,11 @@ static void getDiagnosticEvents(struct espconn *ptr_espconn, Http_parsed_req *pa
 static void getDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getDeviceName");
-    Heap_chunk msg(64, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref, "{\"device_name\":\"%s\"}", espbot.get_name());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = espbot_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        dia_error_evnt(ROUTES_GETDEVICENAME_HEAP_EXHAUSTED, 64);
-        ERROR("getDeviceName heap exhausted %d", 64);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -894,18 +887,13 @@ static void setDeviceName(struct espconn *ptr_espconn, Http_parsed_req *parsed_r
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-    espbot.set_name(device_name);
-    Heap_chunk msg(64, dont_free);
-    espmem.stack_mon();
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETDEVICENAME_HEAP_EXHAUSTED, 64);
-        ERROR("setDeviceName heap exhausted %d", 64);
+    espbot_set_name(device_name);
+    espbot_cfg_save();
+    char *msg = espbot_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref, "{\"device_name\":\"%s\"}", espbot.get_name());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
 }
 
 static void getFs(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1753,7 +1741,7 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/reboot"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Device rebooting...\"}"), false);
-        espbot.reset(ESP_REBOOT);
+        espbot_reset(ESPBOT_restart);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/timedate"))) && (parsed_req->req_method == HTTP_GET))
@@ -1794,7 +1782,7 @@ void espbot_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/ota/reboot"))) && (parsed_req->req_method == HTTP_POST))
     {
         http_response(ptr_espconn, HTTP_ACCEPTED, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Rebooting after OTA...\"}"), false);
-        espbot.reset(ESP_OTA_REBOOT);
+        espbot_reset(ESPBOT_rebootAfterOta);
         return;
     }
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/wifi"))) && (parsed_req->req_method == HTTP_GET))

@@ -70,14 +70,14 @@ void wifi_event_handler(System_Event_t *evt)
                       evt->event_info.disconnected.ssid,
                       evt->event_info.disconnected.reason);
             }
-            system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_DISCONNECTED, '0'); // informing everybody of
+            system_os_post(USER_TASK_PRIO_0, SIG_staMode_disconnected, '0'); // informing everybody of
                                                                              // disconnection from AP
             stamode_connected = false;
         }
         if (wifi_get_opmode() == STATION_MODE)
         {
             espwifi_work_as_ap();
-            system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
+            system_os_post(USER_TASK_PRIO_0, SIG_softapMode_ready, '0');
         }
         os_timer_disarm(&wait_before_reconnect);
         os_timer_arm(&wait_before_reconnect, WIFI_WAIT_BEFORE_RECONNECT, 0);
@@ -104,7 +104,7 @@ void wifi_event_handler(System_Event_t *evt)
             // checkout if the IP address changed
             if (old_ip.addr != evt->event_info.got_ip.ip.addr)
                 // informing everybody that the IP address changed
-                system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, GOT_IP_ALREADY_CONNECTED);
+                system_os_post(USER_TASK_PRIO_0, SIG_staMode_gotIp, GOT_IP_ALREADY_CONNECTED);
         }
         else
         {
@@ -123,7 +123,7 @@ void wifi_event_handler(System_Event_t *evt)
             // stop_connect_timeout_timer();
             wifi_set_opmode_current(STATION_MODE);
             // informing everybody of successfully connection to AP
-            system_os_post(USER_TASK_PRIO_0, SIG_STAMODE_GOT_IP, GOT_IP_AFTER_CONNECTION);
+            system_os_post(USER_TASK_PRIO_0, SIG_staMode_gotIp, GOT_IP_AFTER_CONNECTION);
             // time to update flash configuration for (eventually) saving ssid and password
             espwifi_cfg_save();
         }
@@ -133,7 +133,7 @@ void wifi_event_handler(System_Event_t *evt)
         INFO(MACSTR " connected (AID %d)",
              MAC2STR(evt->event_info.sta_connected.mac),
              evt->event_info.sta_connected.aid);
-        // system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STACONNECTED, '0'); // informing everybody that
+        // system_os_post(USER_TASK_PRIO_0, SIG_softapMode_staConnected, '0'); // informing everybody that
         // a station connected to ESP8266
         break;
     case EVENT_SOFTAPMODE_STADISCONNECTED:
@@ -141,7 +141,7 @@ void wifi_event_handler(System_Event_t *evt)
         INFO(MACSTR " disconnected (AID %d)",
              MAC2STR(evt->event_info.sta_disconnected.mac),
              evt->event_info.sta_disconnected.aid);
-        // system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_STADISCONNECTED, '0'); // informing everybody of
+        // system_os_post(USER_TASK_PRIO_0, SIG_softapMode_staDisconnected, '0'); // informing everybody of
         // a station disconnected from ESP8266
         break;
     case EVENT_SOFTAPMODE_PROBEREQRECVED:
@@ -267,7 +267,7 @@ void espwifi_connect_to_ap(void)
     os_memcpy(stationConf.password, station_pwd, 64);
     stationConf.bssid_set = 0;
     wifi_station_set_config_current(&stationConf);
-    wifi_station_set_hostname(espbot.get_name());
+    wifi_station_set_hostname(espbot_get_name());
 
     // connect
     stamode_connecting++;
@@ -541,7 +541,7 @@ static int wifi_cfg_uptodate(void)
     int ap_channel = cfgfile.getInt(f_str("ap_channel"));
     if (cfgfile.getErr() != JSON_noerr)
     {
-        // no need to arise an error, the cfg file will be overwritten
+        // no need to raise an error, the cfg file will be overwritten
         // dia_error_evnt(WIFI_CFG_UPTODATE_ERROR);
         // ERROR("wifi_cfg_uptodate error");
         return CFG_error;
@@ -637,10 +637,10 @@ char *espwifi_status_json_stringify(char *dest, int len)
         fs_sprintf(msg, "{\"op_mode\":\"STATION\",\"SSID\":\"%s\",", espwifi_station_get_ssid());
         break;
     case SOFTAP_MODE:
-        fs_sprintf(msg, "{\"op_mode\":\"AP\",\"SSID\":\"%s\",", espbot.get_name());
+        fs_sprintf(msg, "{\"op_mode\":\"AP\",\"SSID\":\"%s\",", espbot_get_name());
         break;
     case STATIONAP_MODE:
-        fs_sprintf(msg, "{\"op_mode\":\"AP\",\"SSID\":\"%s\",", espbot.get_name());
+        fs_sprintf(msg, "{\"op_mode\":\"AP\",\"SSID\":\"%s\",", espbot_get_name());
         break;
     default:
         break;
@@ -696,10 +696,10 @@ char *espwifi_scan_results_json_stringify(char *dest, int len)
 void espwifi_init()
 {
     // default AP config
-    os_strncpy((char *)ap_config.ssid, espbot.get_name(), 32);    // uint8 ssid[32];
+    os_strncpy((char *)ap_config.ssid, espbot_get_name(), 32);    // uint8 ssid[32];
     os_memset((char *)ap_config.password, 0, 64);                 //
     os_strcpy((char *)ap_config.password, f_str("espbot123456")); // uint8 password[64];
-    ap_config.ssid_len = os_strlen(espbot.get_name());            // uint8 ssid_len;
+    ap_config.ssid_len = os_strlen(espbot_get_name());            // uint8 ssid_len;
     ap_config.channel = 1;                                        // uint8 channel;
     ap_config.authmode = AUTH_WPA2_PSK;                           // uint8 authmode;
     ap_config.ssid_hidden = 0;                                    // uint8 ssid_hidden;
@@ -731,7 +731,7 @@ void espwifi_init()
     // otherwise default configurations by NON OS SDK are used
     espwifi_work_as_ap(); // make effective the restored configration
     // signal that SOFTAPMODE is ready
-    system_os_post(USER_TASK_PRIO_0, SIG_SOFTAPMODE_READY, '0');
+    system_os_post(USER_TASK_PRIO_0, SIG_softapMode_ready, '0');
     if (os_strlen(station_ssid) > 0)
         espwifi_connect_to_ap();
 }
