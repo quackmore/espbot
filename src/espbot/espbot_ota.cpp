@@ -25,7 +25,7 @@ extern "C"
 #include "espbot_mem_mon.hpp"
 #include "espbot_ota.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webclient.hpp"
+#include "espbot_http_client.hpp"
 
 void Ota_upgrade::init(void)
 {
@@ -204,10 +204,10 @@ static char *readable_ota_status(Ota_status_type status)
 }
 
 //
-// checking binary version on the OTA web server
+// checking binary version on the OTA http server
 //
 
-static Webclnt *ota_client = NULL;
+static Http_clt *ota_client = NULL;
 static struct upgrade_server_info *upgrade_svr = NULL;
 static char *url = NULL;
 extern char *app_release;
@@ -304,7 +304,7 @@ static void check_version(void *param)
     ALL("check_version");
     switch (ota_client->get_status())
     {
-    case WEBCLNT_RESPONSE_READY:
+    case HTTP_CLT_RESPONSE_READY:
         if (ota_client->parsed_response->body)
         {
             TRACE("check_version OTA server bin version: %s", ota_client->parsed_response->body);
@@ -329,7 +329,7 @@ static void check_version(void *param)
         break;
     default:
         dia_error_evnt(OTA_CHECK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
-        ERROR("check_version unexpected webclient status %d", ota_client->get_status());
+        ERROR("check_version unexpected http client status %d", ota_client->get_status());
         esp_ota.set_status(OTA_FAILED);
         break;
     }
@@ -342,7 +342,7 @@ static void ota_ask_version(void *param)
     ALL("ota_ask_version");
     switch (ota_client->get_status())
     {
-    case WEBCLNT_CONNECTED:
+    case HTTP_CLT_CONNECTED:
     {
         // "GET version.txt HTTP/1.1rnHost: 111.222.333.444rnrn" 52 chars
         int req_len = 52 + os_strlen(esp_ota.get_path());
@@ -362,7 +362,7 @@ static void ota_ask_version(void *param)
     break;
     default:
         dia_error_evnt(OTA_ASK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
-        ERROR("ota_ask_version unexpected webclient status %d", ota_client->get_status());
+        ERROR("ota_ask_version unexpected http client status %d", ota_client->get_status());
         esp_ota.set_status(OTA_FAILED);
         ota_client->disconnect(check_for_new_release_cleanup, NULL);
         break;
@@ -412,7 +412,7 @@ static void ota_engine(void)
         if (esp_ota.get_check_version())
         {
             esp_ota.set_status(OTA_VERSION_CHECKING);
-            ota_client = new Webclnt;
+            ota_client = new Http_clt;
             ota_client->connect(*esp_ota.get_host_ip(), esp_ota.get_port(), ota_ask_version, NULL, 6000);
         }
         else

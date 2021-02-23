@@ -22,6 +22,7 @@ extern "C"
 #include "espbot_global.hpp"
 #include "espbot_http.hpp"
 #include "espbot_http_routes.hpp"
+#include "espbot_http_server.hpp"
 #include "espbot_json.hpp"
 #include "espbot_list.hpp"
 #include "espbot_mem_mon.hpp"
@@ -194,9 +195,9 @@ void clean_pending_send(struct espconn *p_espconn)
 void http_check_pending_send(void)
 {
     ALL("http_check_pending_send");
-    if (espwebsvr.get_status() == down)
+    if (http_svr_get_status() == http_svr_down)
     {
-        // meanwhile the server went down
+        // meanwhile the server went http_svr_down
         TRACE("http_check_pending_send - clearing pending send and response queues");
         // clear the pending send queue
         struct http_send *p_pending_send = pending_send->front();

@@ -37,7 +37,7 @@ extern "C"
 #include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webclient.hpp"
+#include "espbot_http_client.hpp"
 
 #ifdef TEST_FUNCTIONS
 // function for testing purpose

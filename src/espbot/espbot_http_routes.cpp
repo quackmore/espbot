@@ -32,7 +32,7 @@ extern "C"
 #include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webserver.hpp"
+#include "espbot_http_server.hpp"
 #include "espbot_wifi.hpp"
 
 static os_timer_t delay_timer;

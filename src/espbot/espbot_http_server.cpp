@@ -14,6 +14,8 @@ extern "C"
 #include "mem.h"
 #include "osapi.h"
 #include "user_interface.h"
+#include "c_types.h"
+#include "espconn.h"
 }
 
 #include "espbot.hpp"
@@ -24,16 +26,23 @@ extern "C"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_queue.hpp"
-#include "espbot_webserver.hpp"
+#include "espbot_http_server.hpp"
 #include "espbot_utils.hpp"
 
-static void webserver_recv(void *arg, char *precdata, unsigned short length)
+static struct
+{
+    Http_svr_status status;
+    struct espconn esp_conn;
+    esp_tcp esptcp;
+} http_svr_state;
+
+static void http_svr_recv(void *arg, char *precdata, unsigned short length)
 {
     struct espconn *ptr_espconn = (struct espconn *)arg;
     Http_parsed_req parsed_req;
-    DEBUG("webserver_recv on %X, len %u, msg %s", ptr_espconn, length, precdata);
+    DEBUG("http_svr_recv on %X, len %u, msg %s", ptr_espconn, length, precdata);
     http_parse_request(precdata, length, &parsed_req);
-    TRACE("webserver_recv parsed req\n"
+    TRACE("http_svr_recv parsed req\n"
           "no_header_message: %d\n"
           "           method: %d\n"
           "              url: %s\n"
@@ -47,31 +56,31 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
     mem_mon_stack();
     if (!parsed_req.no_header_message && (parsed_req.h_content_len > parsed_req.content_len))
     {
-        TRACE("webserver_recv message has been splitted waiting for completion ...");
+        TRACE("http_svr_recv message has been splitted waiting for completion ...");
         http_save_pending_request(arg, precdata, length, &parsed_req);
         return;
     }
     if (parsed_req.no_header_message)
     {
-        TRACE("webserver_recv no header message");
-        http_check_pending_requests(ptr_espconn, parsed_req.req_content, parsed_req.content_len, webserver_recv);
+        TRACE("http_svr_recv no header message");
+        http_check_pending_requests(ptr_espconn, parsed_req.req_content, parsed_req.content_len, http_svr_recv);
         return;
     }
     if (parsed_req.url == NULL)
     {
-        dia_debug_evnt(WEB_SERVER_EMPTY_URL);
-        DEBUG("webserver_recv empty url");
+        dia_debug_evnt(HTTP_SVR_EMPTY_URL);
+        DEBUG("http_svr_recv empty url");
         return;
     }
     system_soft_wdt_feed();
     espbot_http_routes(ptr_espconn, &parsed_req);
 }
 
-static void webserver_recon(void *arg, sint8 err)
+static void http_svr_recon(void *arg, sint8 err)
 {
     struct espconn *pesp_conn = (struct espconn *)arg;
     mem_mon_stack();
-    DEBUG("webserver %d.%d.%d.%d:%d err %d reconnect",
+    DEBUG("http_svr %d.%d.%d.%d:%d err %d reconnect",
           pesp_conn->proto.tcp->remote_ip[0],
           pesp_conn->proto.tcp->remote_ip[1],
           pesp_conn->proto.tcp->remote_ip[2],
@@ -80,11 +89,11 @@ static void webserver_recon(void *arg, sint8 err)
           err);
 }
 
-static void webserver_discon(void *arg)
+static void http_svr_discon(void *arg)
 {
     struct espconn *pesp_conn = (struct espconn *)arg;
     mem_mon_stack();
-    DEBUG("webserver %d.%d.%d.%d:%d disconnect",
+    DEBUG("http_svr %d.%d.%d.%d:%d disconnect",
           pesp_conn->proto.tcp->remote_ip[0],
           pesp_conn->proto.tcp->remote_ip[1],
           pesp_conn->proto.tcp->remote_ip[2],
@@ -92,58 +101,58 @@ static void webserver_discon(void *arg)
           pesp_conn->proto.tcp->remote_port);
 }
 
-static void webserver_listen(void *arg)
+static void http_svr_listen(void *arg)
 {
-    ALL("webserver_listen");
+    ALL("http_svr_listen");
     struct espconn *pesp_conn = (struct espconn *)arg;
     mem_mon_stack();
-    espconn_regist_recvcb(pesp_conn, webserver_recv);
+    espconn_regist_recvcb(pesp_conn, http_svr_recv);
     espconn_regist_sentcb(pesp_conn, http_sentcb);
-    espconn_regist_reconcb(pesp_conn, webserver_recon);
-    espconn_regist_disconcb(pesp_conn, webserver_discon);
+    espconn_regist_reconcb(pesp_conn, http_svr_recon);
+    espconn_regist_disconcb(pesp_conn, http_svr_discon);
 }
 
-void Websvr::init(void)
+void http_svr_init(void)
 {
     // setup specific controllers timer 'espbot_http_routes.cpp'
     init_controllers();
-    _status = down;
+    http_svr_state.status = http_svr_down;
 }
 
-void Websvr::start(uint32 port)
+void http_svr_start(uint32 port)
 {
-    if (_status == down)
+    if (http_svr_state.status == http_svr_down)
     { // setup sdk TCP variables
-        _esp_conn.type = ESPCONN_TCP;
-        _esp_conn.state = ESPCONN_NONE;
-        _esp_conn.proto.tcp = &_esptcp;
-        _esp_conn.proto.tcp->local_port = port;
-        espconn_regist_connectcb(&_esp_conn, webserver_listen);
-        espconn_accept(&_esp_conn);
+        http_svr_state.esp_conn.type = ESPCONN_TCP;
+        http_svr_state.esp_conn.state = ESPCONN_NONE;
+        http_svr_state.esp_conn.proto.tcp = &http_svr_state.esptcp;
+        http_svr_state.esp_conn.proto.tcp->local_port = port;
+        espconn_regist_connectcb(&http_svr_state.esp_conn, http_svr_listen);
+        espconn_accept(&http_svr_state.esp_conn);
 
         // now the server is up
-        _status = up;
-        dia_info_evnt(WEB_SERVER_START);
-        INFO("webserver started");
+        http_svr_state.status = http_svr_up;
+        dia_info_evnt(HTTP_SVR_START);
+        INFO("http_svr started");
     }
 }
 
-void Websvr::stop()
+void http_svr_stop()
 {
-    if (_status == up)
+    if (http_svr_state.status == http_svr_up)
     {
-        _status = down;
-        espconn_disconnect(&_esp_conn);
-        espconn_delete(&_esp_conn);
+        http_svr_state.status = http_svr_down;
+        espconn_disconnect(&http_svr_state.esp_conn);
+        espconn_delete(&http_svr_state.esp_conn);
 
         http_queues_clear();
 
-        dia_info_evnt(WEB_SERVER_STOP);
-        INFO("webserver stopped");
+        dia_info_evnt(HTTP_SVR_STOP);
+        INFO("http_svr stopped");
     }
 }
 
-Websvr_status Websvr::get_status(void)
+Http_svr_status http_svr_get_status(void)
 {
-    return _status;
+    return http_svr_state.status;
 }

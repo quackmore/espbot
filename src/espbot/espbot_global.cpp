@@ -10,5 +10,4 @@
 #include "espbot_global.hpp"
 
 
-Websvr espwebsvr;
 Ota_upgrade esp_ota;

@@ -23,7 +23,7 @@ extern "C"
 #include "espbot_mem_mon.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webserver.hpp"
+#include "espbot_http_server.hpp"
 
 static struct
 {

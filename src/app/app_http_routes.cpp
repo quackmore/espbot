@@ -27,7 +27,7 @@ extern "C"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webserver.hpp"
+#include "espbot_http_server.hpp"
 
 static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {

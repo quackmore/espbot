@@ -33,7 +33,8 @@ extern "C"
 #include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
-#include "espbot_webclient.hpp"
+#include "espbot_http_client.hpp"
+#include "espbot_http_server.hpp"
 #include "espbot_wifi.hpp"
 #include "spiffs_esp8266.hpp"
 
@@ -83,10 +84,10 @@ static void espbot_coordinator_task(os_event_t *e)
             // new connection
             timedate_start_sntp();
             mdns_start(espbot_get_name());
-            // check if there is a web server listening on esp AP interface
+            // check if there is a http server listening on esp AP interface
             if (espbot_http_status != http_server_not_running)
-                espwebsvr.stop();
-            espwebsvr.start(80);
+                http_svr_stop();
+            http_svr_start(80);
             espbot_http_status = http_server_running_on_sta;
             app_init_after_wifi();
         }
@@ -98,8 +99,8 @@ static void espbot_coordinator_task(os_event_t *e)
             mdns_stop();
             mdns_start(espbot_get_name());
             if (espbot_http_status != http_server_not_running)
-                espwebsvr.stop();
-            espwebsvr.start(80);
+                http_svr_stop();
+            http_svr_start(80);
             espbot_http_status = http_server_running_on_sta;
         }
         break;
@@ -107,10 +108,10 @@ static void espbot_coordinator_task(os_event_t *e)
         // [wifi station] disconnected
         timedate_stop_sntp();
         mdns_stop();
-        // stop the webserver only if it is running on the WIFI STATION interface
+        // stop the http server only if it is running on the WIFI STATION interface
         if (espbot_http_status == http_server_running_on_sta)
         {
-            espwebsvr.stop();
+            http_svr_stop();
             espbot_http_status = http_server_not_running;
         }
         app_deinit_on_wifi_disconnect();
@@ -122,22 +123,22 @@ static void espbot_coordinator_task(os_event_t *e)
         // [wifi station+AP] station disconnected
         break;
     case SIG_softapMode_ready:
-        // don't stop the web server if it's already listening on WIFI AP interface
+        // don't stop the http server if it's already listening on WIFI AP interface
         if (espbot_http_status == http_server_running_on_sta)
         {
-            espwebsvr.stop();
+            http_svr_stop();
             espbot_http_status = http_server_not_running;
         }
-        // don't start the web server if it's already listening on WIFI AP interface
+        // don't start the http server if it's already listening on WIFI AP interface
         if (espbot_http_status == http_server_not_running)
         {
-            espwebsvr.start(80);
+            http_svr_start(80);
             espbot_http_status = http_server_running_on_ap;
         }
         app_init_after_wifi();
         break;
     case SIG_http_checkPendingResponse:
-        // getting here from webserver after send callback completed
+        // getting here from web server after send callback completed
         http_check_pending_send();
         break;
     case SIG_next_function:
@@ -288,7 +289,7 @@ int espbot_cfg_save(void)
 
 // GRACEFUL RESET
 // 1) wait 300 ms
-// 2) stop the webserver
+// 2) stop the web server
 // 3) wait 200 ms
 // 4) stop the wifi
 // 5) wait 200 ms
@@ -312,7 +313,7 @@ void espbot_reset(int t_reset)
     case 1:
         // stop services over wifi
         cron_stop();
-        espwebsvr.stop();
+        http_svr_stop();
         mdns_stop();
         timedate_stop_sntp();
         os_timer_setfn(&espbot_state.graceful_rst_timer, (os_timer_func_t *)graceful_reset, (void *)t_reset);
@@ -378,8 +379,8 @@ void espbot_init(void)
     mdns_init();
     esp_ota.init();
     http_init();
-    espwebsvr.init();
-    init_webclients_data_stuctures();
+    http_svr_init();
+    init_http_clients_data_stuctures();
     cron_init();
     app_init_before_wifi();
 

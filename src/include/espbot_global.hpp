@@ -15,9 +15,7 @@ extern "C"
 }
 
 #include "espbot_ota.hpp"
-#include "espbot_webserver.hpp"
 
-extern Websvr espwebsvr;
 extern Ota_upgrade esp_ota;
 
 #endif
