@@ -11,208 +11,300 @@ extern "C"
 {
 #include "mem.h"
 #include "user_interface.h"
+#include "espbot_hal.h"
 }
 
+#include "espbot.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
+#include "espbot_timedate.hpp"
+#include "espbot_utils.hpp"
 
-/*
- * DEBUGGER
- */
+static uint32 stack_min_addr;
+static uint32 stack_max_addr;
+static uint32 heap_start_addr;
+static uint32 max_heap_size;
+static uint32 min_heap_size;
+static uint32 heap_objs;
+static uint32 max_heap_objs;
 
-void Esp_mem::init(void)
+void mem_mon_init(void)
 {
     uint32 first_stack_var;
     void *heap_var = os_zalloc(1);
 
     // stack vars
-    _stack_min_addr = (uint32)&first_stack_var;
-    _stack_max_addr = (uint32)&first_stack_var;
+    stack_min_addr = (uint32)&first_stack_var;
+    stack_max_addr = (uint32)&first_stack_var;
 
     // init heap infos and data structures
-    _heap_start_addr = (uint32)heap_var;
+    heap_start_addr = (uint32)heap_var;
     if (heap_var)
         os_free(heap_var);
-    _max_heap_size = system_get_free_heap_size();
-    _min_heap_size = _max_heap_size;
-    _heap_objs = 0;
-    _max_heap_objs = 0;
+    max_heap_size = system_get_free_heap_size();
+    min_heap_size = max_heap_size;
+    heap_objs = 0;
+    max_heap_objs = 0;
 
-    // DEBUG
-    // int ii;
-    // for (ii = 0; ii < HEAP_ARRAY_SIZE; ii++)
-    // {
-    //     _heap_array[ii].size = -1;
-    //     _heap_array[ii].addr = NULL;
-    // }
-    stack_mon();
+    mem_mon_stack();
 }
 
-void Esp_mem::heap_mon(void)
+void mem_mon_heap(void)
 {
     uint32 currentHeap = system_get_free_heap_size();
-    if (_min_heap_size > currentHeap)
-        _min_heap_size = currentHeap;
+    if (min_heap_size > currentHeap)
+        min_heap_size = currentHeap;
 }
 
-void Esp_mem::stack_mon(void)
+void mem_mon_stack(void)
 {
     uint32 stack_var_addr = (uint32)&stack_var_addr;
-    if (stack_var_addr > _stack_max_addr)
-        _stack_max_addr = stack_var_addr;
-    if (stack_var_addr < _stack_min_addr)
-        _stack_min_addr = stack_var_addr;
+    if (stack_var_addr > stack_max_addr)
+        stack_max_addr = stack_var_addr;
+    if (stack_var_addr < stack_min_addr)
+        stack_min_addr = stack_var_addr;
 }
 
-void *Esp_mem::espbot_zalloc(size_t size)
+void *espbot_zalloc(size_t size)
 {
     void *addr = os_zalloc(size);
     if (addr)
     {
-        espmem._heap_objs++;
-        if (espmem._heap_objs > espmem._max_heap_objs)
-            espmem._max_heap_objs = espmem._heap_objs;
-        // DEBUG
-        // int idx;
-        // for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
-        // {
-        //     if (espmem._heap_array[idx].size == -1)
-        //     {
-        //         espmem._heap_array[idx].size = size;
-        //         espmem._heap_array[idx].addr = addr;
-        //         break;
-        //     }
-        // }
-        // espmem.stack_mon();
+        heap_objs++;
+        if (heap_objs > max_heap_objs)
+            max_heap_objs = heap_objs;
     }
     else
     {
         dia_fatal_evnt(MEM_MON_HEAP_EXHAUSTED);
-        FATAL("Esp_mem::espbot_zalloc heap exhausted");
+        FATAL("espbot_zalloc heap exhausted");
     }
-    espmem.heap_mon();
+    uint32 currentHeap = system_get_free_heap_size();
+    if (min_heap_size > currentHeap)
+        min_heap_size = currentHeap;
     return addr;
 }
 
-void Esp_mem::espbot_free(void *addr)
+void espbot_free(void *addr)
 {
-    espmem._heap_objs--;
+    heap_objs--;
     os_free(addr);
-    // DEBUG
-    // int idx;
-    // for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
+}
+
+char *mem_mon_json_stringify(char *dest, int len)
+{
+    // {"stack_max_addr":"3FFFFE00","stack_min_addr":"3FFFE660","heap_start_addr":"3FFF17A8","heap_free_size":41368,"heap_max_size":43096,"heap_min_size":39488,"heap_objs":99999,"heap_max_objs":99999}
+
+    int msg_len = 193 + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(MEM_MON_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("mem_mon_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    fs_sprintf(msg,
+               "{\"stack_max_addr\":\"%X\",\"stack_min_addr\":\"%X\",",
+               stack_max_addr,
+               stack_min_addr);
+    fs_sprintf((msg + os_strlen(msg)),
+               "\"heap_start_addr\":\"%X\",\"heap_free_size\":%d,",
+               heap_start_addr,
+               system_get_free_heap_size());
+    fs_sprintf((msg + os_strlen(msg)),
+               "\"heap_max_size\":%d,\"heap_min_size\":%d,",
+               max_heap_size,
+               min_heap_size);
+    fs_sprintf((msg + os_strlen(msg)),
+               "\"heap_objs\":%d,\"heap_max_objs\":%d}",
+               heap_objs,
+               max_heap_objs);
+    mem_mon_stack();
+    return msg;
+}
+
+char *mem_dump_json_stringify(char *address_str, int dump_len, char *dest, int len)
+{
+    // {"address":"3FFE8950","length":00000,"content":""}
+    int msg_len = 50 + dump_len + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(MEM_DUMP_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("mem_dump_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    char *address = (char *)atoh(address_str);
+    fs_sprintf(msg,
+               "{\"address\":\"%X\",\"length\":%d,\"content\":\"",
+               address,
+               dump_len);
+    int cnt;
+    for (cnt = 0; cnt < dump_len; cnt++)
+        os_sprintf(msg + os_strlen(msg), "%c", *(address + cnt));
+    fs_sprintf(msg + os_strlen(msg), "\"}");
+    mem_mon_stack();
+    return msg;
+}
+
+char *mem_dump_hex_json_stringify(char *address_str, int dump_len, char *dest, int len)
+{
+    // {"address":"3FFE8950","length":00000,"content":""}
+    // {"address":"3FFE8950","length":00000,"content":" 33 2E 30 2E 34 28 39 35 33 32 63 65 62 29 0 0 70 76 50 6F 72 74 4D 61"}
+
+    int msg_len = 50 + (dump_len * 3) + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(MEM_DUMP_HEX_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("mem_dump_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    char *address = (char *)atoh(address_str);
+    fs_sprintf(msg,
+               "{\"address\":\"%X\",\"length\":%d,\"content\":\"",
+               address,
+               dump_len);
+    int cnt;
+    for (cnt = 0; cnt < dump_len; cnt++)
+        os_sprintf(msg + os_strlen(msg), " %X", *(address + cnt));
+    fs_sprintf(msg + os_strlen(msg), "\"}");
+    mem_mon_stack();
+    return msg;
+}
+
+char *mem_last_reset_json_stringify(char *dest, int len)
+{
+    // enum rst_reason
     // {
-    //     if (espmem._heap_array[idx].addr == addr)
-    //     {
-    //         // eliminate current item from heap allocated items list
-    //         espmem._heap_array[idx].size = -1;
-    //         break;
-    //     }
-    // }
-    // espmem.stack_mon();
+    //     REASON_DEFAULT_RST = 0,
+    //     REASON_WDT_RST = 1,
+    //     REASON_EXCEPTION_RST = 2,
+    //     REASON_SOFT_WDT_RST = 3,
+    //     REASON_SOFT_RESTART = 4,
+    //     REASON_DEEP_SLEEP_AWAKE = 5,
+    //     REASON_EXT_SYS_RST = 6
+    // };
+    // struct rst_info
+    // {
+    //     uint32 reason;
+    //     uint32 exccause;
+    //     uint32 epc1;
+    //     uint32 epc2;
+    //     uint32 epc3;
+    //     uint32 excvaddr;
+    //     uint32 depc;
+    // };
+    // {"date":"","reason":"","exccause":"","epc1":"","epc2":"","epc3":"","evcvaddr":"","depc":"","sp":"","spDump":[]}
+    // array item "01234567",
+    int msg_len = 111 + 24 + 7 * 8 + 11 * 19 + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(MEM_LAST_RESET_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("mem_last_reset_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            *msg = 0;
+            return msg;
+        }
+    }
+    struct rst_info *last_rst = system_get_rst_info();
+    fs_sprintf(msg,
+               "{\"date\":\"%s\","
+               "\"reason\":\"%X\","
+               "\"exccause\":\"%X\","
+               "\"epc1\":\"%X\",",
+               timedate_get_timestr(espbot_get_last_reboot_time()),
+               last_rst->reason,
+               last_rst->exccause,
+               last_rst->epc1);
+    fs_sprintf(msg + os_strlen(msg),
+               "\"epc2\":\"%X\","
+               "\"epc3\":\"%X\","
+               "\"evcvaddr\":\"%X\","
+               "\"depc\":\"%X\",",
+               last_rst->epc2,
+               last_rst->epc3,
+               last_rst->excvaddr,
+               last_rst->depc);
+    fs_sprintf(msg + os_strlen(msg),
+               "\"sp\":\"%X\","
+               "\"spDump\":[",
+               get_last_crash_SP());
+    uint32 address;
+    int res = get_last_crash_stack_dump(0, &address);
+    while (res == 0)
+    {
+        fs_sprintf(msg + os_strlen(msg), "\"%X\",", address);
+        res = get_last_crash_stack_dump(1, &address);
+    }
+    fs_sprintf(msg + os_strlen(msg) - 1, "]}");
+    mem_mon_stack();
+    return msg;
 }
 
-uint32 Esp_mem::get_min_stack_addr(void)
-{
-    return _stack_min_addr;
-}
-
-uint32 Esp_mem::get_max_stack_addr(void)
-{
-    return _stack_max_addr;
-}
-
-uint32 Esp_mem::get_start_heap_addr(void)
-{
-    return _heap_start_addr;
-}
-
-uint32 Esp_mem::get_max_heap_size(void)
-{
-    return _max_heap_size;
-}
-
-uint32 Esp_mem::get_mim_heap_size(void)
-{
-    return _min_heap_size;
-}
-
-// uint32 Esp_mem::get_used_heap_size(void)
-// {
-//     // int idx;
-//     // int used_heap = 0;
-//     // stack_mon();
-//     // for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
-//     // {
-//     //     if (_heap_array[idx].size > 0)
-//     //         used_heap += _heap_array[idx].size;
-//     // }
-//     // return used_heap;
-//     return system_get_free_heap_size();
-// }
-
-uint32 Esp_mem::get_heap_objs(void)
-{
-    return _heap_objs;
-}
-
-uint32 Esp_mem::get_max_heap_objs(void)
-{
-    return _max_heap_objs;
-}
-
-// DEBUG
-// void Esp_mem::print_heap_objects(void)
-// {
-//     int idx;
-//     int counter = 1;
-//     os_printf("heap objects start\n");
-//     for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
-//     {
-//         if (_heap_array[idx].size >= 0)
-//         {
-//             os_printf("#%d -> %X\n", counter, _heap_array[idx].addr);
-//             counter++;
-//         }
-//     }
-//     os_printf("heap objects end\n");
-// }
-
-// struct heap_item *Esp_mem::get_heap_item(List_item item)
-// {
-//     static int idx = 0;
-//     stack_mon();
-//     if (item == first)
-//     {
-//         for (idx = 0; idx < HEAP_ARRAY_SIZE; idx++)
-//             if (_heap_array[idx].size != -1)
-//                 break;
-//     }
-//     else
-//     {
-//         for (idx = (idx + 1); idx < HEAP_ARRAY_SIZE; idx++)
-//             if (_heap_array[idx].size != -1)
-//                 break;
-//     }
-//     if (idx == HEAP_ARRAY_SIZE)
-//         return NULL;
-//     else
-//         return &(_heap_array[idx]);
-// }
 
 #ifdef ESPBOT
 // C++ wrapper
 
 extern "C" void *call_espbot_zalloc(size_t size) // wrapper function
 {
-    return espmem.espbot_zalloc(size);
+    return espbot_zalloc(size);
 }
 
 extern "C" void call_espbot_free(void *addr) // wrapper function
 {
-    espmem.espbot_free(addr);
+    espbot_free(addr);
 }
 
 #endif

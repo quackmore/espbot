@@ -14,7 +14,7 @@ extern "C"
 }
 
 #include "espbot_json.hpp"
-#include "espbot_global.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
 
 JSONP::JSONP()
@@ -69,7 +69,7 @@ static char *find_object_end(char *t_str)
 {
     int paired_brackets = 0;
     char *tmp_ptr = t_str;
-    espmem.stack_mon();
+    mem_mon_stack();
     while (*tmp_ptr) // looking for '{' and '}'
     {
         if (*tmp_ptr == '{')
@@ -97,7 +97,7 @@ static char *find_array_end(char *t_str)
 {
     int paired_brackets = 0;
     char *tmp_ptr = t_str;
-    espmem.stack_mon();
+    mem_mon_stack();
     while (*tmp_ptr) // looking for '[' and ']'
     {
         if (*tmp_ptr == '[')
@@ -124,7 +124,7 @@ int JSONP::syntax_check(void)
 {
     char *ptr = _cursor;
     bool another_pair_found = false;
-    espmem.stack_mon();
+    mem_mon_stack();
 
     _cur_type = JSON_unknown;
     while ((ptr - _jstr) < _len) // looking for starting '{'
@@ -235,7 +235,7 @@ int JSONP::syntax_check(void)
             char *object_end = find_object_end(ptr);
             JSONP JSONP(ptr, ((object_end - ptr) + 1));
             int res = JSONP.syntax_check();
-            espmem.stack_mon();
+            mem_mon_stack();
             if (res > JSON_noerr)
                 return (ptr - _jstr + res);
             ptr = object_end;
@@ -245,7 +245,7 @@ int JSONP::syntax_check(void)
             char *array_end = find_array_end(ptr);
             JSONP_ARRAY array_str(ptr, ((array_end - ptr) + 1));
             int res = array_str.getErr();
-            espmem.stack_mon();
+            mem_mon_stack();
             if (res > JSON_noerr)
                 return (ptr - _jstr + res);
             ptr = array_end;
@@ -314,6 +314,7 @@ int JSONP::find_pair(void)
     _cur_type = JSON_unknown;
     _cur_value = NULL;
     _cur_value_len = 0;
+    mem_mon_stack();
     if (_cursor == _jstr)
     {
         while ((_cursor - _jstr) < _len) // looking for starting '{'
@@ -490,6 +491,7 @@ int JSONP::find_pair(void)
 int JSONP::find_key(const char *t_string)
 {
     _cursor = _jstr;
+    mem_mon_stack();
     if (syntax_check() != JSON_noerr)
         return JSON_notFound;
     while (find_pair() == JSON_pairFound)
@@ -524,7 +526,7 @@ int JSONP::getInt(const char *name)
             return 0;
         }
     char value_str[16];
-    espmem.stack_mon();
+    mem_mon_stack();
 
     os_memset(value_str, 0, 16);
     if (_cur_value_len > 15)
@@ -551,7 +553,7 @@ float JSONP::getFloat(const char *name)
         return 0.0;
     }
     char value_str[64];
-    espmem.stack_mon();
+    mem_mon_stack();
 
     os_memset(value_str, 0, 64);
     if (_cur_value_len > 63)
@@ -582,6 +584,7 @@ void JSONP::getStr(const char *name, char *dest, int len)
         _err = JSON_typeMismatch;
         return;
     }
+    mem_mon_stack();
     os_memset(dest, 0, len);
     os_strncpy(dest, _cur_value, _cur_value_len);
 }
@@ -600,6 +603,7 @@ int JSONP::getStrlen(const char *name)
         _err = JSON_typeMismatch;
         return 0;
     }
+    mem_mon_stack();
     return _cur_value_len;
 }
 
@@ -618,6 +622,7 @@ JSONP JSONP::getObj(const char *name)
         _err = JSON_typeMismatch;
         return empty_obj;
     }
+    mem_mon_stack();
     return JSONP(_cur_value, _cur_value_len);
 }
 
@@ -636,6 +641,7 @@ JSONP_ARRAY JSONP::getArray(const char *name)
         _err = JSON_typeMismatch;
         return empty_obj;
     }
+    mem_mon_stack();
     return JSONP_ARRAY(_cur_value, _cur_value_len);
 }
 
@@ -711,7 +717,7 @@ int JSONP_ARRAY::syntax_check(void)
     char *ptr = _cursor;
     bool another_pair_found = false;
     int tmp_elem_count = 1;
-    espmem.stack_mon();
+    mem_mon_stack();
 
     _cur_type = JSON_unknown;
     while ((ptr - _jstr) < _len) // looking for starting '['
@@ -784,7 +790,7 @@ int JSONP_ARRAY::syntax_check(void)
             char *object_end = find_object_end(ptr);
             JSONP obj(ptr, ((object_end - ptr) + 1));
             int res = obj.getErr();
-            espmem.stack_mon();
+            mem_mon_stack();
             if (res > JSON_noerr)
                 return (ptr - _jstr + res);
             ptr = object_end;
@@ -794,7 +800,7 @@ int JSONP_ARRAY::syntax_check(void)
             char *array_end = find_array_end(ptr);
             JSONP_ARRAY array_str(ptr, ((array_end - ptr) + 1));
             int res = array_str.syntax_check();
-            espmem.stack_mon();
+            mem_mon_stack();
             if (res > JSON_noerr)
                 return (ptr - _jstr + res);
             ptr = array_end;
@@ -867,7 +873,7 @@ int JSONP_ARRAY::find_elem(int idx)
     char *ptr = _cursor;
     bool another_elem_found = false;
     int tmp_elem_count = 0;
-    espmem.stack_mon();
+    mem_mon_stack();
 
     _cur_type = JSON_unknown;
     while ((ptr - _jstr) < _len) // looking for starting '['
@@ -1051,7 +1057,7 @@ int JSONP_ARRAY::getInt(int idx)
             return 0;
         }
     char value_str[16];
-    espmem.stack_mon();
+    mem_mon_stack();
 
     os_memset(value_str, 0, 16);
     if (_cur_len > 15)
@@ -1089,7 +1095,7 @@ float JSONP_ARRAY::getFloat(int idx)
         return 0.0;
     }
     char value_str[64];
-    espmem.stack_mon();
+    mem_mon_stack();
 
     os_memset(value_str, 0, 64);
     if (_cur_len > 63)
@@ -1131,6 +1137,7 @@ void JSONP_ARRAY::getStr(int idx, char *dest, int len)
         _err = JSON_typeMismatch;
         return;
     }
+    mem_mon_stack();
     os_memset(dest, 0, len);
     os_strncpy(dest, _cur_el, _cur_len);
 }
@@ -1160,6 +1167,7 @@ int JSONP_ARRAY::getStrlen(int idx)
         _err = JSON_typeMismatch;
         return 0;
     }
+    mem_mon_stack();
     return _cur_len;
 }
 
@@ -1189,6 +1197,7 @@ JSONP JSONP_ARRAY::getObj(int idx)
         _err = JSON_typeMismatch;
         return empty_obj;
     }
+    mem_mon_stack();
     return JSONP(_cur_el, _cur_len);
 }
 
@@ -1218,6 +1227,7 @@ JSONP_ARRAY JSONP_ARRAY::getArray(int idx)
         _err = JSON_typeMismatch;
         return empty_obj;
     }
+    mem_mon_stack();
     return JSONP_ARRAY(_cur_el, _cur_len);
 }
 

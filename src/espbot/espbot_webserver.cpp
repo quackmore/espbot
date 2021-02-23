@@ -19,7 +19,6 @@ extern "C"
 #include "espbot.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_http.hpp"
 #include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
@@ -45,6 +44,7 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
           parsed_req.url,
           parsed_req.content_len,
           parsed_req.req_content);
+    mem_mon_stack();
     if (!parsed_req.no_header_message && (parsed_req.h_content_len > parsed_req.content_len))
     {
         TRACE("webserver_recv message has been splitted waiting for completion ...");
@@ -65,13 +65,12 @@ static void webserver_recv(void *arg, char *precdata, unsigned short length)
     }
     system_soft_wdt_feed();
     espbot_http_routes(ptr_espconn, &parsed_req);
-    espmem.stack_mon();
 }
 
 static void webserver_recon(void *arg, sint8 err)
 {
     struct espconn *pesp_conn = (struct espconn *)arg;
-    espmem.stack_mon();
+    mem_mon_stack();
     DEBUG("webserver %d.%d.%d.%d:%d err %d reconnect",
           pesp_conn->proto.tcp->remote_ip[0],
           pesp_conn->proto.tcp->remote_ip[1],
@@ -84,7 +83,7 @@ static void webserver_recon(void *arg, sint8 err)
 static void webserver_discon(void *arg)
 {
     struct espconn *pesp_conn = (struct espconn *)arg;
-    espmem.stack_mon();
+    mem_mon_stack();
     DEBUG("webserver %d.%d.%d.%d:%d disconnect",
           pesp_conn->proto.tcp->remote_ip[0],
           pesp_conn->proto.tcp->remote_ip[1],
@@ -97,7 +96,7 @@ static void webserver_listen(void *arg)
 {
     ALL("webserver_listen");
     struct espconn *pesp_conn = (struct espconn *)arg;
-    espmem.stack_mon();
+    mem_mon_stack();
     espconn_regist_recvcb(pesp_conn, webserver_recv);
     espconn_regist_sentcb(pesp_conn, http_sentcb);
     espconn_regist_reconcb(pesp_conn, webserver_recon);

@@ -18,7 +18,6 @@ extern "C"
 #include "espbot.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_json.hpp"
 #include "espbot_http.hpp"
 #include "espbot_list.hpp"
@@ -68,6 +67,7 @@ static void add_client_espconn_association(Webclnt *client, struct espconn *p_pe
     new_association->client = client;
     new_association->p_pespconn = p_pespconn;
     List_err err = webclnt_espconn->push_back(new_association);
+    mem_mon_stack();
     if (err != list_ok)
     {
         dia_error_evnt(WEB_CLIENT_ADD_CLIENT_ASSOCIATION_REG_ERROR);
@@ -81,6 +81,7 @@ static void del_client_association(Webclnt *client)
 {
     ALL("del_client_association");
     A_espconn_webclnt *ptr = webclnt_espconn->front();
+    mem_mon_stack();
     while (ptr)
     {
         if (ptr->client == client)
@@ -104,6 +105,7 @@ void webclnt_connect_timeout(void *arg)
     // esp_diag.info(WEB_CLIENT_CONNECT_TIMEOUT);
     INFO("webclnt_connect_timeout");
     Webclnt *clnt = (Webclnt *)arg;
+    mem_mon_stack();
     clnt->update_status(WEBCLNT_CONNECT_TIMEOUT);
     clnt->call_completed_func();
 }
@@ -113,6 +115,7 @@ static void webclnt_send_req_timeout_function(void *arg)
     // esp_diag.info(WEB_CLIENT_SEND_REQ_TIMEOUT);
     INFO("webclnt_send_req_timeout_function");
     Webclnt *clnt = (Webclnt *)arg;
+    mem_mon_stack();
     clnt->update_status(WEBCLNT_RESPONSE_TIMEOUT);
     clnt->call_completed_func();
 }
@@ -133,7 +136,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
         return;
     }
     os_timer_disarm(&client->_send_req_timeout_timer);
-    espmem.stack_mon();
+    mem_mon_stack();
     DEBUG("webclient_recv msg %s", precdata);
     TRACE("webclient_recv msg len %d", length);
     // in case of binary message
@@ -183,6 +186,7 @@ static void webclient_recv(void *arg, char *precdata, unsigned short length)
     client->parsed_response = parsed_response;
     client->call_completed_func();
     delete parsed_response;
+    mem_mon_stack();
 }
 
 //
@@ -199,7 +203,7 @@ static void webclient_recon(void *arg, sint8 err)
           pesp_conn->proto.tcp->remote_ip[3],
           pesp_conn->proto.tcp->remote_port,
           err);
-    espmem.stack_mon();
+    mem_mon_stack();
 }
 
 static void webclient_discon(void *arg)
@@ -212,7 +216,7 @@ static void webclient_discon(void *arg)
           pesp_conn->proto.tcp->remote_ip[3],
           pesp_conn->proto.tcp->remote_port);
     // Webclnt *client = get_client(pesp_conn);
-    // espmem.stack_mon();
+    // mem_mon_stack();
     // if (client == NULL)
     // {
     //     dia_error_evnt(WEB_CLIENT_DISCON_CANNOT_FIND_ESPCONN, (uint32)pesp_conn);
@@ -221,6 +225,7 @@ static void webclient_discon(void *arg)
     // }
     // client->update_status(WEBCLNT_DISCONNECTED);
     // client->call_completed_func();
+    mem_mon_stack();
 }
 
 static void webclient_connected(void *arg)
@@ -233,7 +238,7 @@ static void webclient_connected(void *arg)
           pesp_conn->proto.tcp->remote_ip[3],
           pesp_conn->proto.tcp->remote_port);
     Webclnt *client = get_client(pesp_conn);
-    espmem.stack_mon();
+    mem_mon_stack();
     espconn_regist_recvcb(pesp_conn, webclient_recv);
     espconn_regist_sentcb(pesp_conn, http_sentcb);
     espconn_regist_reconcb(pesp_conn, webclient_recon);
@@ -306,7 +311,7 @@ void Webclnt::connect(struct ip_addr t_server,
     os_timer_setfn(&_connect_timeout_timer, (os_timer_func_t *)webclnt_connect_timeout, (void *)this);
     os_timer_arm(&_connect_timeout_timer, _comm_timeout, 0);
     sint8 res = espconn_connect(&_esp_conn);
-    espmem.stack_mon();
+    mem_mon_stack();
     if (res)
     {
         // no connection established, have to call the callback 
@@ -336,7 +341,6 @@ void Webclnt::disconnect(void (*completed_func)(void *), void *param)
 void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *), void *param)
 {
     ALL("Webclnt::send_req");
-    espmem.stack_mon();
     _completed_func = completed_func;
     _param = param;
     this->request = new char[msg_len + 1];
@@ -367,6 +371,7 @@ void Webclnt::send_req(char *t_msg, int msg_len, void (*completed_func)(void *),
         call_completed_func();
         break;
     }
+    mem_mon_stack();
 }
 
 Webclnt_status_type Webclnt::get_status(void)
@@ -426,4 +431,5 @@ void Webclnt::print_status(void)
         break;
     }
     TRACE("Webclnt status --> %s", status);
+    mem_mon_stack();
 }

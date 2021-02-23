@@ -16,10 +16,11 @@ extern "C"
 #include "user_interface.h"
 }
 
+#include "espbot.hpp"
 #include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_profiler.hpp"
 #include "espbot_timedate.hpp"
@@ -57,7 +58,7 @@ static void print_greetings(void)
     fs_printf("Chip ID        : %d\n", system_get_chip_id());
     fs_printf("SDK version    : %s\n", system_get_sdk_version());
     fs_printf("Boot version   : %d\n", system_get_boot_version());
-    fs_printf("Espbot version : %s\n", espbot_release);
+    fs_printf("Espbot version : %s\n", espbot_get_version());
     fs_printf("---------------------------------------------------\n");
     fs_printf("Memory map\n");
     system_print_meminfo();
@@ -80,6 +81,7 @@ inline void dia_add_event(char type, int code, uint32 value)
     if (dia_cfg.led_mask & type)
         gpio_set(DIA_LED, ESPBOT_LOW);
     // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_LOW);
+    mem_mon_stack();
 }
 
 void dia_fatal_evnt(int code, uint32 value)
@@ -124,6 +126,7 @@ struct dia_event *dia_get_event(int idx)
     int index = dia_event_queue.last - idx;
     if (index < 0)
         index = EVNT_QUEUE_SIZE + index;
+    mem_mon_stack();
     if (dia_event_queue.evnt[index].type != 0)
         return &dia_event_queue.evnt[index];
     else
@@ -140,6 +143,7 @@ int dia_get_unack_events(void)
             if (dia_event_queue.evnt[idx].ack == 0)
                 counter++;
     }
+    mem_mon_stack();
     return counter;
 }
 
@@ -156,6 +160,7 @@ void dia_ack_events(void)
     if (dia_cfg.led_mask)
         gpio_set(DIA_LED, ESPBOT_HIGH);
     // GPIO_OUTPUT_SET(gpio_NUM(DIA_LED), ESPBOT_HIGH);
+    mem_mon_stack();
 }
 
 void dia_set_led_mask(char mask)
@@ -182,6 +187,7 @@ void dia_set_led_mask(char mask)
     {
         gpio_unconfig(DIA_LED);
     }
+    mem_mon_stack();
 }
 
 void dia_set_serial_log_mask(char mask)
@@ -257,6 +263,7 @@ char *dia_cfg_json_stringify(char *dest, int len)
                "\"uart_0_bitrate\":%d,\"sdk_print_enabled\":%d}",
                dia_cfg.uart_0_bitrate,
                dia_cfg.sdk_print_enabled);
+    mem_mon_stack();
     return msg;
 }
 
@@ -268,7 +275,6 @@ int dia_restore_cfg(void)
     if (!Espfile::exists(DIAG_FILENAME))
         return CFG_cantRestore;
     Cfgfile cfgfile(DIAG_FILENAME);
-    espmem.stack_mon();
     int uart_0_bitrate = cfgfile.getInt(f_str("uart_0_bitrate"));
     int sdk_print_enabled = cfgfile.getInt(f_str("sdk_print_enabled"));
     int led_mask = cfgfile.getInt(f_str("diag_led_mask"));
@@ -283,6 +289,7 @@ int dia_restore_cfg(void)
     dia_cfg.sdk_print_enabled = (bool)sdk_print_enabled;
     dia_cfg.led_mask = (char)led_mask;
     dia_cfg.serial_log_mask = (char)serial_log_mask;
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -294,7 +301,6 @@ static int dia_saved_cfg_updated(void)
         return CFG_notUpdated;
     }
     Cfgfile cfgfile(DIAG_FILENAME);
-    espmem.stack_mon();
     int uart_0_bitrate = cfgfile.getInt(f_str("uart_0_bitrate"));
     int sdk_print_enabled = cfgfile.getInt(f_str("sdk_print_enabled"));
     int led_mask = cfgfile.getInt(f_str("diag_led_mask"));
@@ -313,6 +319,7 @@ static int dia_saved_cfg_updated(void)
     {
         return CFG_notUpdated;
     }
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -322,7 +329,7 @@ int dia_cfg_save(void)
     if (dia_saved_cfg_updated() == CFG_ok)
         return CFG_ok;
     Cfgfile cfgfile(DIAG_FILENAME);
-    espmem.stack_mon();
+    mem_mon_stack();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
     char str[91];

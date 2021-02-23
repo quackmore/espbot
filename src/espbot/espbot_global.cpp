@@ -10,6 +10,5 @@
 #include "espbot_global.hpp"
 
 
-Esp_mem espmem;
 Websvr espwebsvr;
 Ota_upgrade esp_ota;

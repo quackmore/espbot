@@ -151,6 +151,7 @@ static void espbot_coordinator_task(os_event_t *e)
     default:
         break;
     }
+    mem_mon_stack();
 }
 
 static void heartbeat_cb(void)
@@ -182,7 +183,7 @@ void espbot_set_name(char *t_name)
     if (os_strlen(t_name) > 31)
     {
         dia_warn_evnt(ESPOT_SET_NAME_TRUNCATED);
-        WARN("espbot_set_name truncating name to 32 characters");
+        WARN("espbot_set_name truncating name to 31 characters");
     }
     os_strncpy(espbot_cfg.device_name, t_name, 31);
 }
@@ -196,14 +197,15 @@ static int espbot_restore_cfg(void)
     if (!Espfile::exists(ESPBOT_FILENAME))
         return CFG_cantRestore;
     Cfgfile cfgfile(ESPBOT_FILENAME);
-    espmem.stack_mon();
     char device_name[32];
     os_memset(device_name, 0, 32);
     cfgfile.getStr(f_str("espbot_name"), device_name, 31);
+    mem_mon_stack();
     if (cfgfile.getErr() != JSON_noerr)
     {
         dia_error_evnt(ESPBOT_RESTORE_CFG_ERROR);
         ERROR("espbot_restore_cfg error");
+        mem_mon_stack();
         return CFG_error;
     }
     os_strncpy(espbot_cfg.device_name, device_name, 32);
@@ -221,7 +223,7 @@ static int espbot_saved_cfg_updated(void)
     char device_name[32];
     os_memset(device_name, 0, 32);
     cfgfile.getStr(f_str("espbot_name"), device_name, 31);
-    espmem.stack_mon();
+    mem_mon_stack();
     if (cfgfile.getErr() != JSON_noerr)
     {
         // no need to raise an error, the cfg file will be overwritten
@@ -238,8 +240,8 @@ static int espbot_saved_cfg_updated(void)
 
 char *espbot_cfg_json_stringify(char *dest, int len)
 {
-    // {"espbot_name":0}
-    int msg_len = 17 + 1;
+    // {"espbot_name":""}
+    int msg_len = 18 + 32;
     char *msg;
     if (dest == NULL)
     {
@@ -256,16 +258,16 @@ char *espbot_cfg_json_stringify(char *dest, int len)
         msg = dest;
         if (len < msg_len)
         {
-            *msg = 0;
+            msg[0] = 0;
             return msg;
         }
     }
     fs_sprintf(msg,
-               "{\"espbot_name\":%d}",
+               "{\"espbot_name\":\"%s\"}",
                espbot_cfg.device_name);
+    mem_mon_stack();
     return msg;
 }
-
 
 int espbot_cfg_save(void)
 {
@@ -273,12 +275,12 @@ int espbot_cfg_save(void)
     if (espbot_saved_cfg_updated() == CFG_ok)
         return CFG_ok;
     Cfgfile cfgfile(ESPBOT_FILENAME);
-    espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
-    char str[18];
-    espbot_cfg_json_stringify(str, 18);
+    char str[50];
+    espbot_cfg_json_stringify(str, 50);
     int res = cfgfile.n_append(str, os_strlen(str));
+    mem_mon_stack();
     if (res < SPIFFS_OK)
         return CFG_error;
     return CFG_ok;
@@ -345,7 +347,7 @@ void espbot_init(void)
     // BEFORE FILE SYSTEM BECOMES AVAILABLE
     // init functions will use default cfg only
     system_set_os_print(1);    // enable log print
-    espmem.init();             //
+    mem_mon_init();            //
     timedate_init_essential(); // cause diagnostic will use timestamp
     gpio_init();               // cause it's used by diagnostic
     dia_init_essential();      // default cfg

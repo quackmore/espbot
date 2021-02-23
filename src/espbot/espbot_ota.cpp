@@ -46,6 +46,7 @@ void Ota_upgrade::init(void)
     _last_result = OTA_IDLE;
     _cb_on_completion = NULL;
     _cb_param = NULL;
+    mem_mon_stack();
 }
 
 void Ota_upgrade::set_host(char *t_str)
@@ -233,7 +234,7 @@ static int release_cmp(char *cur_rel, char *avail_rel)
     int idx, result;
     char cur_str[10];
     char avail_str[10];
-    espmem.stack_mon();
+    mem_mon_stack();
     // discard v
     cur_ptr++;
     avail_ptr++;
@@ -278,6 +279,7 @@ static int release_cmp(char *cur_rel, char *avail_rel)
         avail_ptr = tmp_ptr + 1;
         // compare substrings
         result = os_strcmp(cur_str, avail_str);
+        mem_mon_stack();
         if (result == 0)
             continue;
         else
@@ -332,6 +334,7 @@ static void check_version(void *param)
         break;
     }
     ota_client->disconnect(check_for_new_release_cleanup, NULL);
+    mem_mon_stack();
 }
 
 static void ota_ask_version(void *param)
@@ -364,6 +367,7 @@ static void ota_ask_version(void *param)
         ota_client->disconnect(check_for_new_release_cleanup, NULL);
         break;
     }
+    mem_mon_stack();
 }
 
 static void ota_completed_cb(void *arg)
@@ -380,6 +384,7 @@ static void ota_completed_cb(void *arg)
         esp_ota.set_status(OTA_FAILED);
     }
     next_function(ota_engine);
+    mem_mon_stack();
 }
 
 static void ota_cleanup(void)
@@ -537,7 +542,7 @@ static void ota_engine(void)
     default:
         break;
     }
-    espmem.stack_mon();
+    mem_mon_stack();
 }
 
 void Ota_upgrade::start_upgrade(void)
@@ -569,7 +574,7 @@ int Ota_upgrade::restore_cfg(void)
     return CFG_OK;
     //    ALL("Ota_upgrade::restore_cfg");
     //    File_to_json cfgfile(f_str("ota.cfg"));
-    //    espmem.stack_mon();
+    //    mem_mon_stack();
     //    if (cfgfile.exists())
     //    {
     //        if (cfgfile.find_string(f_str("host")))
@@ -622,7 +627,7 @@ int Ota_upgrade::saved_cfg_not_updated(void)
     ALL("saved_cfg_not_updated");
     return CFG_OK;
     //    File_to_json cfgfile(f_str("ota.cfg"));
-    //    espmem.stack_mon();
+    //    mem_mon_stack();
     //    if (cfgfile.exists())
     //    {
     //        if (cfgfile.find_string(f_str("host")))
@@ -687,42 +692,42 @@ int Ota_upgrade::save_cfg(void)
 {
     ALL("save_cfg");
     return CFG_OK;
-//    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-//        return CFG_OK;
-//    if (!espfs.is_available())
-//    {
-//        dia_error_evnt(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
-//        ERROR("OTA save_cfg file system not available");
-//        return CFG_ERROR;
-//    }
-//    Ffile cfgfile(&espfs, (char *)f_str("ota.cfg"));
-//    if (!cfgfile.is_available())
-//    {
-//        dia_error_evnt(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
-//        ERROR("OTA save_cfg cannot open file");
-//        return CFG_ERROR;
-//    }
-//    cfgfile.clear();
-//    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
-//    int buffer_len = 70 + 15 + 5 + os_strlen(get_path()) + 1 + 1 + 1;
-//    Heap_chunk buffer(buffer_len);
-//    espmem.stack_mon();
-//    if (buffer.ref == NULL)
-//    {
-//        dia_error_evnt(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
-//        ERROR("OTA save_cfg heap exhausted %d", buffer_len);
-//        return CFG_ERROR;
-//    }
-//    // using fs_sprintf twice to keep fmt len lower that 70 chars
-//    fs_sprintf(buffer.ref,
-//               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
-//               get_host(),
-//               get_port(),
-//               get_path());
-//    fs_sprintf((buffer.ref + os_strlen(buffer.ref)),
-//               "\"check_version\":%d,\"reboot_on_completion\":%d}",
-//               get_check_version(),
-//               get_reboot_on_completion());
-//    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
-//    return CFG_OK;
+    //    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
+    //        return CFG_OK;
+    //    if (!espfs.is_available())
+    //    {
+    //        dia_error_evnt(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
+    //        ERROR("OTA save_cfg file system not available");
+    //        return CFG_ERROR;
+    //    }
+    //    Ffile cfgfile(&espfs, (char *)f_str("ota.cfg"));
+    //    if (!cfgfile.is_available())
+    //    {
+    //        dia_error_evnt(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
+    //        ERROR("OTA save_cfg cannot open file");
+    //        return CFG_ERROR;
+    //    }
+    //    cfgfile.clear();
+    //    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
+    //    int buffer_len = 70 + 15 + 5 + os_strlen(get_path()) + 1 + 1 + 1;
+    //    Heap_chunk buffer(buffer_len);
+    //    mem_mon_stack();
+    //    if (buffer.ref == NULL)
+    //    {
+    //        dia_error_evnt(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
+    //        ERROR("OTA save_cfg heap exhausted %d", buffer_len);
+    //        return CFG_ERROR;
+    //    }
+    //    // using fs_sprintf twice to keep fmt len lower that 70 chars
+    //    fs_sprintf(buffer.ref,
+    //               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
+    //               get_host(),
+    //               get_port(),
+    //               get_path());
+    //    fs_sprintf((buffer.ref + os_strlen(buffer.ref)),
+    //               "\"check_version\":%d,\"reboot_on_completion\":%d}",
+    //               get_check_version(),
+    //               get_reboot_on_completion());
+    //    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
+    //    return CFG_OK;
 }

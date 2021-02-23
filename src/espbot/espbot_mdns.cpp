@@ -20,9 +20,10 @@ extern "C"
 #include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_utils.hpp"
+#include "espbot_webserver.hpp"
 
 static struct
 {
@@ -44,7 +45,6 @@ static int mdns_restore_cfg(void)
     if (!Espfile::exists(MDNS_FILENAME))
         return CFG_cantRestore;
     Cfgfile cfgfile(MDNS_FILENAME);
-    espmem.stack_mon();
     int enabled = cfgfile.getInt(f_str("mdns_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
@@ -53,6 +53,7 @@ static int mdns_restore_cfg(void)
         return CFG_error;
     }
     mdns_cfg.enabled = (bool)enabled;
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -64,7 +65,6 @@ static int mdns_saved_cfg_updated(void)
         return CFG_notUpdated;
     }
     Cfgfile cfgfile(MDNS_FILENAME);
-    espmem.stack_mon();
     int enabled = cfgfile.getInt(f_str("mdns_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
@@ -77,6 +77,7 @@ static int mdns_saved_cfg_updated(void)
     {
         return CFG_notUpdated;
     }
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -107,6 +108,7 @@ char *mdns_cfg_json_stringify(char *dest, int len)
     fs_sprintf(msg,
                "{\"mdns_enabled\":%d}",
                mdns_cfg.enabled);
+    mem_mon_stack();
     return msg;
 }
 
@@ -116,7 +118,6 @@ int mdns_cfg_save(void)
     if (mdns_saved_cfg_updated() == CFG_ok)
         return CFG_ok;
     Cfgfile cfgfile(MDNS_FILENAME);
-    espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
     char str[19];
@@ -124,6 +125,7 @@ int mdns_cfg_save(void)
     int res = cfgfile.n_append(str, os_strlen(str));
     if (res < SPIFFS_OK)
         return CFG_error;
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -143,6 +145,7 @@ void mdns_start(char *app_alias)
         dia_info_evnt(MDNS_START);
         INFO("mDns started");
     }
+    mem_mon_stack();
 }
 
 void mdns_stop(void)
@@ -154,6 +157,7 @@ void mdns_stop(void)
         dia_info_evnt(MDNS_STOP);
         INFO("mDns ended");
     }
+    mem_mon_stack();
 }
 
 void mdns_enable(void)
@@ -163,12 +167,14 @@ void mdns_enable(void)
         mdns_cfg.enabled = true;
         mdns_start(espbot_get_name());
     }
+    mem_mon_stack();
 }
 
 void mdns_disable(void)
 {
     mdns_cfg.enabled = false;
     mdns_stop();
+    mem_mon_stack();
 }
 
 bool mdns_is_enabled(void)

@@ -12,6 +12,7 @@
 extern "C"
 {
 #include "c_types.h"
+#include "osapi.h"
 #include "espbot_mem_macros.h"
 }
 

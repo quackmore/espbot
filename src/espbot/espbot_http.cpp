@@ -123,7 +123,7 @@ Http_header::~Http_header()
 //     }
 //     os_printf("queue end\n");
 // }
-// 
+//
 // static void print_split_queue(Queue<struct http_split_send> *qq)
 // {
 //     os_printf("queue split start\n");
@@ -156,6 +156,7 @@ static void clear_busy_sending_data(void *arg)
     }
     esp_busy_sending_data = false;
     system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
+    mem_mon_stack();
 }
 
 void clean_pending_send(struct espconn *p_espconn)
@@ -187,6 +188,7 @@ void clean_pending_send(struct espconn *p_espconn)
         }
         p_pending_response = pending_split_send->front();
     }
+    mem_mon_stack();
 }
 
 void http_check_pending_send(void)
@@ -260,6 +262,7 @@ void http_check_pending_send(void)
         // serving just one pending_split_send, so that just one espconn_send is engaged
         // next one will be triggered by a espconn_send completion
     }
+    mem_mon_stack();
 }
 
 void http_sentcb(void *arg)
@@ -278,12 +281,13 @@ void http_sentcb(void *arg)
     esp_busy_sending_data = false;
     system_os_post(USER_TASK_PRIO_0, SIG_http_checkPendingResponse, '0');
     system_soft_wdt_feed();
+    mem_mon_stack();
 }
 
 static void push_pending_send(struct espconn *p_espconn, int order, char *msg, int len)
 {
     struct http_send *response_data = new struct http_send;
-    espmem.stack_mon();
+    mem_mon_stack();
     if (response_data)
     {
         response_data->p_espconn = p_espconn;
@@ -348,7 +352,7 @@ void http_send_buffer(struct espconn *p_espconn, int order, char *msg, int len)
         os_timer_arm(&clear_busy_sending_data_timer, 20000, 0);
 
         sint8 res = espconn_send(p_espconn, (uint8 *)send_buffer, len);
-        espmem.stack_mon();
+        mem_mon_stack();
         if (res != 0)
         {
             os_timer_disarm(&clear_busy_sending_data_timer);
@@ -442,7 +446,7 @@ void http_response(struct espconn *p_espconn, int code, char *content_type, cons
             ERROR("http_response heap exhausted %d", os_strlen(msg));
         }
     }
-    espmem.stack_mon();
+    mem_mon_stack();
 }
 
 Queue<struct http_split_send> *pending_split_send;
@@ -529,6 +533,7 @@ static void send_remaining_msg(struct http_split_send *p_sr)
         }
         delete[] p_sr->content;
     }
+    mem_mon_stack();
 }
 
 //
@@ -588,6 +593,7 @@ void http_send(struct espconn *p_espconn, char *msg, int msg_len)
         TRACE("http_send on espconn: %X, msg (full) len: %d", p_espconn, msg_len);
         http_send_buffer(p_espconn, 1, msg, msg_len);
     }
+    mem_mon_stack();
 }
 
 char *http_format_header(class Http_header *p_header)
@@ -646,6 +652,7 @@ char *http_format_header(class Http_header *p_header)
             ptr = ptr + os_strlen(ptr);
         }
         fs_sprintf(ptr, "Pragma: no-cache\r\n\r\n");
+        mem_mon_stack();
         return header_msg.ref;
     }
     else
@@ -690,7 +697,6 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
     ALL("http_parse_request");
     char *tmp_ptr = req;
     char *end_ptr = NULL;
-    espmem.stack_mon();
     int len = 0;
 
     if (tmp_ptr == NULL)
@@ -883,6 +889,7 @@ void http_parse_request(char *req, unsigned short length, Http_parsed_req *parse
         os_strncpy(tmp_str.ref, tmp_ptr, len);
         parsed_req->h_content_len = atoi(tmp_str.ref);
     }
+    mem_mon_stack();
 }
 
 class Http_pending_req
@@ -947,6 +954,7 @@ void http_save_pending_request(void *arg, char *precdata, unsigned short length,
         delete pending_req;
         return;
     }
+    mem_mon_stack();
 }
 
 void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, unsigned short length, void (*msg_complete)(void *, char *, unsigned short))
@@ -977,6 +985,7 @@ void http_check_pending_requests(struct espconn *p_espconn, char *new_msg, unsig
         msg_complete((void *)p_espconn, p_p_req->request, p_p_req->content_len);
         pending_requests->remove();
     }
+    mem_mon_stack();
 }
 
 void clean_pending_responses(struct espconn *p_espconn)
@@ -998,6 +1007,7 @@ void clean_pending_responses(struct espconn *p_espconn)
         if (p_p_req)
             p_p_req = pending_requests->next();
     }
+    mem_mon_stack();
 }
 
 class Http_pending_res
@@ -1079,6 +1089,7 @@ void http_save_pending_response(struct espconn *p_espconn, char *precdata, unsig
         delete pending_res;
         return;
     }
+    mem_mon_stack();
 }
 
 void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, unsigned short length, void (*msg_complete)(void *, char *, unsigned short))
@@ -1108,6 +1119,7 @@ void http_check_pending_responses(struct espconn *p_espconn, char *new_msg, unsi
         msg_complete((void *)p_espconn, p_p_res->response, p_p_res->content_len);
         pending_responses->remove();
     }
+    mem_mon_stack();
 }
 
 void http_init(void)
@@ -1140,6 +1152,7 @@ void http_queues_clear(void)
         pending_split_send->pop();
         p_split = pending_split_send->front();
     }
+    mem_mon_stack();
 }
 
 //
@@ -1170,7 +1183,6 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
     char *end_ptr = NULL;
     char *tmp_str = NULL;
     int len = 0;
-    espmem.stack_mon();
 
     if (tmp_ptr == NULL)
     {
@@ -1358,4 +1370,5 @@ void http_parse_response(char *response, int length, Http_parsed_response *parse
         return;
     }
     os_memcpy(parsed_response->body, tmp_ptr, len);
+    mem_mon_stack();
 }

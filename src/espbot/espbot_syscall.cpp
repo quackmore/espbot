@@ -13,8 +13,8 @@ extern "C"
 #include "c_types.h"
 }
 
-#include "espbot_global.hpp"
 #include "espbot_diagnostic.hpp"
+#include "espbot_mem_mon.hpp"
 
 extern "C" void __cxa_pure_virtual(void)
 {
@@ -23,20 +23,20 @@ extern "C" void __cxa_pure_virtual(void)
 
 void *operator new(size_t size)
 {
-    return espmem.espbot_zalloc(size);
+    return espbot_zalloc(size);
 }
 
 void *operator new[](size_t size)
 {
-    return espmem.espbot_zalloc(size);
+    return espbot_zalloc(size);
 }
 
 void operator delete(void *p)
 {
-    espmem.espbot_free(p);
+    espbot_free(p);
 }
 
 void operator delete[](void *p)
 {
-    espmem.espbot_free(p);
+    espbot_free(p);
 }

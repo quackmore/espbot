@@ -20,7 +20,7 @@ extern "C"
 #include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_timedate.h"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
@@ -54,6 +54,7 @@ void timedate_start_sntp(void)
         dia_info_evnt(SNTP_START);
         INFO("Sntp started");
     }
+    mem_mon_stack();
 }
 
 void timedate_stop_sntp(void)
@@ -65,6 +66,7 @@ void timedate_stop_sntp(void)
         dia_info_evnt(SNTP_STOP);
         INFO("Sntp ended");
     }
+    mem_mon_stack();
 }
 
 uint32 timedate_get_timestamp()
@@ -98,6 +100,7 @@ uint32 timedate_get_timestamp()
         cur_time.sntp_time = timestamp;
         system_rtc_mem_write(RTC_TIMEDATE, &cur_time, (sizeof(struct espbot_time) - 4));
     }
+    mem_mon_stack();
     return timestamp;
 }
 
@@ -107,6 +110,7 @@ char *timedate_get_timestr(uint32 t_time)
     char *tmp_ptr = os_strstr(time_str, f_str("\n"));
     if (tmp_ptr)
         *tmp_ptr = '\0';
+    mem_mon_stack();
     return time_str;
 }
 
@@ -118,6 +122,7 @@ void timedate_set_time_manually(uint32 t_time)
     system_rtc_mem_write(RTC_TIMEDATE, &time_pair, (sizeof(struct espbot_time) - 4));
     dia_info_evnt(TIMEDATE_CHANGED, t_time);
     INFO("timedate changed to %d", t_time);
+    mem_mon_stack();
 }
 
 void timedate_set_timezone(signed char tz)
@@ -128,6 +133,7 @@ void timedate_set_timezone(signed char tz)
         dia_info_evnt(TIMEZONE_CHANGED, timedate_cfg.timezone);
         INFO("timezone changed to %d", timedate_cfg.timezone);
     }
+    mem_mon_stack();
 }
 
 signed char timedate_get_timezone(void)
@@ -163,7 +169,6 @@ static int timedate_restore_cfg(void)
     if (!Espfile::exists(TIMEDATE_FILENAME))
         return CFG_cantRestore;
     Cfgfile cfgfile(TIMEDATE_FILENAME);
-    espmem.stack_mon();
     int sntp_enabled = cfgfile.getInt(f_str("sntp_enabled"));
     int timezone = cfgfile.getInt(f_str("timezone"));
     if (cfgfile.getErr() != JSON_noerr)
@@ -174,6 +179,7 @@ static int timedate_restore_cfg(void)
     }
     timedate_cfg.sntp_enabled = (bool)sntp_enabled;
     timedate_cfg.timezone = (signed char)timezone;
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -185,7 +191,6 @@ static int timedate_saved_cfg_updated(void)
         return CFG_notUpdated;
     }
     Cfgfile cfgfile(TIMEDATE_FILENAME);
-    espmem.stack_mon();
     int sntp_enabled = cfgfile.getInt(f_str("sntp_enabled"));
     int timezone = cfgfile.getInt(f_str("timezone"));
     if (cfgfile.getErr() != JSON_noerr)
@@ -200,6 +205,7 @@ static int timedate_saved_cfg_updated(void)
     {
         return CFG_notUpdated;
     }
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -231,6 +237,7 @@ char *timedate_cfg_json_stringify(char *dest, int len)
                "{\"sntp_enabled\":%d,\"timezone\":%d}",
                timedate_cfg.sntp_enabled,
                timedate_cfg.timezone);
+    mem_mon_stack();
     return msg;
 }
 
@@ -267,6 +274,7 @@ char *timedate_state_json_stringify(char *dest, int len)
                "\"sntp_enabled\":%d,\"timezone\":%d}",
                timedate_cfg.sntp_enabled,
                timedate_cfg.timezone);
+    mem_mon_stack();
     return msg;
 }
 
@@ -276,7 +284,6 @@ int timedate_cfg_save(void)
     if (timedate_saved_cfg_updated() == CFG_ok)
         return CFG_ok;
     Cfgfile cfgfile(TIMEDATE_FILENAME);
-    espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
     char str[35];
@@ -284,6 +291,7 @@ int timedate_cfg_save(void)
     int res = cfgfile.n_append(str, os_strlen(str));
     if (res < SPIFFS_OK)
         return CFG_error;
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -302,6 +310,7 @@ void timedate_init_essential(void)
         rtc_time.magic = ESP_TIMEDATE_MAGIC;
         system_rtc_mem_write(RTC_TIMEDATE, &rtc_time, sizeof(struct espbot_time));
     }
+    mem_mon_stack();
 }
 
 void timedate_init(void)

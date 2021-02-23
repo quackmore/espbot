@@ -12,7 +12,7 @@ extern "C"
 #include "espbot_event_codes.h"
 }
 
-#include "espbot_global.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_spiffs.hpp"
 #include "espbot_diagnostic.hpp"
 
@@ -141,7 +141,7 @@ void esp_spiffs_mount(void)
     dia_info_evnt(SPIFFS_INIT_FS_SIZE, total);
     dia_info_evnt(SPIFFS_INIT_FS_USED, used);
     INFO("File System size [bytes]: %d, used [bytes]:%d", total, used);
-    espmem.stack_mon();
+    mem_mon_stack();
 }
 
 u32_t esp_spiffs_total_size()
@@ -156,7 +156,7 @@ u32_t esp_spiffs_total_size()
     u32_t total = 0;
     u32_t used = 0;
     res = SPIFFS_info(&esp_spiffs.handler, &total, &used);
-    espmem.stack_mon();
+    mem_mon_stack();
     return total;
 }
 
@@ -172,7 +172,7 @@ u32_t esp_spiffs_used_size()
     u32_t total = 0;
     u32_t used = 0;
     res = SPIFFS_info(&esp_spiffs.handler, &total, &used);
-    espmem.stack_mon();
+    mem_mon_stack();
     return used;
 }
 
@@ -196,7 +196,7 @@ s32_t esp_spiffs_check()
         dia_error_evnt(SPIFFS_CHECK_ERRORS, res);
         ERROR("Error %d checking File System", res);
     }
-    espmem.stack_mon();
+    mem_mon_stack();
     return res;
 }
 
@@ -217,7 +217,7 @@ struct spiffs_dirent *esp_spiffs_list(int file_idx)
     pfile = SPIFFS_readdir(&dd, &directory);
     if (pfile == NULL)
         SPIFFS_closedir(&dd);
-    espmem.stack_mon();
+    mem_mon_stack();
     return pfile;
 }
 
@@ -258,6 +258,7 @@ Espfile::Espfile(char *filename)
         dia_error_evnt(ESPFILE_OPEN_ERROR, _err);
         ERROR("Espfile::Espfile error %d opening file %s", _err, _name);
     }
+    mem_mon_stack();
 }
 
 // close the file (if open)
@@ -277,6 +278,7 @@ Espfile::~Espfile()
         dia_error_evnt(ESPFILE_CLOSE_ERROR, SPIFFS_errno(&esp_spiffs.handler));
         ERROR("Espfile::~Espfile error %d closing file %s", SPIFFS_errno(&esp_spiffs.handler), _name);
     }
+    mem_mon_stack();
 }
 
 s32_t Espfile::n_read(char *buffer, int len)
@@ -301,7 +303,7 @@ s32_t Espfile::n_read(char *buffer, int len)
         dia_error_evnt(ESPFILE_N_READ_READ_ERROR, _err);
         ERROR("Espfile::n_read error %d reading file %s", _err, _name);
     }
-    espmem.stack_mon();
+    mem_mon_stack();
     return res;
 }
 
@@ -336,7 +338,7 @@ s32_t Espfile::n_read(char *buffer, int offset, int len)
         ERROR("Espfile::n_read error %d reading file %s", _err, _name);
         return res;
     }
-    espmem.stack_mon();
+    mem_mon_stack();
     return res;
 }
 
@@ -362,7 +364,7 @@ s32_t Espfile::n_append(char *buffer, int len)
         dia_error_evnt(ESPFILE_N_APPEND_WRITE_ERROR, _err);
         ERROR("Espfile::n_append error %d writing file %s", _err, _name);
     }
-    espmem.stack_mon();
+    mem_mon_stack();
     return res;
 }
 
@@ -397,7 +399,7 @@ s32_t Espfile::clear()
         ERROR("Espfile::clear error %d opening file %s", _err, _name);
         return _err;
     }
-    espmem.stack_mon();
+    mem_mon_stack();
     return res;
 }
 
@@ -424,6 +426,7 @@ s32_t Espfile::remove()
         ERROR("Espfile::remove error %d removing file %s", _err, _name);
         return res;
     }
+    mem_mon_stack();
     _handler = -1; // so the destructor won't try to close the file
     return res;
 }
@@ -452,7 +455,7 @@ bool Espfile::exists(char *name)
             return true;
     }
     SPIFFS_closedir(&directory);
-    espmem.stack_mon();
+    mem_mon_stack();
     return false;
 }
 
@@ -467,9 +470,9 @@ int Espfile::size(char *name)
     spiffs_DIR directory;
     struct spiffs_dirent tmp_file;
     struct spiffs_dirent *file_ptr;
-    espmem.stack_mon();
 
     SPIFFS_opendir(&esp_spiffs.handler, "/", &directory);
+    mem_mon_stack();
     while ((file_ptr = SPIFFS_readdir(&directory, &tmp_file)))
     {
         if (0 == os_strncmp(name, (char *)file_ptr->name, os_strlen(name)))

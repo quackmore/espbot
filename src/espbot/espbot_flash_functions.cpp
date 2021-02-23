@@ -18,7 +18,6 @@ extern "C"
 
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_spiffs.hpp"
 
@@ -31,7 +30,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
     u32_t start_addr = (t_addr / FS_ALIGN_BYTES) * FS_ALIGN_BYTES;
     // and how many bytes are required by alignment
     int align_bytes = t_addr % FS_ALIGN_BYTES;
-    espmem.stack_mon();
+    mem_mon_stack();
 
     // boundary checks
     if ((start_addr < FS_START) || (start_addr >= FS_END) ||
@@ -44,7 +43,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
 
     // let's use aligned ram variables
     // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)esp_zalloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
+    uint32 buffer_space = (uint32)espbot_zalloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
     uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
 
     while (t_size > 0)
@@ -58,14 +57,14 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
         {
             dia_error_evnt(SPIFFS_FLASH_READ_ERROR, start_addr);
             ERROR("Error reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-            esp_free((void *)buffer_space);
+            espbot_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             dia_error_evnt(SPIFFS_FLASH_READ_TIMEOUT, start_addr);
             ERROR("Timeout reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-            esp_free((void *)buffer_space);
+            espbot_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
 
@@ -91,7 +90,7 @@ s32_t esp_spiffs_read(u32_t t_addr, u32_t t_size, u8_t *t_dst)
             t_size = 0;
         }
     }
-    esp_free((void *)buffer_space);
+    espbot_free((void *)buffer_space);
     return SPIFFS_OK;
 }
 
@@ -116,9 +115,9 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
 
     // let's use aligned ram variable
     // warning: using stack instead of heap will produce hallucinations
-    uint32 buffer_space = (uint32)esp_zalloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
+    uint32 buffer_space = (uint32)espbot_zalloc(LOG_PAGE_SIZE + FS_ALIGN_BYTES);
     uint32 *buffer = (uint32 *)(((buffer_space + FS_ALIGN_BYTES) / FS_ALIGN_BYTES) * FS_ALIGN_BYTES);
-    espmem.stack_mon();
+    mem_mon_stack();
 
     while (t_size > 0)
     {
@@ -131,14 +130,14 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
         {
             dia_error_evnt(SPIFFS_FLASH_WRITE_READ_ERROR, start_addr);
             ERROR("Error reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-            esp_free((void *)buffer_space);
+            espbot_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_ERR;
         }
         if (res == SPI_FLASH_RESULT_TIMEOUT)
         {
             dia_error_evnt(SPIFFS_FLASH_WRITE_READ_TIMEOUT, start_addr);
             ERROR("Timeout reading flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-            esp_free((void *)buffer_space);
+            espbot_free((void *)buffer_space);
             return SPIFFS_FLASH_RESULT_TIMEOUT;
         }
 
@@ -159,14 +158,14 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
             {
                 dia_error_evnt(SPIFFS_FLASH_WRITE_WRITE_ERROR, start_addr);
                 ERROR("Error writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-                esp_free((void *)buffer_space);
+                espbot_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_ERR;
             }
             if (res == SPI_FLASH_RESULT_TIMEOUT)
             {
                 dia_error_evnt(SPIFFS_FLASH_WRITE_WRITE_TIMEOUT, start_addr);
                 ERROR("Timeout writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-                esp_free((void *)buffer_space);
+                espbot_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_TIMEOUT;
             }
 
@@ -191,20 +190,20 @@ s32_t esp_spiffs_write(u32_t t_addr, u32_t t_size, u8_t *t_src)
             {
                 dia_error_evnt(SPIFFS_FLASH_WRITE_WRITE_ERROR, start_addr);
                 ERROR("Error writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-                esp_free((void *)buffer_space);
+                espbot_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_ERR;
             }
             if (res == SPI_FLASH_RESULT_TIMEOUT)
             {
                 dia_error_evnt(SPIFFS_FLASH_WRITE_WRITE_TIMEOUT, start_addr);
                 ERROR("Timeout writing flash from %X for %d bytes", start_addr, LOG_PAGE_SIZE);
-                esp_free((void *)buffer_space);
+                espbot_free((void *)buffer_space);
                 return SPIFFS_FLASH_RESULT_TIMEOUT;
             }
             t_size = 0;
         }
     }
-    esp_free((void *)buffer_space);
+    espbot_free((void *)buffer_space);
     return SPIFFS_OK;
 }
 
@@ -226,7 +225,7 @@ s32_t esp_spiffs_erase(u32_t t_addr, u32_t t_size)
     // find sector number and offset from sector start
     uint16_t sect_number = t_addr / FLASH_SECT_SIZE;
     uint32_t sect_offset = t_addr % FLASH_SECT_SIZE;
-    espmem.stack_mon();
+    mem_mon_stack();
 
     while (t_size > 0)
     {

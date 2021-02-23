@@ -19,7 +19,6 @@ extern "C"
 #include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
@@ -174,6 +173,7 @@ void wifi_event_handler(System_Event_t *evt)
         TRACE("unknown event %x", evt->event);
         break;
     }
+    mem_mon_stack();
 }
 
 void espwifi_get_ip_address(struct ip_info *t_ip)
@@ -193,7 +193,6 @@ void espwifi_work_as_ap(void)
     ALL("espwifi_work_as_ap");
     struct ip_info ap_ip;
     struct dhcps_lease dhcp_lease;
-    espmem.stack_mon();
 
     // switch to SOFTAP otherwise wifi_softap_set_config_current won't work
     // wifi_set_opmode_current(SOFTAP_MODE);
@@ -243,6 +242,7 @@ void espwifi_work_as_ap(void)
         TRACE("AP config: Security:    Unknown");
         break;
     }
+    mem_mon_stack();
 }
 
 void espwifi_connect_to_ap(void)
@@ -272,7 +272,7 @@ void espwifi_connect_to_ap(void)
     // connect
     stamode_connecting++;
     wifi_station_connect();
-    espmem.stack_mon();
+    mem_mon_stack();
 }
 
 bool espwifi_is_connected(void)
@@ -336,6 +336,7 @@ static void fill_in_ap_list(void *arg, STATUS status)
     }
     if (scan_completed_cb)
         scan_completed_cb(scan_completed_param);
+    mem_mon_stack();
 }
 
 void espwifi_scan_for_ap(struct scan_config *config, void (*callback)(void *), void *param)
@@ -462,7 +463,6 @@ static int wifi_cfg_restore(void)
         ERROR("wifi_cfg_restore error");
         return CFG_error;
     }
-    espmem.stack_mon();
     os_memset(station_ssid, 0, 32);
     cfgfile.getStr(f_str("station_ssid"), station_ssid, 32);
     if (cfgfile.getErr() == JSON_notFound)
@@ -499,6 +499,7 @@ static int wifi_cfg_restore(void)
     }
     char ap_password[64];
     os_memset(ap_password, 0, 64);
+    mem_mon_stack();
     cfgfile.getStr(f_str("ap_pwd"), ap_password, 64);
     if (cfgfile.getErr() == JSON_notFound)
     {
@@ -531,7 +532,6 @@ static int wifi_cfg_uptodate(void)
         return CFG_notUpdated;
     }
     Cfgfile cfgfile(WIFI_CFG_FILENAME);
-    espmem.stack_mon();
     char st_ssid[32];
     cfgfile.getStr(f_str("station_ssid"), st_ssid, 32);
     char st_pwd[64];
@@ -539,6 +539,7 @@ static int wifi_cfg_uptodate(void)
     char ap_pwd[64];
     cfgfile.getStr(f_str("ap_pwd"), ap_pwd, 64);
     int ap_channel = cfgfile.getInt(f_str("ap_channel"));
+    mem_mon_stack();
     if (cfgfile.getErr() != JSON_noerr)
     {
         // no need to raise an error, the cfg file will be overwritten
@@ -562,13 +563,13 @@ int espwifi_cfg_save(void)
     if (wifi_cfg_uptodate() == CFG_ok)
         return CFG_ok;
     Cfgfile cfgfile(WIFI_CFG_FILENAME);
-    espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
 
     char str[225];
     espwifi_cfg_json_stringify(str, 225);
     int res = cfgfile.n_append(str, os_strlen(str));
+    mem_mon_stack();
     if (res < SPIFFS_OK)
         return CFG_error;
     return CFG_ok;
@@ -650,6 +651,7 @@ char *espwifi_status_json_stringify(char *dest, int len)
     espwifi_get_ip_address(&tmp_ip);
     char *ip_ptr = (char *)&tmp_ip.ip.addr;
     fs_sprintf(ptr, "\"ip_address\":\"%d.%d.%d.%d\"}", ip_ptr[0], ip_ptr[1], ip_ptr[2], ip_ptr[3]);
+    mem_mon_stack();
     return msg;
 }
 
@@ -689,7 +691,7 @@ char *espwifi_scan_results_json_stringify(char *dest, int len)
     tmp_ptr = msg + os_strlen(msg);
     fs_sprintf(tmp_ptr, "]}");
     espwifi_free_ap_list();
-    espmem.stack_mon();
+    mem_mon_stack();
     return msg;
 }
 
@@ -734,4 +736,5 @@ void espwifi_init()
     system_os_post(USER_TASK_PRIO_0, SIG_softapMode_ready, '0');
     if (os_strlen(station_ssid) > 0)
         espwifi_connect_to_ap();
+    mem_mon_stack();
 }

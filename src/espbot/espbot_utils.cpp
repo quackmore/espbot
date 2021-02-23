@@ -18,7 +18,6 @@ extern "C"
 
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_utils.hpp"
 
@@ -28,7 +27,7 @@ int atoh(char *str)
     int power = 16;
     int tmpvalue;
     int result = 0;
-    espmem.stack_mon();
+    mem_mon_stack();
     while (str[idx] != '\0')
     {
         tmpvalue = 0;
@@ -53,7 +52,7 @@ void decodeUrlStr(char *str)
     char hexchar[3];
     int idx = 0;
     hexchar[2] = 0;
-    espmem.stack_mon();
+    mem_mon_stack();
     while (str[idx] != '\0')
     {
         if (str[idx] == '%')
@@ -79,7 +78,7 @@ void atoipaddr(struct ip_addr *ip, char *str)
     int cnt = 0;
     int tmp_ip[4];
     char tmp_str[4];
-    espmem.stack_mon();
+    mem_mon_stack();
     while (*tmp_ptr == ' ')
         *tmp_ptr++;
     do

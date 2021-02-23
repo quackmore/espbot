@@ -17,8 +17,8 @@ extern "C"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_list.hpp"
+#include "espbot_mem_mon.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
 
@@ -158,6 +158,7 @@ static void state_current_time(struct date *time)
     // esplog.trace("                minutes: %d\n", time->minutes);
     // esplog.trace("                seconds: %d\n", time->seconds);
     // esplog.trace("            day of week: %d\n", time->day_of_week);
+    mem_mon_stack();
 }
 
 static struct date current_time;
@@ -217,6 +218,7 @@ static void cron_execute(void)
             current_job->command(current_job->param);
         current_job = job_list->next();
     }
+    mem_mon_stack();
 }
 
 static int cron_restore_cfg(void);
@@ -245,6 +247,7 @@ void cron_init(void)
     job_list = new List<struct job>(CRON_MAX_JOBS, delete_content);
     os_memset(&current_time, 0, sizeof(struct date));
     state_current_time(&current_time);
+    mem_mon_stack();
 }
 
 /*
@@ -270,6 +273,7 @@ void cron_sync(void)
     // TRACE("cron period: %d", cron_period);
     os_timer_arm(&cron_timer, cron_period, 0);
     cron_state.running = true;
+    mem_mon_stack();
 }
 
 int cron_add_job(char minutes,
@@ -343,6 +347,7 @@ int cron_add_job(char minutes,
         ERROR("cron_add_job cannot complete");
         return -1;
     }
+    mem_mon_stack();
     return new_job->id;
 }
 
@@ -358,6 +363,7 @@ void cron_del_job(int job_id)
         }
         job_itr = job_list->next();
     }
+    mem_mon_stack();
 }
 
 void cron_print_jobs(void)
@@ -395,6 +401,7 @@ void cron_enable(void)
         dia_info_evnt(CRON_START);
         INFO("cron started");
     }
+    mem_mon_stack();
 }
 
 void cron_start(void)
@@ -405,6 +412,7 @@ void cron_start(void)
         dia_info_evnt(CRON_START);
         INFO("cron started");
     }
+    mem_mon_stack();
 }
 
 void cron_disable(void)
@@ -422,6 +430,7 @@ void cron_disable(void)
         dia_info_evnt(CRON_STOP);
         INFO("cron stopped");
     }
+    mem_mon_stack();
 }
 
 void cron_stop(void)
@@ -433,6 +442,7 @@ void cron_stop(void)
         dia_info_evnt(CRON_STOP);
         INFO("cron stopped");
     }
+    mem_mon_stack();
 }
 
 bool cron_enabled(void)
@@ -449,7 +459,6 @@ static int cron_restore_cfg(void)
     if (!Espfile::exists(CRON_FILENAME))
         return CFG_cantRestore;
     Cfgfile cfgfile(CRON_FILENAME);
-    espmem.stack_mon();
     int enabled = cfgfile.getInt(f_str("cron_enabled"));
     if (cfgfile.getErr() != JSON_noerr)
     {
@@ -458,6 +467,7 @@ static int cron_restore_cfg(void)
         return CFG_error;
     }
     cron_cfg.enabled = (bool)enabled;
+    mem_mon_stack();
     return CFG_ok;
 }
 
@@ -469,8 +479,8 @@ static int cron_saved_cfg_updated(void)
         return CFG_notUpdated;
     }
     Cfgfile cfgfile(CRON_FILENAME);
-    espmem.stack_mon();
     int enabled = cfgfile.getInt(f_str("cron_enabled"));
+    mem_mon_stack();
     if (cfgfile.getErr() != JSON_noerr)
     {
         // no need to raise an error, the cfg file will be overwritten
@@ -512,6 +522,7 @@ char *cron_cfg_json_stringify(char *dest, int len)
     fs_sprintf(msg,
                "{\"cron_enabled\":%d}",
                cron_cfg.enabled);
+    mem_mon_stack();
     return msg;
 }
 
@@ -521,7 +532,6 @@ int cron_cfg_save(void)
     if (cron_saved_cfg_updated() == CFG_ok)
         return CFG_ok;
     Cfgfile cfgfile(CRON_FILENAME);
-    espmem.stack_mon();
     if (cfgfile.clear() != SPIFFS_OK)
         return CFG_error;
     char str[19];
@@ -529,5 +539,6 @@ int cron_cfg_save(void)
     int res = cfgfile.n_append(str, os_strlen(str));
     if (res < SPIFFS_OK)
         return CFG_error;
+    mem_mon_stack();
     return CFG_ok;
 }
