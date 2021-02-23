@@ -10,7 +10,6 @@
 #include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 
 static char *get_file_content(Cfgfile *ptr, char *&str, char *filename)
 {
