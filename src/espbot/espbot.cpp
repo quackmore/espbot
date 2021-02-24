@@ -23,13 +23,13 @@ extern "C"
 #include "espbot_cron.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_gpio.hpp"
 #include "espbot_hal.h"
 #include "espbot_mem_mon.hpp"
 #include "espbot_mdns.hpp"
 #include "espbot_http.hpp"
 #include "espbot_json.hpp"
+#include "espbot_ota.hpp"
 #include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
@@ -377,7 +377,7 @@ void espbot_init(void)
 
     // BEFORE WIFI
     mdns_init();
-    esp_ota.init();
+    ota_init();
     http_init();
     http_svr_init();
     init_http_clients_data_stuctures();

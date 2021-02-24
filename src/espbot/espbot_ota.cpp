@@ -18,186 +18,110 @@ extern "C"
 }
 
 #include "espbot.hpp"
-#include "espbot_config.hpp"
+#include "espbot_cfgfile.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
-#include "espbot_global.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_ota.hpp"
 #include "espbot_utils.hpp"
 #include "espbot_http_client.hpp"
 
-void Ota_upgrade::init(void)
+static struct
 {
-    _rel_cmp_result = 0;
-    if (restore_cfg() != CFG_OK)
-    {
-        // something went wrong while loading flash config
-        set_host("0.0.0.0");
-        _port = 0;
-        _path = new char[2];
-        os_strncpy(_path, f_str("/"), 1);
-        _check_version = false;
-        _reboot_on_completion = false;
-        dia_warn_evnt(OTA_INIT_DEFAULT_CFG);
-        WARN("OTA init starting with default configuration");
-    }
-    _status = OTA_IDLE;
-    _last_result = OTA_IDLE;
-    _cb_on_completion = NULL;
-    _cb_param = NULL;
-    mem_mon_stack();
+    Ota_status_type status;
+    Ota_status_type last_result;
+    int rel_cmp_result;
+    void (*cb_on_completion)(void *);
+    void *cb_param;
+} ota_state;
+
+static struct
+{
+    char host_str[16];
+    ip_addr host;
+    unsigned int port;
+    char path[128];
+    bool check_version;
+    bool reboot_on_completion;
+} ota_cfg;
+
+void ota_set_host(char *t_str)
+{
+    os_memset(ota_cfg.host_str, 0, 16);
+    os_strncpy(ota_cfg.host_str, t_str, 15);
+    atoipaddr(&ota_cfg.host, t_str);
 }
 
-void Ota_upgrade::set_host(char *t_str)
+void ota_set_port(unsigned int val)
 {
-    os_strncpy(_host_str, t_str, 15);
-    atoipaddr(&_host, t_str);
+    ota_cfg.port = val;
 }
 
-void Ota_upgrade::set_port(unsigned int val)
+void ota_set_path(char *t_str)
 {
-    _port = val;
+    if (os_strlen(t_str) > 127)
+    {
+        dia_warn_evnt(OTA_PATH_TRUNCATED, 127);
+        WARN("OTA set_path path truncated to 127 chars");
+    }
+    os_memset(ota_cfg.path, 0, 128);
+    os_strncpy(ota_cfg.path, t_str, 127);
 }
 
-void Ota_upgrade::set_path(char *t_str)
-{
-    if (_path)
-    {
-        delete[] _path;
-        _path = NULL;
-    }
-    _path = new char[os_strlen(t_str) + 1];
-    if (_path)
-    {
-        os_strncpy(_path, t_str, os_strlen(t_str));
-    }
-    else
-    {
-        dia_error_evnt(OTA_SET_PATH_HEAP_EXHAUSTED, os_strlen(t_str));
-        ERROR("OTA set_path heap exhausted %d", os_strlen(t_str));
-    }
-}
-
-void Ota_upgrade::set_check_version(bool enabled)
+void ota_set_check_version(bool enabled)
 {
     if (enabled)
-        _check_version = true;
+        ota_cfg.check_version = true;
     else
-        _check_version = false;
+        ota_cfg.check_version = false;
 }
 
-void Ota_upgrade::set_reboot_on_completion(bool enabled)
+void ota_set_reboot_on_completion(bool enabled)
 {
     if (enabled)
-        _reboot_on_completion = true;
+        ota_cfg.reboot_on_completion = true;
     else
-        _reboot_on_completion = false;
+        ota_cfg.reboot_on_completion = false;
 }
 
-char *Ota_upgrade::get_host(void)
+Ota_status_type ota_get_status(void)
 {
-    return _host_str;
+    return ota_state.status;
 }
 
-int Ota_upgrade::get_port(void)
+Ota_status_type ota_get_last_result(void)
 {
-    return _port;
+    return ota_state.last_result;
 }
 
-char *Ota_upgrade::get_path(void)
+void ota_set_cb_on_completion(void (*fun)(void *))
 {
-    return _path;
+    ota_state.cb_on_completion = fun;
 }
 
-bool Ota_upgrade::get_check_version(void)
+void ota_set_cb_param(void *param)
 {
-    return _check_version;
-}
-
-bool Ota_upgrade::get_reboot_on_completion(void)
-{
-    return _reboot_on_completion;
-}
-
-ip_addr *Ota_upgrade::get_host_ip(void)
-{
-    return &_host;
-}
-
-bool Ota_upgrade::check_version(void)
-{
-    return _check_version;
-}
-
-bool Ota_upgrade::reboot_on_completion(void)
-{
-    return _reboot_on_completion;
-}
-
-Ota_status_type Ota_upgrade::get_status(void)
-{
-    return _status;
-}
-
-void Ota_upgrade::set_status(Ota_status_type val)
-{
-    _status = val;
-}
-
-Ota_status_type Ota_upgrade::get_last_result(void)
-{
-    return _last_result;
-}
-
-void Ota_upgrade::set_last_result(Ota_status_type val)
-{
-    _last_result = val;
-}
-
-void Ota_upgrade::cb_on_completion(void)
-{
-    if (_cb_on_completion)
-        _cb_on_completion(_cb_param);
-}
-
-void Ota_upgrade::set_cb_on_completion(void (*fun)(void *))
-{
-    _cb_on_completion = fun;
-}
-void Ota_upgrade::set_cb_param(void *param)
-{
-    _cb_param = param;
-}
-
-void Ota_upgrade::set_rel_cmp_result(int val)
-{
-    _rel_cmp_result = val;
-}
-
-int Ota_upgrade::get_rel_cmp_result(void)
-{
-    return _rel_cmp_result;
+    ota_state.cb_param = param;
 }
 
 static char *readable_ota_status(Ota_status_type status)
 {
     switch (status)
     {
-    case OTA_IDLE:
-        return (char *)f_str("OTA_IDLE");
-    case OTA_VERSION_CHECKING:
-        return (char *)f_str("OTA_VERSION_CHECKING");
-    case OTA_VERSION_CHECKED:
-        return (char *)f_str("OTA_VERSION_CHECKED");
-    case OTA_UPGRADING:
-        return (char *)f_str("OTA_UPGRADING");
-    case OTA_SUCCESS:
-        return (char *)f_str("OTA_SUCCESS");
-    case OTA_FAILED:
-        return (char *)f_str("OTA_FAILED");
-    case OTA_ALREADY_TO_THE_LATEST:
-        return (char *)f_str("OTA_ALREADY_TO_THE_LATEST");
+    case OTA_idle:
+        return (char *)f_str("OTA_idle");
+    case OTA_version_checking:
+        return (char *)f_str("OTA_version_checking");
+    case OTA_version_checked:
+        return (char *)f_str("OTA_version_checked");
+    case OTA_upgrading:
+        return (char *)f_str("OTA_upgrading");
+    case OTA_success:
+        return (char *)f_str("OTA_success");
+    case OTA_failed:
+        return (char *)f_str("OTA_failed");
+    case OTA_already_to_the_lastest:
+        return (char *)f_str("OTA_already_to_the_lastest");
     default:
         return (char *)f_str("UNKNOWN");
     }
@@ -310,27 +234,27 @@ static void check_version(void *param)
             TRACE("check_version OTA server bin version: %s", ota_client->parsed_response->body);
             if (release_format_chk(ota_client->parsed_response->body))
             {
-                esp_ota.set_rel_cmp_result(release_cmp(app_release, ota_client->parsed_response->body));
-                esp_ota.set_status(OTA_VERSION_CHECKED);
+                ota_state.rel_cmp_result = release_cmp(app_release, ota_client->parsed_response->body);
+                ota_state.status = OTA_version_checked;
             }
             else
             {
                 dia_error_evnt(OTA_CHECK_VERSION_BAD_FORMAT);
                 ERROR("check_version bad version format");
-                esp_ota.set_status(OTA_FAILED);
+                ota_state.status = OTA_failed;
             }
         }
         else
         {
             dia_error_evnt(OTA_CHECK_VERSION_EMPTY_RES);
             ERROR("check_version empty response");
-            esp_ota.set_status(OTA_FAILED);
+            ota_state.status = OTA_failed;
         }
         break;
     default:
         dia_error_evnt(OTA_CHECK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
         ERROR("check_version unexpected http client status %d", ota_client->get_status());
-        esp_ota.set_status(OTA_FAILED);
+        ota_state.status = OTA_failed;
         break;
     }
     ota_client->disconnect(check_for_new_release_cleanup, NULL);
@@ -345,25 +269,25 @@ static void ota_ask_version(void *param)
     case HTTP_CLT_CONNECTED:
     {
         // "GET version.txt HTTP/1.1rnHost: 111.222.333.444rnrn" 52 chars
-        int req_len = 52 + os_strlen(esp_ota.get_path());
+        int req_len = 52 + os_strlen(ota_cfg.path);
         Heap_chunk req(req_len);
         if (req.ref == NULL)
         {
             ERROR("ota_ask_version - heap exausted [%d]", req_len);
-            esp_ota.set_status(OTA_FAILED);
+            ota_state.status = OTA_failed;
             ota_client->disconnect(check_for_new_release_cleanup, NULL);
             break;
         }
         fs_sprintf(req.ref,
                    "GET %sversion.txt HTTP/1.1\r\nHost: %s\r\n\r\n",
-                   esp_ota.get_path(), esp_ota.get_host());
+                   ota_cfg.path, ota_cfg.host_str);
         ota_client->send_req(req.ref, os_strlen(req.ref), check_version, NULL);
     }
     break;
     default:
         dia_error_evnt(OTA_ASK_VERSION_UNEXPECTED_WEBCLIENT_STATUS, ota_client->get_status());
         ERROR("ota_ask_version unexpected http client status %d", ota_client->get_status());
-        esp_ota.set_status(OTA_FAILED);
+        ota_state.status = OTA_failed;
         ota_client->disconnect(check_for_new_release_cleanup, NULL);
         break;
     }
@@ -377,11 +301,11 @@ static void ota_completed_cb(void *arg)
 
     if (u_flag == UPGRADE_FLAG_FINISH)
     {
-        esp_ota.set_status(OTA_SUCCESS);
+        ota_state.status = OTA_success;
     }
     else
     {
-        esp_ota.set_status(OTA_FAILED);
+        ota_state.status = OTA_failed;
     }
     next_function(ota_engine);
     mem_mon_stack();
@@ -403,41 +327,41 @@ static void ota_cleanup(void)
 
 static void ota_engine(void)
 {
-    TRACE("OTA status -> %s", readable_ota_status(esp_ota.get_status()));
-    switch (esp_ota.get_status())
+    TRACE("OTA status -> %s", readable_ota_status(ota_state.status));
+    switch (ota_state.status)
     {
-    case OTA_IDLE:
+    case OTA_idle:
     {
-        esp_ota.set_last_result(OTA_IDLE);
-        if (esp_ota.get_check_version())
+        ota_state.last_result = OTA_idle;
+        if (ota_cfg.check_version)
         {
-            esp_ota.set_status(OTA_VERSION_CHECKING);
+            ota_state.status = OTA_version_checking;
             ota_client = new Http_clt;
-            ota_client->connect(*esp_ota.get_host_ip(), esp_ota.get_port(), ota_ask_version, NULL, 6000);
+            ota_client->connect(ota_cfg.host, ota_cfg.port, ota_ask_version, NULL, 6000);
         }
         else
         {
             // no version check required, upgrade anyway
-            esp_ota.set_status(OTA_UPGRADING);
+            ota_state.status = OTA_upgrading;
             next_function(ota_engine);
         }
         break;
     }
-    case OTA_VERSION_CHECKED:
+    case OTA_version_checked:
     {
-        if (esp_ota.get_rel_cmp_result() < 0)
+        if (ota_state.rel_cmp_result < 0)
         {
             // current release is lower than the available one
-            esp_ota.set_status(OTA_UPGRADING);
+            ota_state.status = OTA_upgrading;
         }
         else
         {
-            esp_ota.set_status(OTA_ALREADY_TO_THE_LATEST);
+            ota_state.status = OTA_already_to_the_lastest;
         }
         next_function(ota_engine);
         break;
     }
-    case OTA_UPGRADING:
+    case OTA_upgrading:
     {
         char *binary_file;
         switch (system_upgrade_userbin_check())
@@ -451,7 +375,7 @@ static void ota_engine(void)
         default:
             dia_error_evnt(OTA_TIMER_FUNCTION_USERBIN_ID_UNKNOWN);
             ERROR("OTA: bad userbin number");
-            esp_ota.set_status(OTA_FAILED);
+            ota_state.status = OTA_failed;
             next_function(ota_engine);
             return;
         }
@@ -460,7 +384,7 @@ static void ota_engine(void)
         {
             dia_error_evnt(OTA_ENGINE_HEAP_EXHAUSTED, sizeof(upgrade_server_info));
             ERROR("ota_engine heap exhausted %d", sizeof(upgrade_server_info));
-            esp_ota.set_status(OTA_FAILED);
+            ota_state.status = OTA_failed;
             next_function(ota_engine);
             return;
         }
@@ -468,19 +392,19 @@ static void ota_engine(void)
         int url_len = 46 + // format string
                       15 + // ip
                       5 +  // port
-                      os_strlen(esp_ota.get_path()) +
+                      os_strlen(ota_cfg.path) +
                       os_strlen(binary_file);
         url = new char[url_len];
         if (url == NULL)
         {
             dia_error_evnt(OTA_ENGINE_HEAP_EXHAUSTED, url_len);
             ERROR("OTA save_cfg heap exhausted %d", url_len);
-            esp_ota.set_status(OTA_FAILED);
+            ota_state.status = OTA_failed;
             next_function(ota_engine);
             return;
         }
-        *((uint32 *)(upgrade_svr->ip)) = esp_ota.get_host_ip()->addr;
-        upgrade_svr->port = esp_ota.get_port();
+        *((uint32 *)(upgrade_svr->ip)) = ota_cfg.host.addr;
+        upgrade_svr->port = ota_cfg.port;
         upgrade_svr->check_times = 10000;
         upgrade_svr->check_cb = ota_completed_cb;
         // upgrade_svr->pespconn = pespconn;
@@ -488,54 +412,57 @@ static void ota_engine(void)
                    "GET %s%s HTTP/1.1\r\nHost: %s:%d\r\n"
                    "Connection: close\r\n"
                    "\r\n",
-                   esp_ota.get_path(), binary_file, esp_ota.get_host(), esp_ota.get_port());
+                   ota_cfg.path, binary_file, ota_cfg.host_str, ota_cfg.port);
         TRACE("ota_engine url %s", url);
         upgrade_svr->url = (uint8 *)url;
         if (system_upgrade_start(upgrade_svr) == false)
         {
             dia_error_evnt(OTA_CANNOT_START_UPGRADE);
             ERROR("OTA cannot start upgrade");
-            esp_ota.set_status(OTA_FAILED);
+            ota_state.status = OTA_failed;
         }
         break;
     }
-    case OTA_SUCCESS:
+    case OTA_success:
     {
-        esp_ota.set_last_result(OTA_SUCCESS);
-        esp_ota.cb_on_completion();
+        ota_state.last_result = OTA_success;
+        if (ota_state.cb_on_completion)
+            ota_state.cb_on_completion(ota_state.cb_param);
         ota_cleanup();
         dia_info_evnt(OTA_SUCCESSFULLY_COMPLETED);
         INFO("OTA successfully completed");
-        if (esp_ota.reboot_on_completion())
+        if (ota_cfg.reboot_on_completion)
         {
             dia_debug_evnt(OTA_REBOOTING_AFTER_COMPLETION);
             DEBUG("OTA - rebooting after completion");
             espbot_reset(ESPBOT_rebootAfterOta);
         }
-        esp_ota.set_status(OTA_IDLE);
+        ota_state.status = OTA_idle;
         break;
     }
-    case OTA_FAILED:
+    case OTA_failed:
     {
-        esp_ota.set_last_result(OTA_FAILED);
-        esp_ota.cb_on_completion();
+        ota_state.last_result = OTA_failed;
+        if (ota_state.cb_on_completion)
+            ota_state.cb_on_completion(ota_state.cb_param);
         ota_cleanup();
         dia_error_evnt(OTA_FAILURE);
         ERROR("OTA failed");
-        esp_ota.set_status(OTA_IDLE);
+        ota_state.status = OTA_idle;
         break;
     }
-    case OTA_ALREADY_TO_THE_LATEST:
+    case OTA_already_to_the_lastest:
     {
-        esp_ota.set_last_result(OTA_ALREADY_TO_THE_LATEST);
-        esp_ota.cb_on_completion();
+        ota_state.last_result = OTA_already_to_the_lastest;
+        if (ota_state.cb_on_completion)
+            ota_state.cb_on_completion(ota_state.cb_param);
         ota_cleanup();
         dia_info_evnt(OTA_UP_TO_DATE);
         INFO("OTA everything up to date");
-        esp_ota.set_status(OTA_IDLE);
+        ota_state.status = OTA_idle;
         break;
     }
-    case OTA_VERSION_CHECKING:
+    case OTA_version_checking:
     {
         break;
     }
@@ -545,12 +472,14 @@ static void ota_engine(void)
     mem_mon_stack();
 }
 
-void Ota_upgrade::start_upgrade(void)
+void ota_start(void)
 {
     ALL("start_upgrade");
-    if ((_status == OTA_IDLE) || (_status == OTA_ALREADY_TO_THE_LATEST) || (_status == OTA_FAILED))
+    if ((ota_state.status == OTA_idle) ||
+        (ota_state.status == OTA_already_to_the_lastest) ||
+        (ota_state.status == OTA_failed))
     {
-        _status = OTA_IDLE;
+        ota_state.status = OTA_idle;
         next_function(ota_engine);
     }
     else
@@ -564,170 +493,148 @@ void Ota_upgrade::start_upgrade(void)
 // CONFIGURATION PERSISTENCE
 //
 
-int Ota_upgrade::restore_cfg(void)
+#define OTA_FILENAME ((char *)f_str("ota.cfg"))
+
+static int ota_restore_cfg(void)
 {
-    set_host((char *)f_str("192.168.1.201"));
-    set_port(20090);
-    set_path((char *)f_str("/"));
-    set_check_version(false);
-    set_reboot_on_completion(true);
-    return CFG_OK;
-    //    ALL("Ota_upgrade::restore_cfg");
-    //    File_to_json cfgfile(f_str("ota.cfg"));
-    //    mem_mon_stack();
-    //    if (cfgfile.exists())
-    //    {
-    //        if (cfgfile.find_string(f_str("host")))
-    //        {
-    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
-    //            ERROR("OTA restore_cfg cannot find 'host'");
-    //            return CFG_ERROR;
-    //        }
-    //        set_host(cfgfile.get_value());
-    //        if (cfgfile.find_string(f_str("port")))
-    //        {
-    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
-    //            ERROR("OTA restore_cfg cannot find 'port'");
-    //            return CFG_ERROR;
-    //        }
-    //        set_port(atoi(cfgfile.get_value()));
-    //        if (cfgfile.find_string(f_str("path")))
-    //        {
-    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
-    //            ERROR("OTA restore_cfg cannot find 'path'");
-    //            return CFG_ERROR;
-    //        }
-    //        set_path(cfgfile.get_value());
-    //        if (cfgfile.find_string(f_str("check_version")))
-    //        {
-    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
-    //            ERROR("OTA restore_cfg cannot find 'check_version'");
-    //            return CFG_ERROR;
-    //        }
-    //        set_check_version((bool)atoi(cfgfile.get_value()));
-    //        if (cfgfile.find_string(f_str("reboot_on_completion")))
-    //        {
-    //            dia_error_evnt(OTA_RESTORE_CFG_INCOMPLETE);
-    //            ERROR("OTA restore_cfg cannot find 'reboot_on_completion'");
-    //            return CFG_ERROR;
-    //        }
-    //        set_reboot_on_completion((bool)atoi(cfgfile.get_value()));
-    //        return CFG_OK;
-    //    }
-    //    else
-    //    {
-    //        dia_warn_evnt(OTA_RESTORE_CFG_FILE_NOT_FOUND);
-    //        WARN("OTA restore_cfg file not found");
-    //        return CFG_ERROR;
-    //    }
+    ALL("ota_restore_cfg");
+
+    if (!Espfile::exists(OTA_FILENAME))
+        return CFG_cantRestore;
+    Cfgfile cfgfile(OTA_FILENAME);
+    char host_str[16];
+    os_memset(host_str, 0, 16);
+    cfgfile.getStr(f_str("host"), host_str, 16);
+    int port = cfgfile.getInt(f_str("port"));
+    char path[128];
+    os_memset(path, 0, 128);
+    cfgfile.getStr(f_str("path"), path, 128);
+    int check_version = cfgfile.getInt(f_str("check_version"));
+    int reboot_on_completion = cfgfile.getInt(f_str("reboot_on_completion"));
+    mem_mon_stack();
+    if (cfgfile.getErr() != JSON_noerr)
+    {
+        dia_error_evnt(OTA_RESTORE_CFG_ERROR);
+        ERROR("ota_restore_cfg error");
+        mem_mon_stack();
+        return CFG_error;
+    }
+    ota_set_host(host_str);
+    ota_cfg.port = port;
+    ota_set_path(path);
+    ota_cfg.check_version = (bool)check_version;
+    ota_cfg.reboot_on_completion = (bool)reboot_on_completion;
+    return CFG_ok;
 }
 
-int Ota_upgrade::saved_cfg_not_updated(void)
+static int ota_saved_cfg_updated(void)
 {
-    ALL("saved_cfg_not_updated");
-    return CFG_OK;
-    //    File_to_json cfgfile(f_str("ota.cfg"));
-    //    mem_mon_stack();
-    //    if (cfgfile.exists())
-    //    {
-    //        if (cfgfile.find_string(f_str("host")))
-    //        {
-    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-    //            ERROR("OTA saved_cfg_not_updated cannot find 'host'");
-    //            return CFG_ERROR;
-    //        }
-    //        if (os_strcmp(get_host(), cfgfile.get_value()))
-    //        {
-    //            return CFG_REQUIRES_UPDATE;
-    //        }
-    //        if (cfgfile.find_string(f_str("port")))
-    //        {
-    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-    //            ERROR("OTA saved_cfg_not_updated cannot find 'port'");
-    //            return CFG_ERROR;
-    //        }
-    //        if (_port != (atoi(cfgfile.get_value())))
-    //        {
-    //            return CFG_REQUIRES_UPDATE;
-    //        }
-    //        if (cfgfile.find_string(f_str("path")))
-    //        {
-    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-    //            ERROR("OTA saved_cfg_not_updated cannot find 'path'");
-    //            return CFG_ERROR;
-    //        }
-    //        if (os_strcmp(get_path(), cfgfile.get_value()))
-    //        {
-    //            return CFG_REQUIRES_UPDATE;
-    //        }
-    //        if (cfgfile.find_string(f_str("check_version")))
-    //        {
-    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-    //            ERROR("OTA saved_cfg_not_updated cannot find 'check_version'");
-    //            return CFG_ERROR;
-    //        }
-    //        if (get_check_version() != atoi(cfgfile.get_value()))
-    //        {
-    //            return CFG_REQUIRES_UPDATE;
-    //        }
-    //        if (cfgfile.find_string(f_str("reboot_on_completion")))
-    //        {
-    //            dia_error_evnt(OTA_SAVED_CFG_NOT_UPDATED_INCOMPLETE);
-    //            ERROR("OTA saved_cfg_not_updated cannot find 'reboot_on_completion'");
-    //            return CFG_ERROR;
-    //        }
-    //        if (get_reboot_on_completion() != atoi(cfgfile.get_value()))
-    //        {
-    //            return CFG_REQUIRES_UPDATE;
-    //        }
-    //        return CFG_OK;
-    //    }
-    //    else
-    //    {
-    //        return CFG_REQUIRES_UPDATE;
-    //    }
+    ALL("ota_saved_cfg_updated");
+    if (!Espfile::exists(OTA_FILENAME))
+    {
+        return CFG_notUpdated;
+    }
+    Cfgfile cfgfile(OTA_FILENAME);
+    char host_str[16];
+    os_memset(host_str, 0, 16);
+    cfgfile.getStr(f_str("host"), host_str, 16);
+    int port = cfgfile.getInt(f_str("port"));
+    char path[128];
+    os_memset(path, 0, 128);
+    cfgfile.getStr(f_str("path"), path, 128);
+    int check_version = cfgfile.getInt(f_str("check_version"));
+    int reboot_on_completion = cfgfile.getInt(f_str("reboot_on_completion"));
+    mem_mon_stack();
+    if (cfgfile.getErr() != JSON_noerr)
+    {
+        // no need to raise an error, the cfg file will be overwritten
+        // dia_error_evnt(OTA_SAVED_CFG_UPDATED_ERROR);
+        // ERROR("ota_saved_cfg_updated error");
+        return CFG_error;
+    }
+    if ((os_strcmp(ota_cfg.host_str, host_str) != 0) ||
+        (ota_cfg.port != port) ||
+        (os_strcmp(ota_cfg.path, path) != 0) ||
+        (ota_cfg.check_version != (bool)check_version) ||
+        (ota_cfg.reboot_on_completion != (bool)reboot_on_completion))
+    {
+        return CFG_notUpdated;
+    }
+    return CFG_ok;
 }
 
-int Ota_upgrade::save_cfg(void)
+char *ota_cfg_json_stringify(char *dest, int len)
 {
-    ALL("save_cfg");
-    return CFG_OK;
-    //    if (saved_cfg_not_updated() != CFG_REQUIRES_UPDATE)
-    //        return CFG_OK;
-    //    if (!espfs.is_available())
-    //    {
-    //        dia_error_evnt(OTA_SAVE_CFG_FS_NOT_AVAILABLE);
-    //        ERROR("OTA save_cfg file system not available");
-    //        return CFG_ERROR;
-    //    }
-    //    Ffile cfgfile(&espfs, (char *)f_str("ota.cfg"));
-    //    if (!cfgfile.is_available())
-    //    {
-    //        dia_error_evnt(OTA_SAVE_CFG_CANNOT_OPEN_FILE);
-    //        ERROR("OTA save_cfg cannot open file");
-    //        return CFG_ERROR;
-    //    }
-    //    cfgfile.clear();
-    //    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
-    //    int buffer_len = 70 + 15 + 5 + os_strlen(get_path()) + 1 + 1 + 1;
-    //    Heap_chunk buffer(buffer_len);
-    //    mem_mon_stack();
-    //    if (buffer.ref == NULL)
-    //    {
-    //        dia_error_evnt(OTA_SAVE_CFG_HEAP_EXHAUSTED, buffer_len);
-    //        ERROR("OTA save_cfg heap exhausted %d", buffer_len);
-    //        return CFG_ERROR;
-    //    }
-    //    // using fs_sprintf twice to keep fmt len lower that 70 chars
-    //    fs_sprintf(buffer.ref,
-    //               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
-    //               get_host(),
-    //               get_port(),
-    //               get_path());
-    //    fs_sprintf((buffer.ref + os_strlen(buffer.ref)),
-    //               "\"check_version\":%d,\"reboot_on_completion\":%d}",
-    //               get_check_version(),
-    //               get_reboot_on_completion());
-    //    cfgfile.n_append(buffer.ref, os_strlen(buffer.ref));
-    //    return CFG_OK;
+    // {"host":"192.168.1.201","port":20090,"path":"","check_version":0,"reboot_on_completion":1}
+    // int msg_len = 90 + 128 + 1;
+    int msg_len = 90 + os_strlen(ota_cfg.path) + 1;
+    char *msg;
+    if (dest == NULL)
+    {
+        msg = new char[msg_len];
+        if (msg == NULL)
+        {
+            dia_error_evnt(OTA_CFG_STRINGIFY_HEAP_EXHAUSTED, msg_len);
+            ERROR("ota_cfg_json_stringify heap exhausted [%d]", msg_len);
+            return NULL;
+        }
+    }
+    else
+    {
+        msg = dest;
+        if (len < msg_len)
+        {
+            msg[0] = 0;
+            return msg;
+        }
+    }
+    fs_sprintf(msg,
+               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
+               ota_cfg.host_str,
+               ota_cfg.port,
+               ota_cfg.path);
+    fs_sprintf((msg + os_strlen(msg)),
+               "\"check_version\":%d,\"reboot_on_completion\":%d}",
+               ota_cfg.check_version,
+               ota_cfg.reboot_on_completion);
+    mem_mon_stack();
+    return msg;
+}
+
+int ota_cfg_save(void)
+{
+    ALL("ota_cfg_save");
+    if (ota_saved_cfg_updated() == CFG_ok)
+        return CFG_ok;
+    Cfgfile cfgfile(OTA_FILENAME);
+    if (cfgfile.clear() != SPIFFS_OK)
+        return CFG_error;
+    char str[(90 + 128 + 1)];
+    ota_cfg_json_stringify(str, (90 + 128 + 1));
+    int res = cfgfile.n_append(str, os_strlen(str));
+    mem_mon_stack();
+    if (res < SPIFFS_OK)
+        return CFG_error;
+    return CFG_ok;
+}
+
+void ota_init(void)
+{
+    ota_state.rel_cmp_result = 0;
+    if (ota_restore_cfg() != CFG_ok)
+    {
+        // something went wrong while loading flash config
+        ota_set_host("0.0.0.0");
+        ota_cfg.port = 0;
+        ota_set_path((char *)f_str("/"));
+        ota_cfg.check_version = false;
+        ota_cfg.reboot_on_completion = false;
+        dia_warn_evnt(OTA_INIT_DEFAULT_CFG);
+        WARN("OTA init starting with default configuration");
+    }
+    ota_state.status = OTA_idle;
+    ota_state.last_result = OTA_idle;
+    ota_state.cb_on_completion = NULL;
+    ota_state.cb_param = NULL;
+    mem_mon_stack();
 }

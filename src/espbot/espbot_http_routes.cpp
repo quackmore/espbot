@@ -23,12 +23,12 @@ extern "C"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_gpio.hpp"
-#include "espbot_global.hpp"
 #include "espbot_http.hpp"
 #include "espbot_http_routes.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
 #include "espbot_mdns.hpp"
+#include "espbot_ota.hpp"
 #include "espbot_spiffs.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
@@ -1250,15 +1250,15 @@ static void setTimedate(struct espconn *ptr_espconn, Http_parsed_req *parsed_req
 static void ota_answer_on_completion(void *param)
 {
     struct espconn *ptr_espconn = (struct espconn *)param;
-    switch (esp_ota.get_last_result())
+    switch (ota_get_last_result())
     {
-    case OTA_SUCCESS:
+    case OTA_success:
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"OTA completed. Rebooting...\"}"), false);
         break;
-    case OTA_FAILED:
+    case OTA_failed:
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("OTA failed"), false);
         break;
-    case OTA_ALREADY_TO_THE_LATEST:
+    case OTA_already_to_the_lastest:
         http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, f_str("{\"msg\":\"Binary version already to the latest\"}"), false);
         break;
     default:
@@ -1269,39 +1269,19 @@ static void ota_answer_on_completion(void *param)
 static void startOTA(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("startOTA");
-    esp_ota.set_cb_on_completion(ota_answer_on_completion);
-    esp_ota.set_cb_param((void *)ptr_espconn);
-    esp_ota.start_upgrade();
+    ota_set_cb_on_completion(ota_answer_on_completion);
+    ota_set_cb_param((void *)ptr_espconn);
+    ota_start();
 }
 
 static void getOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("getOtaCfg");
-    int msg_len = 90 +
-                  16 +
-                  6 +
-                  os_strlen(esp_ota.get_path()) +
-                  10;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref)
-    {
-        fs_sprintf(msg.ref,
-                   "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
-                   esp_ota.get_host(),
-                   esp_ota.get_port(),
-                   esp_ota.get_path());
-        fs_sprintf((msg.ref + os_strlen(msg.ref)),
-                   "\"check_version\":%d,\"reboot_on_completion\":%d}",
-                   esp_ota.get_check_version(),
-                   esp_ota.get_reboot_on_completion());
-        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
-    }
+    char *msg = ota_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
     else
-    {
-        dia_error_evnt(ROUTES_GETOTACFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("getOtaCfg heap exhausted %d", msg_len);
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-    }
 }
 
 static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
@@ -1320,35 +1300,17 @@ static void setOtaCfg(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-
-    esp_ota.set_host(host);
-    esp_ota.set_port(port);
-    esp_ota.set_path(path);
-    esp_ota.set_check_version(check_version);
-    esp_ota.set_reboot_on_completion(reboot_on_completion);
-    esp_ota.save_cfg();
-
-    // {"host":"","port":,"path":"","check_version":,"reboot_on_completion":}
-
-    int msg_len = 70 + 15 + 5 + os_strlen(esp_ota.get_path()) + 1 + 1 + 1;
-    Heap_chunk msg(msg_len, dont_free);
-    if (msg.ref == NULL)
-    {
-        dia_error_evnt(ROUTES_SETOTACFG_HEAP_EXHAUSTED, msg_len);
-        ERROR("setOtaCfg heap exhausted %d", msg_len);
+    ota_set_host(host);
+    ota_set_port(port);
+    ota_set_path(path);
+    ota_set_check_version(check_version);
+    ota_set_reboot_on_completion(reboot_on_completion);
+    ota_cfg_save();
+    char *msg = ota_cfg_json_stringify();
+    if (msg)
+        http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg, true);
+    else
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
-        return;
-    }
-    fs_sprintf(msg.ref,
-               "{\"host\":\"%s\",\"port\":%d,\"path\":\"%s\",",
-               esp_ota.get_host(),
-               esp_ota.get_port(),
-               esp_ota.get_path());
-    fs_sprintf((msg.ref + os_strlen(msg.ref)),
-               "\"check_version\":%d,\"reboot_on_completion\":%d}",
-               esp_ota.get_check_version(),
-               esp_ota.get_reboot_on_completion());
-    http_response(ptr_espconn, HTTP_OK, HTTP_CONTENT_JSON, msg.ref, true);
     mem_mon_stack();
 }
 
