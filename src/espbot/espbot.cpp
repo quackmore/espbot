@@ -36,7 +36,6 @@ extern "C"
 #include "espbot_http_client.hpp"
 #include "espbot_http_server.hpp"
 #include "espbot_wifi.hpp"
-#include "spiffs_esp8266.hpp"
 
 /*
  *  APP_RELEASE is coming from git

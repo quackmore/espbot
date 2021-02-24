@@ -15,13 +15,11 @@ extern "C"
 #include "user_interface.h"
 }
 
-#include "espbot_config.hpp"
 #include "espbot_diagnostic.hpp"
 #include "espbot_event_codes.h"
 #include "espbot_gpio.hpp"
 #include "espbot_json.hpp"
 #include "espbot_mem_mon.hpp"
-#include "spiffs_esp8266.hpp"
 
 #define ESPBOT_INPUT_GET(input_reg, gpio_no) ((input_reg >> gpio_no) & BIT0)
 
