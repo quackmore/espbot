@@ -69,3 +69,22 @@ $('#info_save').on('click', function () {
       });
     });
 });
+
+$('#testStart').on('click', function () {
+  show_spinner();
+  return esp_query({
+    type: 'POST',
+    url: '/api/test',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify({ test_number: Number(($('#testId').val())), test_param: Number($('#testParam').val()) }),
+    success: function () {
+      alert("Test started...");
+      esp_get_info()
+        .then(function () {
+          hide_spinner(500)
+        });
+    },
+    error: query_err
+  });
+});

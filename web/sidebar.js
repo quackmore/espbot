@@ -4,10 +4,10 @@ var esp8266 = {
   "type": "ESPBOT",
   "api": "2.2.0",
   "ip": "192.168.10.1",
-  "url": "",
-  "cors": false
-  // "url": "http://192.168.1.187",
-  // "cors": true
+  // "url": "",
+  // "cors": false
+  "url": "http://192.168.1.176",
+  "cors": true
 };
 
 function goto(page) {

@@ -38,23 +38,18 @@ static void get_api_info(struct espconn *ptr_espconn, Http_parsed_req *parsed_re
         http_response(ptr_espconn, HTTP_SERVER_ERROR, HTTP_CONTENT_JSON, f_str("Heap exhausted"), false);
 }
 
-#ifdef TEST_FUNCTIONS
-
 static void runTest(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("runTest");
-    int test_number;
-    int test_param;
     JSONP test_cfg(parsed_req->req_content, parsed_req->content_len);
-    test_cfg.getVal((char *)f_str("test_number"), test_number);
-    test_cfg.getVal((char *)f_str("test_param"), test_param);
-    if(test_cfg.getErr()  != JSON_noerr)
+    int test_number = test_cfg.getInt((char *)f_str("test_number"));
+    int test_param = test_cfg.getInt((char *)f_str("test_param"));
+    if (test_cfg.getErr() != JSON_noerr)
     {
         http_response(ptr_espconn, HTTP_BAD_REQUEST, HTTP_CONTENT_JSON, f_str("Json bad syntax"), false);
         return;
     }
-
-    espmem.stack_mon();
+    mem_mon_stack();
     // {"test_number":4294967295,"test_param":4294967295}
     Heap_chunk msg(64, dont_free);
     if (msg.ref == NULL)
@@ -72,8 +67,6 @@ static void runTest(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
     run_test(test_number, test_param);
 }
 
-#endif
-
 bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
 {
     ALL("app_http_routes");
@@ -83,12 +76,10 @@ bool app_http_routes(struct espconn *ptr_espconn, Http_parsed_req *parsed_req)
         get_api_info(ptr_espconn, parsed_req);
         return true;
     }
-#ifdef TEST_FUNCTIONS
     if ((0 == os_strcmp(parsed_req->url, f_str("/api/test"))) && (parsed_req->req_method == HTTP_POST))
     {
         runTest(ptr_espconn, parsed_req);
         return true;
     }
-#endif
     return false;
 }

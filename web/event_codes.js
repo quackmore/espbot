@@ -1,6 +1,12 @@
 function get_code_str(code) { var code_str = [];
-code_str[parseInt("01A0", 16)] = "APP_INFO_STRINGIFY_HEAP_EXHAUSTED";
-code_str[parseInt("01A1", 16)] = "APP_RUNTEST_HEAP_EXHAUSTED";
+code_str[parseInt("1000", 16)] = "APP_INFO_STRINGIFY_HEAP_EXHAUSTED";
+code_str[parseInt("1001", 16)] = "APP_RUNTEST_HEAP_EXHAUSTED";
+code_str[parseInt("0500", 16)] = "DHT_HEAP_EXHAUSTED";
+code_str[parseInt("0501", 16)] = "DHT_READING_TIMEOUT";
+code_str[parseInt("0502", 16)] = "DHT_READING_CHECKSUM_ERR";
+code_str[parseInt("0503", 16)] = "DHT_READ_HEAP_EXHAUSTED";
+code_str[parseInt("0504", 16)] = "MAX6675_THERMOCOUPLE_DISCONNECTED";
+code_str[parseInt("0505", 16)] = "MAX6675_HEAP_EXHAUSTED";
 code_str[parseInt("0010", 16)] = "FILE_TO_JSON_FS_NOT_AVAILABLE";
 code_str[parseInt("0011", 16)] = "FILE_TO_JSON_FILE_NOT_FOUND";
 code_str[parseInt("0012", 16)] = "FILE_TO_JSON_CANNOT_OPEN_FILE";
