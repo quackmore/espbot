@@ -13,7 +13,7 @@ extern "C"
 #include "mem.h"
 #include "user_interface.h"
 #include "app_event_codes.h"
-#include "library_dio_task.h"
+#include "drivers_dio_task.h"
 #include "esp8266_io.h"
 }
 
@@ -23,8 +23,8 @@ extern "C"
 #include "espbot_diagnostic.hpp"
 #include "espbot_timedate.hpp"
 #include "espbot_utils.hpp"
-#include "library.hpp"
-#include "library_dht.hpp"
+#include "drivers.hpp"
+#include "drivers_dht.hpp"
 
 /*
  *  APP_RELEASE is coming from git
@@ -88,7 +88,7 @@ void app_deinit_on_wifi_disconnect()
 
 char *app_info_json_stringify(char *dest, int len)
 {
-   // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","api_version":"","library_version":"","sdk_version":"","boot_version":""}
+   // {"device_name":"","chip_id":"","app_name":"","app_version":"","espbot_version":"","api_version":"","drivers_version":"","sdk_version":"","boot_version":""}
     int msg_len = 155 +
                   os_strlen(espbot_get_name()) +
                   10 +
@@ -96,7 +96,7 @@ char *app_info_json_stringify(char *dest, int len)
                   os_strlen(app_release) +
                   os_strlen(espbot_get_version()) +
                   os_strlen(f_str(API_RELEASE)) +
-                  os_strlen(library_release) +
+                  os_strlen(drivers_release) +
                   os_strlen(system_get_sdk_version()) +
                   10 +
                   1;
@@ -130,9 +130,9 @@ char *app_info_json_stringify(char *dest, int len)
                app_release,
                espbot_get_version());
     fs_sprintf(msg + os_strlen(msg),
-               "\"api_version\":\"%s\",\"library_version\":\"%s\",",
+               "\"api_version\":\"%s\",\"drivers_version\":\"%s\",",
                f_str(API_RELEASE),
-               library_release);
+               drivers_release);
     fs_sprintf(msg + os_strlen(msg),
                "\"sdk_version\":\"%s\",\"boot_version\":\"%d\"}",
                system_get_sdk_version(),

@@ -9,7 +9,7 @@
 #ifndef __APP_HPP__
 #define __APP_HPP__
 
-#include "library_dht.hpp"
+#include "drivers_dht.hpp"
 
 /*
  *  API_RELEASE is coming from the api yaml file version row

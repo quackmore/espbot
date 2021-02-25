@@ -15,8 +15,8 @@ extern "C"
 #include "gpio.h"
 #include "ip_addr.h"
 #include "osapi.h"
-#include "library_di_sequence.h"
-#include "library_do_sequence.h"
+#include "drivers_di_sequence.h"
+#include "drivers_do_sequence.h"
 #include "mem.h"
 #include "user_interface.h"
 }
@@ -38,7 +38,6 @@ extern "C"
 #include "espbot_utils.hpp"
 #include "espbot_http_client.hpp"
 
-#ifdef TEST_FUNCTIONS
 // function for testing purpose
 
 static int test_counter;
@@ -54,7 +53,7 @@ static void test_function(void)
 static struct ip_addr host_ip;
 static int host_port;
 static char *client_request;
-static Webclnt *espclient;
+static Http_clt *espclient;
 
 void init_test(struct ip_addr ip, uint32 port, char *request)
 {
@@ -82,7 +81,7 @@ void init_test(struct ip_addr ip, uint32 port, char *request)
         //          os_strlen(client_request),
         //          client_request);
     }
-    espclient = new Webclnt;
+    espclient = new Http_clt;
 }
 
 void free_client(void *)
@@ -95,7 +94,7 @@ void check_version(void *param)
     // ALL("check_version");
     switch (espclient->get_status())
     {
-    case WEBCLNT_RESPONSE_READY:
+    case HTTP_CLT_RESPONSE_READY:
         if (espclient->parsed_response->body)
         {
             fs_printf("Server responded: %s\n", espclient->parsed_response->body);
@@ -115,7 +114,7 @@ void get_version(void *param)
     // ALL("get_version");
     switch (espclient->get_status())
     {
-    case WEBCLNT_CONNECTED:
+    case HTTP_CLT_CONNECTED:
         fs_printf("Sending request [%s]\n", client_request);
         espclient->send_req(client_request, os_strlen(client_request), check_version, NULL);
         delete[] client_request;
@@ -132,7 +131,7 @@ void get_version(void *param)
 void test_webclient(void)
 {
     // webclient test
-    // staus WEBCLNT_DISCONNECTED
+    // staus HTTP_CLT_DISCONNECTED
     // connect to OTA server and get the version
     fs_printf("Starting connection to server ...\n");
     espclient->connect(host_ip, host_port, get_version, NULL);
@@ -794,9 +793,9 @@ void run_test(int32 idx, int32 param)
         // Error diagnostic log
         int idx = 0;
         fs_printf("###### start of diagnostic events\n");
-        while (esp_diag.get_event(idx))
+        while (dia_get_event(idx))
         {
-            struct dia_event *event_ptr = esp_diag.get_event(idx);
+            struct dia_event *event_ptr = dia_get_event(idx);
             fs_printf("event %d - %s %d %X %X %d\n",
                       idx,
                       esp_sntp.get_timestr(event_ptr->timestamp),
@@ -805,7 +804,7 @@ void run_test(int32 idx, int32 param)
                       event_ptr->code,
                       event_ptr->value);
             idx++;
-            if (idx >= esp_diag.get_max_events_count())
+            if (idx >= dia_get_max_events_count())
                 break;
         }
         fs_printf("###### end of diagnostic events\n");
@@ -814,13 +813,13 @@ void run_test(int32 idx, int32 param)
     case 15:
     {
         // Acknowledge events
-        esp_diag.ack_events();
+        dia_ack_events();
     }
     break;
     case 16:
     {
         // get unacknowledged events
-        int value = esp_diag.get_unack_events();
+        int value = dia_get_unack_events();
         fs_printf("unacknoledged events: %d\n", value);
     }
     break;
@@ -829,7 +828,7 @@ void run_test(int32 idx, int32 param)
         // Error print
         event_counter++;
         fs_printf("A new fatal event (%d) was injected.\n", event_counter);
-        esp_diag.fatal(event_counter, 100 + event_counter);
+        dia_fatal_evnt(event_counter, 100 + event_counter);
     }
     break;
     case 18:
@@ -837,7 +836,7 @@ void run_test(int32 idx, int32 param)
         // Error print
         event_counter++;
         fs_printf("A new error event (%d) was injected.\n", event_counter);
-        esp_diag.error(event_counter, 100 + event_counter);
+        dia_error_evnt(event_counter, 100 + event_counter);
     }
     break;
     case 19:
@@ -845,7 +844,7 @@ void run_test(int32 idx, int32 param)
         // Error print
         event_counter++;
         fs_printf("A new warning event (%d) was injected.\n", event_counter);
-        esp_diag.warn(event_counter, 100 + event_counter);
+        dia_warn_evnt(event_counter, 100 + event_counter);
     }
     break;
     */
@@ -854,7 +853,7 @@ void run_test(int32 idx, int32 param)
         // Error print
         event_counter++;
         fs_printf("A new info event (%d) was injected.\n", event_counter);
-        esp_diag.info(event_counter, 100 + event_counter);
+        dia_info_evnt(event_counter, 100 + event_counter);
     }
     break;
         /*
@@ -863,7 +862,7 @@ void run_test(int32 idx, int32 param)
         // Error print
         event_counter++;
         fs_printf("A new debug event (%d) was injected.\n", event_counter);
-        esp_diag.debug(event_counter, 100 + event_counter);
+        dia_debug_evnt(event_counter, 100 + event_counter);
     }
     break;
     case 22:
@@ -871,7 +870,7 @@ void run_test(int32 idx, int32 param)
         // Error print
         event_counter++;
         fs_printf("A new trace event (%d) was injected.\n", event_counter);
-        esp_diag.trace(event_counter, 100 + event_counter);
+        dia_trace_evnt(event_counter, 100 + event_counter);
     }
     break;
     case 29:
@@ -1369,13 +1368,12 @@ void run_test(int32 idx, int32 param)
         TRACE("heap: %d", system_get_free_heap_size());
         {
             Cfgfile cfg_file("diagnostic.cfg");
-            int diag_led_mask;
-            cfg_file.getVal("diag_led_mask", diag_led_mask);
+            int diag_led_mask = cfg_file.getInt(f_str("diag_led_mask"));
             if (cfg_file.getErr() != JSON_noerr)
                 TRACE("uh oh cannot find diag_led_mask");
             else
                 TRACE("diag_led_mask %d", diag_led_mask);
-            cfg_file.getVal("enabled", diag_led_mask);
+            diag_led_mask = cfg_file.getInt(f_str("enabled"));
             if (cfg_file.getErr() != JSON_noerr)
                 TRACE("uh oh cannot find enabled");
             else
@@ -1388,4 +1386,3 @@ void run_test(int32 idx, int32 param)
         break;
     }
 }
-#endif

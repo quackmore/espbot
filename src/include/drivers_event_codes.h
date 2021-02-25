@@ -6,15 +6,15 @@
  * think this stuff is worth it, you can buy me a beer in return. Quackmore
  * ----------------------------------------------------------------------------
  */
-#ifndef __LIBRARY_H__
-#define __LIBRARY_H__
+#ifndef __DRIVERS_EVENT_CODES_H__
+#define __DRIVERS_EVENT_CODES_H__
 
-#include "c_types.h"
+#define DHT_HEAP_EXHAUSTED 0x1000
+#define DHT_READING_TIMEOUT 0x1001
+#define DHT_READING_CHECKSUM_ERR 0x1002
+#define DHT_READ_HEAP_EXHAUSTED 0x1003
 
-
-// these are espbot memory management methods
-// https://github.com/quackmore/espbot
-void *call_espbot_zalloc(size_t size);
-void call_espbot_free(void *addr);
+#define MAX6675_THERMOCOUPLE_DISCONNECTED 0x1004
+#define MAX6675_HEAP_EXHAUSTED 0x1005
 
 #endif

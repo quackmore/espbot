@@ -21,11 +21,11 @@ ifndef PDIR # {
 GEN_IMAGES= eagle.app.v6.out
 GEN_BINS= eagle.app.v6.bin
 SPECIAL_MKTARGETS=$(APP_MKTARGETS)
-SUBDIRS=         \
-	espbot       \
-	app          \
-	driver       \
-	spiffs       \
+SUBDIRS=    \
+	espbot    \
+	app       \
+	driver    \
+	spiffs    \
 	user
 
 endif # } PDIR
@@ -35,10 +35,10 @@ LDDIR = $(SDK_DIR)/ld
 
 CCFLAGS += -Os
 
-TARGET_LDFLAGS =		        \
-	-nostdlib		            \
-	-Wl,-EL                     \
-	--longcalls                 \
+TARGET_LDFLAGS =           \
+	-nostdlib                \
+	-Wl,-EL                  \
+	--longcalls              \
 	--text-section-literals
 
 ifeq ($(FLAVOR),debug)
@@ -49,43 +49,43 @@ ifeq ($(FLAVOR),release)
     TARGET_LDFLAGS += -g -O0
 endif
 
-COMPONENTS_eagle.app.v6 =   \
-	espbot/libespbot.a      \
-	app/libapp.a            \
-	driver/libdriver.a      \
-	spiffs/libspiffs.a      \
+COMPONENTS_eagle.app.v6 =    \
+	espbot/libespbot.a         \
+	app/libapp.a               \
+	driver/libdriver.a         \
+	spiffs/libspiffs.a         \
 	user/libuser.a
 
-LINKFLAGS_eagle.app.v6 =       \
+LINKFLAGS_eagle.app.v6 =     \
 	-L../lib                   \
-	-nostdlib	               \
-    -T$(LD_FILE)               \
-	-Wl,--no-check-sections	   \
-	-Wl,--gc-sections	       \
-    -u call_user_start	       \
-	-Wl,-static				   \
-	-Wl,--start-group		   \
-	-lc					       \
-	-lgcc					   \
-	-lhal					   \
-	-lphy	                   \
-	-lpp	                   \
-	-lnet80211	               \
-	-llwip	                   \
-	-lwpa	                   \
-	-lcrypto	               \
-	-lmain	                   \
+	-nostdlib                  \
+  -T$(LD_FILE)               \
+	-Wl,--no-check-sections    \
+	-Wl,--gc-sections          \
+  -u call_user_start         \
+	-Wl,-static                \
+	-Wl,--start-group          \
+	-lc                        \
+	-lgcc                      \
+	-lhal                      \
+	-lphy                      \
+	-lpp                       \
+	-lnet80211                 \
+	-llwip                     \
+	-lwpa                      \
+	-lcrypto                   \
+	-lmain                     \
 	-lupgrade                  \
-	-lpwm	                   \
-	-llibrary	                   \
+	-lpwm                      \
+	-ldrivers                  \
 	$(DEP_LIBS_eagle.app.v6)   \
 	-Wl,--end-group
-#	-ljson	                   \
-#	-lssl	                   \
+#	-ljson                     \
+#	-lssl                      \
 #	-lsmartconfig              \
 
-DEPENDS_eagle.app.v6 =                         \
-                $(LD_FILE)                     \
+DEPENDS_eagle.app.v6 =                          \
+                $(LD_FILE)                      \
                 $(LDDIR)/eagle.rom.addr.v6.ld
 
 #############################################################
@@ -96,7 +96,7 @@ DEPENDS_eagle.app.v6 =                         \
 #   for a subtree within the makefile rooted therein
 #
 
-#UNIVERSAL_TARGET_DEFINES =		\
+#UNIVERSAL_TARGET_DEFINES =
 
 # Other potential configuration flags include:
 #	-DTXRX_TXBUF_DEBUG
@@ -104,12 +104,12 @@ DEPENDS_eagle.app.v6 =                         \
 #	-DWLAN_CONFIG_CCX
 CONFIGURATION_DEFINES =	-DICACHE_FLASH
 
-DEFINES +=				\
-	$(UNIVERSAL_TARGET_DEFINES)	\
+DEFINES +=                       \
+	$(UNIVERSAL_TARGET_DEFINES)    \
 	$(CONFIGURATION_DEFINES)
 
-DDEFINES +=				\
-	$(UNIVERSAL_TARGET_DEFINES)	\
+DDEFINES +=                      \
+	$(UNIVERSAL_TARGET_DEFINES)    \
 	$(CONFIGURATION_DEFINES)
 
 
