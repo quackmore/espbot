@@ -2,7 +2,7 @@ openapi: 3.0.0
 
 info:
   title: ESPBOT APIs
-  version: 2.2.0
+  version: 2.3.0
   description: >
     These APIs are for reading, setting and controlling an ESPBOT based APP. 
 
